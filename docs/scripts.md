@@ -540,6 +540,68 @@ prints `test -f <path> -> no`, so a session where delivery never happened is
 distinguishable from one where the check ran and found nothing wrong. Every
 session carries the hook, whatever it has attached.
 
+## scripts/attribution-guard.sh
+
+Blocks a pull request body carrying a Claude Code attribution line. Run by the
+`PreToolUse` hook `config/settings.json` registers, which passes the tool call
+to it on stdin as JSON.
+
+| `tool_name` | What is scanned |
+| --- | --- |
+| `Bash` | The command, and every file it passes as a body, where the command runs `gh pr create`, `gh pr edit`, or `gh api` against an endpoint carrying `/pulls`. Any other command is left alone. |
+| Anything else | Every string in `tool_input`, at any depth. |
+
+A body file is taken from four token forms: `--body-file <path>`,
+`--body-file=<path>`, `-F <name>=@<path>` for any field name, and
+`body=@<path>` after any flag spelling. A field named anything but `body` is
+recognised only after `-F`. One run of surrounding quotes is stripped from the
+path. A path that is not a readable regular file is skipped. The first mebibyte
+of the file is scanned.
+
+The match is case-insensitive, against `Generated (with|by) \[?Claude Code` and
+`claude.ai/code/session_`.
+
+| Outcome | Exit | Output |
+| --- | --- | --- |
+| A line matched | 2 | The matched line and the instruction to remove it, on stderr. |
+| Nothing matched | 0 | None. |
+| Input that is not a JSON object, carries no `tool_name`, or arrives with no `jq` on `PATH` | 0 | None. |
+
+Scoping the `Bash` branch to pull request operations keeps documentation
+quoting the footer writable. A `grep` for the footer text is not a pull request
+operation, and is not scanned.
+
+A matched line goes to stderr through the same control-byte replacement
+`scripts/verify.sh` uses, so a body carrying ESC or CR cannot rewrite the line
+an operator reads. The line printed is a line of the body or of a body file, so
+a body file the command names by mistake can put one of its lines in front of
+the session.
+
+These paths reach a pull request body without being scanned. Each is accepted,
+not handled.
+
+| Path | Why it is missed |
+| --- | --- |
+| `--body "$(cat notes.md)"`, a heredoc, or any other shell substitution | The hook receives the command before the shell expands it, so the body text is not in what it reads. |
+| `curl`, `wget` or a script posting to `/repos/<owner>/<repo>/pulls` | Neither `gh pr` nor `gh api` appears in the command, so the command is not classified as a pull request operation. |
+| `gh api graphql` mutating a pull request | The endpoint is `/graphql`, and the classifier requires `/pulls`. |
+| A body-file path carrying a space | The path is read up to the first space, and the truncated path is then skipped as unreadable. |
+| A body file past its first mebibyte | Only the first mebibyte is read. |
+| A `--body-file` flag and its path on different lines of a continued command | Each token form is matched within one line. |
+
+Nothing is printed when the guard is inert — `jq` absent, or the script absent
+from the path the hook names — so a session cannot tell an inert guard from one
+that found nothing. `scripts/verify.sh` is what separates them.
+
+`scripts/verify.sh` runs the live `PreToolUse` command against a sample
+`gh pr create` body carrying the footer, and expects exit 2 with the guard's
+own `attribution-guard: matched line ->` marker on stderr. The exit status
+alone does not distinguish a guard that matched from a `PreToolUse` command
+whose shell syntax is broken, `bash -c` exiting 2 for both. The assertion runs
+whatever command the live `settings.json` registers, so it trusts that file as
+much as the session running it already does. It tests the delivered hook, not
+this file, so it fails in a session whose snapshot predates the hook.
+
 ## config/plugins.tsv
 
 `README.md` carries the format.
