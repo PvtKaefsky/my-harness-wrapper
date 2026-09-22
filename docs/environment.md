@@ -80,8 +80,9 @@ The hook reads `stop_hook_active` first, so it blocks a stop and passes the next
 consecutive one. A hold therefore costs one wake-up, and the hook does not block
 two consecutive stops. Each re-armed wait opens a fresh cycle of its own.
 
-In a session that builds the snapshot, the harness writes the file during
-session start. Whether a restored session rewrites it is unchecked.
+The harness writes the file during session start, in a session that builds the
+snapshot and in one that restores it. In the one restoring session observed,
+under "Snapshot caching", its mtime was 17:53:14, after boot.
 
 ## Delivery
 
@@ -97,6 +98,11 @@ bootstrap and is named in the log. The script always ends `exit 0`.
 
 `scripts/bootstrap.sh` runs from `/opt/my-harness-wrapper`, as root, and is the
 only step that writes `/root/.claude`.
+
+`scripts/bootstrap.sh` copies the payload and merges the settings from the clone
+of the default branch made at build time. A merged change therefore reaches the
+next build with no paste. No operator action triggers that build. The pasted
+copy supplies the clone URL and the version marker.
 
 ## Waiting for a reviewer
 
@@ -174,6 +180,22 @@ Later sessions restore that snapshot and skip it.
 The snapshot rebuilds when the init script text changes, when allowed hosts
 change, or after roughly seven days. Only the first is under an operator's
 control.
+
+One session has been observed restoring a snapshot. Its boot time was
+17:53:09 and its `/home/user/bootstrap.log` mtime 17:42:18, both on 2026-09-22.
+
+A restore does not rewrite `/root/.claude/settings.json`. In that session the
+file's mtime and ctime were both 17:42:12, before boot. A write after boot sets
+ctime to the time of the write, whatever mtime it leaves, so a rewrite that
+preserved the mtime would still show a ctime after boot. The restore itself
+keeps build-time ctimes: `/home/user/bootstrap.log` read 17:42:18 for both.
+Neither time separates an unwritten file from an image altered below the
+filesystem before boot.
+
+More than one snapshot exists at a time. A session with a different single
+repository attached built a snapshot at 17:47:23, its `bootstrap.log` mtime,
+between the 17:42 build and that restoring session's boot. The restoring session
+restored the 17:42 build, not the 17:47 one.
 
 The clone is part of the snapshot rather than re-made per session. Its
 `origin/*` refs are the build's, plus whatever the session itself pushed, so
@@ -254,11 +276,19 @@ The harness injects its own attribution reminder. `sessionUrl: false` removes
 the `Claude-Session` line from it. `coAuthoredBy: false` removed neither the
 `Co-Authored-By` line nor the pull request footer, and `config/settings.json`
 no longer carries that key: it sets `attribution.commit` and `attribution.pr`
-to the empty string instead. Whether those two values remove the two lines is
-unchecked, no session having run under them. The payload's no-attribution rule
-is what has kept a line the reminder asks for out of a commit.
+to the empty string instead. The payload's no-attribution rule is what has kept
+a line the reminder asks for out of a commit.
 `scripts/verify.sh` checks that each setting is in the live file, not that it
 takes effect.
+
+In the first session run with `attribution.commit` and `attribution.pr` as empty
+strings and `sessionUrl` as `false`, no attribution reminder reached context. No
+system reminder carried a `Co-Authored-By` line, a `Claude-Session` line or a
+pull request footer. The Bash tool's description still directs commit messages
+and pull request bodies to end with the attribution lines a system reminder
+gives, "when one is present". That session ran CLI 2.1.280. One session does not
+separate the two keys taking effect from a CLI version that sends no reminder at
+all.
 
 A pull request description can carry a footer the tool call did not send.
 Pull request #1 carried, below the body `mcp__github__create_pull_request` was
@@ -272,10 +302,11 @@ every create adds the footer nor that no edit adds it is established.
 A `PreToolUse` hook sees the tool call, so `scripts/attribution-guard.sh`
 cannot see a footer added after it. That edit is what removed it here.
 
-The live `attribution` object in the session that created that pull request
-held `sessionUrl: false`, which removes the `Claude-Session` trailer from a
-commit and not the session link from this footer. It held no `commit` or `pr`
-key, so whether those suppress the footer is unchecked.
+Pull request #1's footer carried a session link although
+`attribution.sessionUrl` was `false` in the live settings of the session that
+created it. That setting removes the `Claude-Session` trailer from a commit, and
+did not remove the session link from that footer. Those live settings held no
+`commit` or `pr` key.
 
 The harness's task line forbids pushing to a branch other than the one it
 names. The branch rule's standing-permission sentence in `config/CLAUDE.md`
@@ -322,14 +353,14 @@ that records observations records the sandbox.
 
 ## Unresolved
 
-* Whether a snapshot-restored session rewrites `/root/.claude/settings.json`.
-* Whether a snapshot-restored session rewrites `/root/.claude/stop-hook-git-check.sh`.
 * Which component rewrites `/root/.gitconfig`, and what triggers it.
 * What triggers a rebuild. A session's check reported
   `log mtime >= boot time -> yes, this session built the snapshot`. That line
   says a build ran in that container. It does not say which of the three
   triggers caused it, and it does not separate a build from any other write to
-  `/home/user/bootstrap.log` after boot.
+  `/home/user/bootstrap.log` after boot. A build at 17:47:23 in a session with a
+  different single repository attached left the 17:42 build as the snapshot a
+  later session with this repository attached restored.
 * Whether a `claude plugin install` of a later CLI version, or a delivered key
   of a different shape, preserves what this one did. The build settled the case
   it ran: bootstrap wrote `config/settings.json` whole before the CLI
