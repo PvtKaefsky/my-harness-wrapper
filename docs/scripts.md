@@ -663,6 +663,15 @@ live `settings.json` registers, so it trusts that file as much as the session
 running it already does. It tests the delivered hook, not this file, so it
 fails in a session whose snapshot predates the hook.
 
+A second assertion does the same for the first live `PostToolUse` command whose
+text names `attribution-guard.sh`. It feeds that command a
+`mcp__github__create_pull_request` response whose `body` carries the footer, and
+expects exit 2 with `attribution-guard: matched line in the response body ->` on
+stderr, which the guard prints only on a footer match. The
+selection, the broken-shell ambiguity and the trust in the live file are as
+above. A guard that predates the `PostToolUse` path scans the clean
+`tool_input` instead, exits 0, and fails the assertion.
+
 ## scripts/test-attribution-guard.sh
 
 Runs `scripts/attribution-guard.sh` from its own directory against a fixed set
