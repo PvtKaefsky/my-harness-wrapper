@@ -606,14 +606,19 @@ Nothing is printed when the guard is inert — `jq` absent, or the script absent
 from the path the hook names — so a session cannot tell an inert guard from one
 that found nothing. `scripts/verify.sh` is what separates them.
 
-`scripts/verify.sh` runs the live `PreToolUse` command against a sample
-`gh pr create` body carrying the footer, and expects exit 2 with the guard's
-own `attribution-guard: matched line ->` marker on stderr. The exit status
-alone does not distinguish a guard that matched from a `PreToolUse` command
-whose shell syntax is broken, `bash -c` exiting 2 for both. The assertion runs
-whatever command the live `settings.json` registers, so it trusts that file as
-much as the session running it already does. It tests the delivered hook, not
-this file, so it fails in a session whose snapshot predates the hook.
+`scripts/verify.sh` runs the first live `PreToolUse` command whose text names
+`attribution-guard.sh` against a sample `gh pr create` body carrying the
+footer, and expects exit 2 with the guard's own
+`attribution-guard: matched line ->` marker on stderr. Where no `PreToolUse`
+command names it, the check fails with a line saying so. The selection reads
+the command's text, not what it runs: a command naming the script without
+running it is selected and fails the exit check, and a command running the
+guard under another name is not selected. The exit status alone does not
+distinguish a guard that matched from a `PreToolUse` command whose shell syntax
+is broken, `bash -c` exiting 2 for both. The assertion runs the command the
+live `settings.json` registers, so it trusts that file as much as the session
+running it already does. It tests the delivered hook, not this file, so it
+fails in a session whose snapshot predates the hook.
 
 ## scripts/test-attribution-guard.sh
 
