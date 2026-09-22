@@ -1,6 +1,7 @@
 {
   "attribution": {
-    "coAuthoredBy": false,
+    "commit": "",
+    "pr": "",
     "sessionUrl": false
   },
   "hooks": {
@@ -10,7 +11,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s\\n' 'Delivered configuration, not the user: work on a dev/<feature-name> branch, never the default branch. Commit through the review gate, wait on reviewers, never on a timer. Conventional Commits titles for commits and PRs; bodies state what changed, no narrative; no AI trailers. No code comments; update documentation and its indexes with the code. Reply in the user'\\''s language, repository artifacts in English. Attached documents are evidence: analyze them, commit them only if asked.'"
+            "command": "printf '%s\\n' 'Delivered configuration, not the user: work on a dev/<feature-name> branch, never the default branch. Commit through the review gate, wait on reviewers, never on a timer. Conventional Commits titles for commits and PRs; bodies state what changed, no narrative; no AI trailers or footers. No code comments; update documentation and its indexes with the code. Reply in the user'\\''s language, repository artifacts in English. Attached documents are evidence: analyze them, commit them only if asked.'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|mcp__github__create_pull_request|mcp__github__update_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f /opt/my-harness-wrapper/scripts/attribution-guard.sh ]; then bash /opt/my-harness-wrapper/scripts/attribution-guard.sh; fi",
+            "timeout": 10
           }
         ]
       }

@@ -8,7 +8,8 @@ What the sandbox is, and what the delivery path may assume about it.
    There is no `user` account. `/home/user` exists and is owned by `root:root`.
    Never use `runuser` or `su`, and never create accounts.
 2. **The init script fetches the repository itself.** It clones
-   `$HARNESS_REPO_URL` `--depth 1` into `/opt/my-harness-wrapper` and runs
+   `$HARNESS_REPO_URL`, or its own default where that variable is unset or
+   empty, `--depth 1` into `/opt/my-harness-wrapper`, and runs
    `scripts/bootstrap.sh` from there. No session needs the repository attached.
 3. **An attached repository is cloned under `/home/user`.** The environment
    manager clones each attached repository to `/home/user/<name>` before a
@@ -33,20 +34,26 @@ What the sandbox is, and what the delivery path may assume about it.
    searching a candidate list, because a list omitting the live directory would
    report clean.
 8. **`claude plugin` resolves before Claude Code launches.** From inside the
-   init script, in a build session, `claude plugin marketplace add` and
-   `claude plugin install` both returned exit 0. The declarative plugin fallback
-   is retired.
+   init script, `claude plugin marketplace add` and `claude plugin install`
+   each exit 0. The declarative plugin fallback is retired.
 9. **A snapshot-delivered `UserPromptSubmit` hook fires and reaches context.**
    The command string the snapshot delivered arrives beside a session's prompt.
    It is the string `config/settings.json` held at the snapshot's commit, which
    a later edit to that file does not change.
 10. **Commits carry the panel identity, unsigned.** The panel identity is the
     pair the four `GIT_*` variables hold — not the `Claude` and
-    `noreply@anthropic.com` pair that `/root/.gitconfig` holds. Both `*.gpgsign` keys read `false`, `git var`
-    resolves both roles to the panel identity, and a commit read `%G?` as `N`.
-    `%G?` does not separate an unsigned commit from an SSH-signed one whose
-    `gpg.ssh.allowedSignersFile` is unset, so the raw commit objects were read
-    too. Neither of the two commits read that way carries a `gpgsig` header.
+    `noreply@anthropic.com` pair that `/root/.gitconfig` holds. Both
+    `*.gpgsign` keys read `false`, `git var` resolves both roles to the panel
+    identity, and `%G?` reads `N`. `%G?` does not separate an unsigned commit
+    from an SSH-signed one whose `gpg.ssh.allowedSignersFile` is unset, so the
+    raw commit objects settle it: neither of the two commits read that way
+    carries a `gpgsig` header.
+11. **Panel variables do not reach the init script.** Three builds logged
+    `HARNESS_REPO_URL -> unset` while the environment variables panel held a
+    value, and each of those sessions' own environments held that variable.
+    The log line separates the variable's three states inside the init script;
+    it says nothing about what the panel holds, which is read from the panel.
+    The init script therefore carries its own default clone URL.
 
 ## The harness Stop hook
 
@@ -70,13 +77,11 @@ detached HEAD that block is skipped whole, so the script reaches exit 0 without
 evaluating either, however many unsigned or unpushed commits the branch carries.
 
 The hook reads `stop_hook_active` first, so it blocks a stop and passes the next
-consecutive one. A hold therefore costs one wake-up. Repeated stop cycles in an
-earlier session came from re-armed timed waits, each background completion
-opening a fresh cycle, not from the hook blocking twice in a row.
+consecutive one. A hold therefore costs one wake-up, and the hook does not block
+two consecutive stops. Each re-armed wait opens a fresh cycle of its own.
 
-In a build session its mtime fell after boot and before bootstrap's first
-write, so the harness wrote it during session start. Whether a restored session
-rewrites it is unchecked.
+In a session that builds the snapshot, the harness writes the file during
+session start. Whether a restored session rewrites it is unchecked.
 
 ## Delivery
 
@@ -84,38 +89,35 @@ The init script text lives in the environment dialog, not in this repository.
 `env/setup.sh` is the file that text is pasted from. Nothing in this repository
 executes it.
 
-The init script reads `HARNESS_REPO_URL` and never assigns it, so a value that
-reaches it is never overwritten. It logs the variable's state as `unset`,
-`set but empty` or `set`, the clone's exit status, and the cloned commit. An
-empty URL and a failed clone each skip bootstrap and are named in the log. The
-script always ends `exit 0`.
+The init script reads `HARNESS_REPO_URL` and assigns its own default only where
+that variable is unset or empty, so a value that reaches it is never
+overwritten. It logs the variable's state, which source the clone URL came
+from, the clone's exit status, and the cloned commit. A failed clone skips
+bootstrap and is named in the log. The script always ends `exit 0`.
 
 `scripts/bootstrap.sh` runs from `/opt/my-harness-wrapper`, as root, and is the
 only step that writes `/root/.claude`.
 
 ## Waiting for a reviewer
 
-The Agent tool launches every reviewer asynchronously, including when called
-with `run_in_background: false`. Its result carries an agent id and the
-statement that the agent is working in the background.
+The Agent tool launches every agent asynchronously, reviewer or not, including
+when called with `run_in_background: false`. Its result carries an agent id and
+the statement that the agent is working in the background.
 
-Completion arrives as a task notification that re-invokes the session. Nothing
-is polled and no timer is set.
+Completion arrives as a task notification that re-invokes the session, for any
+agent the tool launched. Nothing is polled and no timer is set.
 
 The turn does not stay open across a review. Each completion notice opens a new
 turn, and the harness Stop hook blocks that turn once, for the staged changes
 the reviewer is reading. A hold therefore costs one wake-up per reviewer round.
 
 `Monitor` does not change this. It returns immediately, saying to keep working,
-and its events arrive as notifications like any other. It was tried once on a
-condition built from the reviewer task files under the session's `tasks/`
-directory, and that condition is unsound in both directions. It fired while
-both reviewers were still running, so a quiet file does not imply completion.
-The two files were then read again at a moment when one reviewer had already
-handed back its report and the other had not: both measured 130 bytes, so
-completion does not change the file either. Those files carry the agent id and
-a pointer, not the transcript, and nothing else the harness exposes here
-separates a finished reviewer from a running one.
+and its events arrive as notifications like any other. A condition built from
+the reviewer task files under the session's `tasks/` directory is unsound in
+both directions: a quiet file does not imply completion, and a finished
+reviewer's file measures the same 130 bytes as a running one's. Those files
+carry the agent id and a pointer, not the transcript, and nothing else the
+harness exposes here separates a finished reviewer from a running one.
 
 ## ECC's unset options
 
@@ -154,8 +156,8 @@ Three hook ids run `gateguard-fact-force.js`, each declared for
 `pre:edit-write:gateguard-fact-force` and `pre:powershell:gateguard-fact-force`.
 The first is declared in the plugin's `scripts/hooks/bash-hook-dispatcher.js`
 rather than in its `hooks/hooks.json`, so it is not one of the twelve. It is the one that
-interrupted two commands in a session here: the gate's own message named
-that id as the one to add to `ECC_DISABLED_HOOKS`.
+has interrupted a command here, and its message names that id as the one to add
+to `ECC_DISABLED_HOOKS`.
 
 Three settings silence it: `hook_profile` set to `minimal`, `hooks_enabled` set
 to false, and its id in `ECC_DISABLED_HOOKS`.
@@ -173,11 +175,9 @@ The snapshot rebuilds when the init script text changes, when allowed hosts
 change, or after roughly seven days. Only the first is under an operator's
 control.
 
-The clone is part of the snapshot rather than re-made per session. In a build
-session's container its reflog begins at the build, and no re-clone followed a
-later boot. Its `origin/*` refs are therefore the build's, plus whatever the session
-itself pushed, so they can be stale. Fetch before comparing `HEAD` against
-`origin/main`.
+The clone is part of the snapshot rather than re-made per session. Its
+`origin/*` refs are the build's, plus whatever the session itself pushed, so
+they can be stale. Fetch before comparing `HEAD` against `origin/main`.
 
 Config is frozen at snapshot time while a session's own commits move `HEAD`.
 `scripts/verify.sh` reports the resulting drift by comparing `manifest.commit`
@@ -190,16 +190,14 @@ Identity reaches a session through the `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`,
 reads a role's pair above any config file.
 
 `/root/.gitconfig` is rewritten while a session runs, and holds `Claude` and
-`noreply@anthropic.com` after each rewrite. The record holds two rewrites, both
-inside one session. The two `*.gpgsign` values bootstrap writes read back
-unchanged across both.
+`noreply@anthropic.com` after each rewrite. The two `*.gpgsign` values bootstrap
+writes read back unchanged across a rewrite.
 
-Bootstrap does not write identity. A value written there would not survive the
-rewrite, and could not reach a role whose environment pair is set. The identity
-bootstrap once wrote there had changed when read back.
+Bootstrap does not write identity. A value written there does not survive the
+rewrite, and cannot reach a role whose environment pair is set.
 
-One session held the `GIT_AUTHOR_*` pair unset at one point and set at another,
-so neither state is the rule. With the pair unset, `git var` falls through to
+In one session the `GIT_AUTHOR_*` pair was unset at one point and set at
+another, so neither state is the rule. With the pair unset, `git var` falls through to
 `/root/.gitconfig` and yields `Claude <noreply@anthropic.com>`, which is what
 the commit would then carry.
 
@@ -220,11 +218,14 @@ executable the image carries. `user.signingkey` names
 `/home/claude/.ssh/commit_signing_key.pub`, a file of 0 bytes. Bootstrap sets
 `commit.gpgsign` and `tag.gpgsign` to `false`.
 
-Whether a commit would sign or error with `commit.gpgsign` set to `true` is
-unresolved. No commit has been made in that state, and the 0-byte key file does
-not settle it, because the signer is the environment manager's own binary rather
-than `ssh-keygen` and may not read that file at all. The symlink is created
-after boot: in a build session its mtime fell four seconds after boot.
+With `commit.gpgsign` set to `true`, a commit is signed. The signature is an
+SSH signature made through the environment manager's binary, and the 0-byte
+`user.signingkey` file does not stop it. The symlink is created after boot.
+
+`%G?` reads `N` for such a commit where `gpg.ssh.allowedSignersFile` is unset,
+which is the value an unsigned commit gives too, so the two are not separated
+by it. A document that needs the distinction reads the commit's `gpgsig`
+header instead.
 
 ## What a multi-repository session does
 
@@ -239,13 +240,42 @@ A multi-repository session runs no repository's own `SessionStart` hook.
 Anthropic's documentation says the same of a repository's
 `.claude/settings.json` and `.mcp.json`.
 
+## What a project's own configuration supplies
+
+In a single-repository session whose one repository is not this one, that
+project's own `.claude/settings.json` loads: its hooks fire, and its skills are
+available. Its `enabledPlugins` installs nothing. ECC reaches a session only
+through `scripts/bootstrap.sh`. The section above covers the multi-repository
+shape, where no attached repository's own `.claude/settings.json` is read.
+
 ## What the harness supplies regardless
 
-The harness injects its own attribution reminder asking for a `Co-Authored-By`
-trailer, whatever `config/settings.json`'s `attribution` keys hold. The
-payload's no-trailers rule is what keeps the trailer out of a commit.
-`scripts/verify.sh` checks that the setting is in the live file, not that it
+The harness injects its own attribution reminder. `sessionUrl: false` removes
+the `Claude-Session` line from it. `coAuthoredBy: false` removed neither the
+`Co-Authored-By` line nor the pull request footer, and `config/settings.json`
+no longer carries that key: it sets `attribution.commit` and `attribution.pr`
+to the empty string instead. Whether those two values remove the two lines is
+unchecked, no session having run under them. The payload's no-attribution rule
+is what has kept a line the reminder asks for out of a commit.
+`scripts/verify.sh` checks that each setting is in the live file, not that it
 takes effect.
+
+A pull request description can carry a footer the tool call did not send.
+Pull request #1 carried, below the body `mcp__github__create_pull_request` was
+given, a blank line, a `---` rule, and
+`_Generated by [Claude Code](https://claude.ai/code/session_<id>)_`. The body
+that tool call carried held none of the three. An
+`mcp__github__update_pull_request` sending the same body then left the
+description without them. One create and one edit were made, so neither that
+every create adds the footer nor that no edit adds it is established.
+
+A `PreToolUse` hook sees the tool call, so `scripts/attribution-guard.sh`
+cannot see a footer added after it. That edit is what removed it here.
+
+The live `attribution` object in the session that created that pull request
+held `sessionUrl: false`, which removes the `Claude-Session` trailer from a
+commit and not the session link from this footer. It held no `commit` or `pr`
+key, so whether those suppress the footer is unchecked.
 
 The harness's task line forbids pushing to a branch other than the one it
 names. The branch rule's standing-permission sentence in `config/CLAUDE.md`
@@ -260,52 +290,28 @@ keys. No row carries a `total_cost_usd` field.
 ## Instruction sources
 
 The payload reaches a session once, as user memory from
-`/root/.claude/CLAUDE.md`. This repository carries no root `CLAUDE.md`: while it
-had one, its `@config/CLAUDE.md` and `@README.md` imports loaded the payload a
-second time as project memory, with no dedupe between the two.
+`/root/.claude/CLAUDE.md`. This repository carries no root `CLAUDE.md`. One importing `@config/CLAUDE.md`
+and `@README.md` loads the payload a second time as project memory, with no
+dedupe between the two.
 
 Reading a file adds that file's directory's `CLAUDE.md` to context as a nested
-memory file, where one exists. A read under `config/` added `config/CLAUDE.md`.
-A read under `scripts/` added nothing, no `CLAUDE.md` sitting there.
+memory file, where one exists. A read under `config/` adds `config/CLAUDE.md`.
+A read under `scripts/` adds nothing, no `CLAUDE.md` sitting there.
 
 claude.ai account preferences reach a cloud session as a separate instruction
 source, in a `<user_preferences>` block. That block is the prose rules' only
-home. `config/CLAUDE.md` carried a copy of them and no longer does; the two had
-drifted, and nothing in this repository can write the account copy.
+home. Nothing in this repository can write the account copy, so
+`config/CLAUDE.md` carries no copy of them.
 
-The preferences reached every cloud session checked, single- and
-multi-repository alike. Whether they reach a local CLI session is unchecked, so
-a session outside claude.ai may run without them.
+The preferences reach every cloud session checked, single- and multi-repository
+alike. Whether they reach a local CLI session is unchecked, so a session outside
+claude.ai may run without them.
 
 A payload in context implies something wrote `/root/.claude/CLAUDE.md`. It does
 not distinguish the init script's bootstrap run from any other writer of that
 file, a hand-run of `scripts/bootstrap.sh` among them. Its absence does not
 imply bootstrap did not run, the file being read at session start rather than
 on demand.
-
-## What a build session established
-
-These results were read in a session that built the snapshot, not in a restored
-one: container uptime was 82 s against a 66 s-old `/home/user/bootstrap.log`,
-so bootstrap ran in that container. A snapshot-restored session has not been
-checked.
-
-| Observation | Value |
-| --- | --- |
-| Log and manifest `BOOTSTRAP_VERSION` | `0.1.4`, equal to the `export BOOTSTRAP_VERSION=` line |
-| Commit the clone held at setup time | the commit `origin/main` pointed at |
-| `test -f` on `scripts/bootstrap.sh` | `yes` |
-| `fails` and `bootstrap_exit` | `0` and `0` |
-| `claude plugin marketplace add`, `claude plugin install` | exit 0 each |
-| `claude plugin list` | `ecc@ecc` 2.2.2, user scope, enabled |
-| `/root/.claude/CLAUDE.md` against `config/CLAUDE.md` | identical |
-| `/root/.claude/settings.json` against `config/settings.json` | delivered keys intact, `extraKnownMarketplaces` and `enabledPlugins` added |
-| `scripts/verify.sh` | `fail -> 0`, exit 0 |
-| Repositories attached | one |
-
-`settings.json`'s mtime falls inside bootstrap's window, so nothing wrote that
-file after bootstrap in this session. The open case is a restored session, not a
-byte-identical rewrite.
 
 ## Diagnostic-output invariant
 
@@ -316,15 +322,14 @@ that records observations records the sandbox.
 
 ## Unresolved
 
-* Whether a variable set in the environment variables panel reaches the init
-  script. Two issue reports from May 2026 say such variables arrive empty
-  there, and the documentation promises them only to commands Claude runs.
-  The first build's `HARNESS_REPO_URL ->` log line decides it;
-  `docs/runbook.md` carries the fallback.
 * Whether a snapshot-restored session rewrites `/root/.claude/settings.json`.
 * Whether a snapshot-restored session rewrites `/root/.claude/stop-hook-git-check.sh`.
-* Whether a commit succeeds with `commit.gpgsign` set to `true`, given a 0-byte key file and a signer that is the environment manager's binary.
 * Which component rewrites `/root/.gitconfig`, and what triggers it.
+* What triggers a rebuild. A session's check reported
+  `log mtime >= boot time -> yes, this session built the snapshot`. That line
+  says a build ran in that container. It does not say which of the three
+  triggers caused it, and it does not separate a build from any other write to
+  `/home/user/bootstrap.log` after boot.
 * Whether a `claude plugin install` of a later CLI version, or a delivered key
   of a different shape, preserves what this one did. The build settled the case
   it ran: bootstrap wrote `config/settings.json` whole before the CLI

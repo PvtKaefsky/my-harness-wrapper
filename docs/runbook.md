@@ -10,9 +10,9 @@ In this order:
    Environments.
 3. Start any session and read `/home/user/bootstrap.log`.
 
-The environment variables panel carries `HARNESS_REPO_URL` and the four
-identity variables `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`
-and `GIT_COMMITTER_EMAIL`. No repository needs attaching.
+The environment variables panel carries the four identity variables
+`GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
+`GIT_COMMITTER_EMAIL`. No repository needs attaching.
 
 The facts that fix that order:
 
@@ -33,12 +33,11 @@ the repository's. That failure is the signal to paste again.
 This repository is attached only to record or implement an environment change
 the user asked for.
 
-### If `HARNESS_REPO_URL` does not reach the setup script
+### Cloning a different repository
 
-The log's `HARNESS_REPO_URL ->` line decides it. Where that line reads `unset`
-or `set but empty` while the panel holds a value, give the pasted copy of
-`env/setup.sh` a second line reading `export HARNESS_REPO_URL=<url>`. The
-committed file stays without it.
+The init script assigns its own default clone URL where `HARNESS_REPO_URL` is
+unset or empty. To clone a different repository, edit that default URL in the
+pasted copy of `env/setup.sh`.
 
 ## The version line
 
@@ -93,6 +92,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL settings....: actual no expectation could be read` | That key could not be read from `config/settings.json`. | Fix the tree. This is a repository fault, not a session fault. |
 | `FAIL settings....: ..., <state>` | The state ends the line and names the cause: `does not carry`, `absent from the live file`, `absent from the delivered file`, `live top level is ...`, `delivered top level is ...`, `live file holds N JSON documents`, `delivered file holds N JSON documents`, or `not determined` where `jq` could not run. | Read the state. A document count other than one, or a non-object top level, is a corrupt file rather than a delivery that did not happen. |
 | `FAIL settings....: expected ... present in ...` | `config/settings.json` does not carry that key, or its top level is not an object. The `actual` value names which. | Fix the tree. This is a repository fault, not a session fault. |
+| `FAIL PreToolUse attribution guard` | The live `PreToolUse` command did not exit 2 on a `gh pr create` body carrying the Claude Code footer. The state ends the line: `exit=N` for a command that ran, `exit=2 without <marker>` for one that exited 2 without the guard's own stderr marker, `no PreToolUse command in <path> (jq exit=N)`, or `sample input not built (jq exit=N)`. | Read the state. `no PreToolUse command` reads the same for a live `settings.json` that registers none and for one `jq` could not read; the `(jq exit=N)` suffix separates them, `0` for the first and non-zero for the second. On either, the snapshot predates the hook: re-paste `env/setup.sh` and rebuild. `exit=0` means the hook is registered and the guard is not at the path it names. `exit=2 without <marker>` means the registered command is broken shell, `bash -c` exiting 2 on a syntax error. |
 | `FAIL config/plugins.tsv` | No file at that path under the repository being checked. | Read the `test -f` line above it. The deployed copy is absent, incomplete, or `HARNESS_DIR` names another tree. |
 | `FAIL plugin: ... among the installed ids` | A plugin named in `config/plugins.tsv` is not among the ids `claude plugin list --json` reports. | Read the `claude plugin install ... -> exit=` line in `/home/user/bootstrap.log`, then re-run the install by hand for the current error. |
 | `FAIL plugin: ... expected an id list` | No id list could be read, so the plugin could not be tested. | Act on the `FAIL live config dir agreement` line above it. |

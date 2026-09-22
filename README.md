@@ -11,11 +11,12 @@ into a session's Claude config directory.
 1. The cloud environment runs the init script stored in its dialog. That text
    is a copy of `env/setup.sh`; the dialog holds the text, not a reference to
    this repository.
-2. The init script writes `/home/user/bootstrap.log`, reads the clone URL from
-   `HARNESS_REPO_URL`, and clones this repository `--depth 1` into
-   `/opt/my-harness-wrapper`.
-3. The init script runs `scripts/bootstrap.sh` from that clone. An empty URL
-   and a failed clone each skip that step and are named in the log.
+2. The init script writes `/home/user/bootstrap.log` and clones this repository
+   `--depth 1` into `/opt/my-harness-wrapper`. The clone URL comes from
+   `HARNESS_REPO_URL`, or from the script's own default where that variable is
+   unset or empty.
+3. The init script runs `scripts/bootstrap.sh` from that clone. A failed clone
+   skips that step and is named in the log.
 4. `scripts/bootstrap.sh` creates `/root/.claude`, symlinks `/home/user/.claude`
    to it where that path is absent, copies `config/CLAUDE.md` there, merges
    `config/settings.json` there, sets both `*.gpgsign` keys to `false`
@@ -40,6 +41,7 @@ Every later session restores that snapshot and skips it. A change under
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/session-check.sh` | Reports what a session starts with. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
+| `scripts/attribution-guard.sh` | Blocks a pull request body carrying a Claude Code attribution line. Run by the `PreToolUse` hook `config/settings.json` registers. |
 | `README.md` | This file. |
 | `docs/` | Documentation. |
 
@@ -59,8 +61,8 @@ the same way. `docs/scripts.md` carries where the two loops diverge.
 
 ### Deploy a change under `config/`
 
-Set `HARNESS_REPO_URL` and the four identity variables in the environment
-variables panel. Bump the `export BOOTSTRAP_VERSION=` line in `env/setup.sh`,
+Set the four identity variables in the environment variables panel. Bump the
+`export BOOTSTRAP_VERSION=` line in `env/setup.sh`,
 merge to `main`, then paste the file's contents into the environment dialog
 unchanged and start any session. Nothing needs attaching. The full order, and
 the facts that fix it, are in `docs/runbook.md`.
