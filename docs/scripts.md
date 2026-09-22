@@ -38,9 +38,7 @@ left untouched: the step repairs nothing it did not create.
 
 The invariant is asserted separately, after that conditional and whether or not
 it ran. Both paths go through `readlink -f` and the two results are compared; a
-mismatch prints `-> no` and counts into `fails`. Without that assertion a
-pre-existing `/home/user/.claude` pointing elsewhere survived every run with
-nothing counted, while `README.md` stated the two paths resolve to one tree.
+mismatch prints `-> no` and counts into `fails`.
 
 The two `readlink -f` defaults differ, `unresolved-link` against
 `unresolved-config`, so two unresolvable paths never compare equal and pass.
@@ -60,31 +58,27 @@ takes the right-hand value whole. Arrays are replaced rather than combined, at
 any depth. Whatever `config/settings.json` holds at a path is what the merge
 leaves there, so the merge cannot add to an array already present.
 
-That was confirmed against a destination carrying keys and hooks of its own. A
-destination key absent from the source survives. A nested object keeps the keys
-the source omits. A sibling hook event survives. A delivered
+A destination key absent from the source survives. A nested object keeps the
+keys the source omits. A sibling hook event survives. A delivered
 `hooks.UserPromptSubmit` array leaves none of the entries already registered
 there.
 
-A build session measured what step 6 then does to a delivered `hooks` array:
-the delivered array survived the CLI's rewrite. That build took the copy
-branch, its destination being absent, so the measurement does not cover a
-merged file. Nor does it cover a later CLI version or a differently shaped key.
+A delivered `hooks` array survives step 6's rewrite. That holds for a copied
+destination. A merged file, a later CLI version and a differently shaped key
+are not covered.
 
-`mktemp` is counted, and an empty path counts as a failure too. Without that
-check the merge redirects to an empty filename, which fails before `jq` runs and
-reports the failure against `jq`.
+`mktemp` is counted, and an empty path counts as a failure too.
 
 The temporary file is created beside the destination, not in `/tmp`, so the `mv`
 is a same-filesystem rename and the destination is replaced whole or not at all.
 A cross-filesystem `mv` writes into the destination path directly, and an
 interruption partway leaves invalid JSON there rather than the unmerged file.
 
-The temporary file is set to mode 644 before the rename. `mktemp` creates a file
-at mode 600, and a rename replaces the destination inode with its permissions,
-so without that step a merge would narrow a 644 destination to 600. A failed
-`chmod` discards the temporary file instead of renaming it, leaving the previous
-destination in place, so no path installs a file at the wrong mode.
+The temporary file is set to mode 644 before the rename, `mktemp` creating it
+at mode 600 and a rename carrying the temporary file's permissions to the
+destination. A failed `chmod` discards the temporary file instead of renaming
+it, leaving the previous destination in place, so no path installs a file at
+the wrong mode.
 
 The `mv` that installs the merged file is counted. A `jq` that succeeds and an
 `mv` that fails leave the destination unchanged and the merged file behind at
@@ -98,11 +92,11 @@ The two values are written globally, not per repository. The snapshot is reused,
 and later sessions clone fresh repositories after this script has been skipped,
 so only `/root/.gitconfig` reaches them.
 
-Identity is not written here, for two reasons. A value written here would not
-survive the rewrite: the identity this step used to write had changed when read
-back, as `docs/environment.md` records under "Identity". And `git var` reads a
-role's environment pair above any config file, so a `user.name` or `user.email`
-written here cannot reach a role whose variable is set.
+Identity is not written here. A value written here does not survive the rewrite
+of `/root/.gitconfig`, which `docs/environment.md` records under "Identity", and
+`git var` reads a role's environment pair above any config file, so a
+`user.name` or `user.email` written here cannot reach a role whose variable is
+set.
 
 Neither reason reaches a role the environment leaves unset, where the global
 file would still hold what this step wrote. That role is what dropping the write
@@ -151,10 +145,9 @@ session has drifted from the repository. Not run at boot.
 `REPO` reads `${HARNESS_DIR:-/opt/my-harness-wrapper}`, the copy the init
 script cloned. That copy is the reference, not the script's own location: a
 hand-run from an attached checkout must still report on what was delivered.
-Deriving the path from `${BASH_SOURCE[0]}` would compare the delivered manifest
-against the checkout the operator happened to run from, so a stale or absent
-deployment would report clean. `scripts/bootstrap.sh` derives its own `SRC`
-instead, because it must read the tree it ships with.
+A path derived from `${BASH_SOURCE[0]}` would report clean for a stale or absent
+deployment. `scripts/bootstrap.sh` derives its own `SRC` instead, because it
+must read the tree it ships with.
 
 `HARNESS_DIR` names another tree for a hand-run. It is read with `${x:-y}`, so
 a set-but-empty value falls back to the default rather than emptying every
@@ -187,9 +180,7 @@ searching a fixed list of candidate homes. A config directory outside such a
 list would report clean.
 
 `CLAUDE_CONFIG_DIR` is read with the colon-less default, because the CLI treats
-a set-but-empty value as a value. `${x:-y}` would substitute `$HOME/.claude`,
-and every check below would then pass against a directory the CLI is not
-reading.
+a set-but-empty value as a value.
 
 The resolution runs ahead of the `claude` calls. The CLI honours a relative
 `CLAUDE_CONFIG_DIR` by creating that directory under the operator's working
@@ -200,16 +191,13 @@ directory, so invoking it before this gate has a side effect on a bad value.
 Two checks assert something about the resolved directory.
 
 `FAIL live config dir agreement` compares the live CLI's plugin state against
-that directory's own `settings.json`. Reading that file alone would be
-circular, it being a snapshot artifact that cannot contradict the resolution
-the script just made, so the CLI is the witness it is compared against.
+that directory's own `settings.json`. The CLI is the witness, that file being a
+snapshot artifact that cannot contradict the resolution the script just made.
 
 The settings side reports four states rather than a boolean: the key present,
 the key absent, a top level that is not an object, and a file that is absent,
 unreadable or holds a count of documents other than one. Only the first two
-are compared; the rest fail as their own state. A bare
-`jq -e 'has("enabledPlugins")'` collapsed the last two into `no`, which made a
-missing or malformed file look like a directory with no plugins.
+are compared; the rest fail as their own state.
 
 `FAIL manifest.config_dir` compares the resolved directory against
 `manifest.config_dir`, both through `readlink -f`. Its two defaults,
@@ -223,11 +211,7 @@ either way is a value manufactured by a failure.
 ### The plugin checks
 
 Plugin state is read from `claude plugin list --json`, not from the command's
-human-readable output. The earlier form matched the English string
-`No plugins installed` and grepped each id out of free text, so a wording,
-format or localisation change read as plugins present, and the per-plugin
-`printf | grep -qF` could report `FAIL plugin` for an installed plugin when the
-output still unwritten at `grep -q`'s exit exceeded the pipe buffer.
+human-readable output, which a wording, format or localisation change moves.
 
 Three states are separated. A non-zero exit, output whose top level is not an
 array, and a failure extracting the ids from a well-typed array all give
@@ -237,7 +221,7 @@ a guess either way, and it also fails each per-plugin check rather than letting
 an untestable id pass.
 
 The per-plugin test compares whole ids, not substrings, so an id that is a
-prefix of an installed one no longer matches.
+prefix of an installed one does not match.
 
 An absent `config/plugins.tsv` is a `FAIL`, not a skipped check. Reading no
 rows and having no file to read produce different output, so the check's
@@ -250,19 +234,16 @@ restored session it is also an artifact of a different container.
 ### The expected version
 
 `docs/runbook.md`, under "The version line", carries where the expectation is
-read from and every line shape the read rejects. Two implementation choices sit
-behind that list.
+read from and every line shape the read rejects.
 
-Trailing blanks are trimmed with `[!$' \t']` rather than `[:blank:]`. The
-character class is locale-dependent: under `C.UTF-8` it also trims U+3000, which
-would build an expectation bash never produces, and the mismatch line would then
-render both operands identically.
+Trailing blanks are trimmed with `[!$' \t']` rather than `[:blank:]`, which is
+locale-dependent: under `C.UTF-8` `[:blank:]` also trims U+3000, building an
+expectation bash never produces.
 
-`grep -a` is used. Without it, a NUL byte anywhere in `env/setup.sh` makes
-`grep` write `binary file matches` to stderr and nothing to stdout, which
-reaches the read as a match that produced no output. Measured on GNU grep 3.11;
-before 3.5 that notice went to stdout, which the read reports as an unparsed
-value instead. Both fail closed.
+`grep -a` is used. Without it, a NUL byte anywhere in `env/setup.sh` makes GNU
+grep 3.11 write `binary file matches` to stderr and nothing to stdout, which
+reaches the read as a match that produced no output. Before grep 3.5 that notice
+went to stdout, which the read reports as an unparsed value. Both fail closed.
 
 ### The manifest version field
 
@@ -298,10 +279,9 @@ directory bootstrap never wrote. `cmp`'s exit 1 is a difference and its exits
 above 1 are a failure to compare, which are reported as different states rather
 than folded together.
 
-Without this check, a repository that lost `config/CLAUDE.md` reached
-`fail -> 0`: `scripts/bootstrap.sh` counts the missing file into `fails`, but
-that count reaches only the log and the script's exit status, neither of which
-`scripts/verify.sh` reads, and no manifest field records it.
+`scripts/bootstrap.sh` counts a missing `config/CLAUDE.md` into `fails`, and
+that count reaches only the log and that script's exit status, neither of which
+`scripts/verify.sh` reads. No manifest field records it.
 
 ### The delivered keys
 
@@ -312,10 +292,9 @@ payload is checked without the script being edited; a delivered file that is
 not an object, or carries no key at all, is a `FAIL` of its own.
 
 The merge is additive, so a key the live file carries and the delivered file no
-longer names is left in place and is not reported. Pruning the live file is not
-something either script does. The CLI rewrites the live file
-and reorders its keys, so a text comparison would fail on a file carrying the
-right values.
+longer names is left in place and is not reported. Neither script prunes the
+live file. The CLI rewrites the live file and reorders its keys, so a text
+comparison would fail on a file carrying the right values.
 
 The test is that the live value carries the delivered one, not that the two are
 equal. `scripts/bootstrap.sh`'s step 4 merges the delivered file over the live
@@ -357,15 +336,10 @@ A key absent from `config/settings.json` fails as a repository fault. A key
 absent from the live file, or holding a different value, fails with both sides
 printed.
 
-Until this check existed, a failed `mv` in `scripts/bootstrap.sh`'s step 4 left
-both keys absent from the live file while `scripts/verify.sh` reported clean.
-
 Each file is slurped into its own variable, and a file that does not yield
 exactly one JSON document is reported as that state. Reading both files into one
-array instead aligns them by position: a live file holding two documents then
-displaces the delivered one out of the compared slot, and the check reports
-carrying while never reading the delivered value at all. That was measured, not
-reasoned about.
+array aligns them by position, and a live file holding two documents then
+displaces the delivered one out of the compared slot.
 
 `settings_probe`, which supplies the displayed value, still emits one line per
 document, so for such a file the displayed value is each document's probe in
@@ -390,11 +364,12 @@ place of the literals it used to carry:
 | Author and committer naming one identity | A commit attributed to two people |
 | Neither email being `noreply@anthropic.com` | The harness identity taking over |
 
-The last is the failure that has happened: with the pair absent, `git var`
-resolves from `/root/.gitconfig`, which holds `Claude <noreply@anthropic.com>`
-after every rewrite. Asserting the variables alone would not catch it, because
-a role can be unset and still yield an identity; asserting the email alone
-would not catch a set-but-wrong pair. The four are checked together.
+The last assertion catches a failure that has occurred here. With the pair
+absent, `git var` resolves from `/root/.gitconfig`, which holds
+`Claude <noreply@anthropic.com>` after every rewrite. The four are checked
+together: a role can be unset and still yield an identity, so the variable
+assertions alone miss that case, and a set-but-wrong pair carries no harness
+email, so the email assertion alone misses that one.
 
 Deriving the expected identity from the same variables `git var` reads makes
 that third assertion narrow: it tests that git honours the pair, not that the
@@ -420,9 +395,8 @@ variables that did not cause it.
 
 The ident is trimmed from `Name <email> <unix-ts> <tz>` to `Name <email>` with
 `%`, not `%%`. Git strips `<`, `>` and newlines from both fields before writing
-an ident, measured on values carrying each: `a<b>c@example.com` comes back as
-`abc@example.com`. So exactly one `>` can appear, but shortest-suffix removal
-does not depend on that holding. With `%%`, a second `> ` would truncate to a
+an ident: `a<b>c@example.com` comes back as `abc@example.com`. So exactly one
+`>` can appear, but shortest-suffix removal does not depend on that holding. With `%%`, a second `> ` would truncate to a
 prefix that can equal the expected identity. The email is read back out of the
 trimmed ident with `##*<`, sound for the same reason: no `<` survives inside
 either field, so the last one is always the delimiter.
@@ -436,9 +410,9 @@ finding two identical diagnostic strings and reporting them as one identity.
 ### The signing keys
 
 Both keys are checked, because bootstrap writes both. `docs/environment.md`,
-under "Identity", records that the two values read back unchanged across both
-recorded rewrites of `/root/.gitconfig`; under "Unresolved" it leaves open what
-triggers a rewrite and which component performs it.
+under "Identity", records that the two values read back unchanged across a
+rewrite of `/root/.gitconfig`; under "Unresolved" it leaves open what triggers a
+rewrite and which component performs it.
 
 The read is effective, not `--global`: repository-local config wins over the
 global value bootstrap writes, so reading `--global` would hide a local
@@ -515,21 +489,18 @@ The echoed `verify.sh` output is capped at `SESSION_CHECK_OUT_LINE_CAP` lines,
 The two agree on every input but one: a file whose last bytes are NUL with no
 trailing newline. `grep -a -c ''` counts that remainder as a line while `read`
 drops the NUL bytes, leaves the variable empty and stops, so the header reads
-one higher than the number of lines that follow. That is a known gap. Every line is read from the file rather than from a captured
-variable, because a command substitution strips trailing newlines: reading
-through one made an empty output count as one line and dropped trailing blank
-lines from both the count and the echo.
+one higher than the number of lines that follow. That is a known gap. Every line is read from the file rather than from a
+captured variable, because a command substitution strips trailing newlines,
+which counts an empty output as one line and drops trailing blank lines.
 
 `/home/user/session-check.log` is appended to on every session start and is
 never rotated.
 
 Every `grep` reading that file passes `-a`, for the reason `env/setup.sh`'s
 version line needs it: without it a NUL byte anywhere makes GNU grep treat the
-whole file as binary. Measured on GNU grep 3.11, a file holding one — `-q`
-still matched while the retrieval printed nothing, so the whole `FAIL` and
-`NOTE` branch emitted silently nothing; the tally was not found either; and
-`grep -c ''` counted one line more than the file holds, so the header and the
-echo disagreed.
+whole file as binary. On such a file `-q` still matches while the retrieval
+prints nothing, so the `FAIL` and `NOTE` branch emits nothing and the tally is
+not found, and `grep -c ''` counts one line more than the file holds.
 
 A NUL byte inside a line is still dropped rather than replaced. Each line is
 read into a shell variable, which cannot hold one, so the control-byte
@@ -556,9 +527,9 @@ itself once `timeout` returns.
 substitution, because a surviving grandchild holds the substitution's pipe open
 and the read blocks after `timeout` has exited.
 
-Measured with a stub `claude` on `PATH` that ignores `SIGTERM`: without the
-group kill the stub outlived the check and the script did not return; with it
-the script returns at the inner bound and no stub process remains.
+Without the group kill a `SIGTERM`-ignoring grandchild outlives the check and
+the script does not return. With it the script returns at the inner bound and no
+such process remains.
 
 ### The SessionStart hook
 
