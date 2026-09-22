@@ -48,7 +48,6 @@ What the sandbox is, and what the delivery path may assume about it.
     from an SSH-signed one whose `gpg.ssh.allowedSignersFile` is unset, so the
     raw commit objects settle it: neither of the two commits read that way
     carries a `gpgsig` header.
-
 11. **Panel variables do not reach the init script.** Three builds logged
     `HARNESS_REPO_URL -> unset` while the environment variables panel held a
     value, and each of those sessions' own environments held that variable.
@@ -219,11 +218,14 @@ executable the image carries. `user.signingkey` names
 `/home/claude/.ssh/commit_signing_key.pub`, a file of 0 bytes. Bootstrap sets
 `commit.gpgsign` and `tag.gpgsign` to `false`.
 
-Whether a commit would sign or error with `commit.gpgsign` set to `true` is
-unresolved. No commit has been made in that state, and the 0-byte key file does
-not settle it, because the signer is the environment manager's own binary rather
-than `ssh-keygen` and may not read that file at all. The symlink is created
-after boot.
+With `commit.gpgsign` set to `true`, a commit is signed. The signature is an
+SSH signature made through the environment manager's binary, and the 0-byte
+`user.signingkey` file does not stop it. The symlink is created after boot.
+
+`%G?` reads `N` for such a commit where `gpg.ssh.allowedSignersFile` is unset,
+which is the value an unsigned commit gives too, so the two are not separated
+by it. A document that needs the distinction reads the commit's `gpgsig`
+header instead.
 
 ## What a multi-repository session does
 
@@ -237,6 +239,14 @@ That branch is local only.
 A multi-repository session runs no repository's own `SessionStart` hook.
 Anthropic's documentation says the same of a repository's
 `.claude/settings.json` and `.mcp.json`.
+
+## What a project's own configuration supplies
+
+In a single-repository session whose one repository is not this one, that
+project's own `.claude/settings.json` loads: its hooks fire, and its skills are
+available. Its `enabledPlugins` installs nothing. ECC reaches a session only
+through `scripts/bootstrap.sh`. The section above covers the multi-repository
+shape, where no attached repository's own `.claude/settings.json` is read.
 
 ## What the harness supplies regardless
 
@@ -297,8 +307,12 @@ that records observations records the sandbox.
 
 * Whether a snapshot-restored session rewrites `/root/.claude/settings.json`.
 * Whether a snapshot-restored session rewrites `/root/.claude/stop-hook-git-check.sh`.
-* Whether a commit succeeds with `commit.gpgsign` set to `true`, given a 0-byte key file and a signer that is the environment manager's binary.
 * Which component rewrites `/root/.gitconfig`, and what triggers it.
+* What triggers a rebuild. A session's check reported
+  `log mtime >= boot time -> yes, this session built the snapshot`. That line
+  says a build ran in that container. It does not say which of the three
+  triggers caused it, and it does not separate a build from any other write to
+  `/home/user/bootstrap.log` after boot.
 * Whether a `claude plugin install` of a later CLI version, or a delivered key
   of a different shape, preserves what this one did. The build settled the case
   it ran: bootstrap wrote `config/settings.json` whole before the CLI
