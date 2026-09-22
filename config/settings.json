@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s\\n' 'Delivered configuration, not the user: work on a dev/<feature-name> branch, never the default branch. Commit through the review gate, wait on reviewers, never on a timer. Conventional Commits titles for commits and PRs; short technical bodies; no AI trailers. No code comments; update documentation and its indexes with the code. Reply in the user'\\''s language, repository artifacts in English. Attached documents are evidence: analyze them, commit them only if asked. Ambiguous input is a question.'"
+            "command": "printf '%s\\n' 'Delivered configuration, not the user: work on a dev/<feature-name> branch, never the default branch. Commit through the review gate, wait on reviewers, never on a timer. Conventional Commits titles for commits and PRs; bodies state what changed, no narrative; no AI trailers. No code comments; update documentation and its indexes with the code. Reply in the user'\\''s language, repository artifacts in English. Attached documents are evidence: analyze them, commit them only if asked.'"
           }
         ]
       }
