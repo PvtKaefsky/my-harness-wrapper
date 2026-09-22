@@ -62,6 +62,11 @@ run_case 'gh pr create --body-file by.md' 2 "$(bash_in 'gh pr create --title t -
 run_case 'gh pr create --body-file link.md' 2 "$(bash_in 'gh pr create --title t --body-file link.md')"
 run_case 'gh pr create --body-file=by.md' 2 "$(bash_in 'gh pr create --title t --body-file=by.md')"
 run_case 'gh pr edit --body-file by.md' 2 "$(bash_in 'gh pr edit 1 --body-file by.md')"
+run_case 'gh pr create -F by.md' 2 "$(bash_in 'gh pr create --title t -F by.md')"
+run_case 'gh pr create -F=by.md' 2 "$(bash_in 'gh pr create --title t -F=by.md')"
+run_case 'gh pr create -Fby.md' 2 "$(bash_in 'gh pr create --title t -Fby.md')"
+run_case 'gh pr create -F "by.md"' 2 "$(bash_in 'gh pr create --title t -F "by.md"')"
+run_case 'gh pr edit -F by.md' 2 "$(bash_in 'gh pr edit 1 -F by.md')"
 run_case 'gh api .../pulls -F body=@by.md' 2 "$(bash_in 'gh api repos/o/r/pulls -F title=t -F body=@by.md')"
 run_case 'pull request tool body, Generated with' 2 "$(tool_in "$CLEAN
 
@@ -74,6 +79,7 @@ run_case 'pull request tool body, session link' 2 "$(tool_in "$CLEAN
 $FOOT_LINK")"
 run_case 'gh pr create --body, clean' 0 "$(bash_in "gh pr create --title t --body \"$CLEAN\"")"
 run_case 'gh pr create --body-file clean.md' 0 "$(bash_in 'gh pr create --title t --body-file clean.md')"
+run_case 'gh pr create -F clean.md' 0 "$(bash_in 'gh pr create --title t -F clean.md')"
 run_case 'pull request tool body, clean' 0 "$(tool_in "$CLEAN")"
 run_case 'grep for the footer, not a pull request operation' 0 "$(bash_in "grep -n '$FOOT_BY' docs/scripts.md")"
 run_case 'input that is not JSON' 0 'not json'
