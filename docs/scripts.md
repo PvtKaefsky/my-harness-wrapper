@@ -632,15 +632,16 @@ fails on, and that is counted too.
 its exit-code rule as established fact 5.
 
 It fetches the repository rather than reading an attached checkout. The clone
-URL comes from `HARNESS_REPO_URL`; the script never assigns that variable, so a
-value the environment supplies is never overwritten. The destination is the
-literal `/opt/my-harness-wrapper`.
+URL comes from `HARNESS_REPO_URL` where that variable is set and non-empty, and
+from the script's own default, this repository's URL, where it is unset or
+empty. A value the environment supplies is never overwritten. The destination
+is the literal `/opt/my-harness-wrapper`.
 
 | Line | What it reports |
 | --- | --- |
 | `BOOTSTRAP_VERSION=` | The version the pasted text carries. |
 | `HARNESS_DIR ->` | The clone destination. |
-| `HARNESS_REPO_URL -> unset / set but empty / set` | The variable's state, never its value. |
+| `HARNESS_REPO_URL -> <state>; clone URL from <environment\|default>` | The variable's state, and which of the two supplied the URL. Never the value itself. |
 | `command -v git ->` | Whether git is on `PATH`. |
 | `test -e <dir> -> yes/no` | Whether anything already occupies the destination. |
 | `git clone --depth 1 ... -> exit=N` | The clone's exit status. |
@@ -650,9 +651,9 @@ literal `/opt/my-harness-wrapper`.
 | `bootstrap -> skipped, ...` | Why the delivery step did not run. |
 
 The URL's state is reported with the three-state idiom `scripts/verify.sh` uses
-for `CLAUDE_CONFIG_DIR`: an empty variable is not an absent one, and the
-fallback in `docs/runbook.md` turns on which of the two the log names. The
-script never prints the value itself.
+for `CLAUDE_CONFIG_DIR`: an empty variable is not an absent one. Both of those
+two states take the default, and the line names which source supplied the URL.
+The script never prints the value itself.
 
 That is not a guarantee that a credential-bearing URL stays out of the log.
 `git clone` runs under the script's own redirection, and git writes the remote
@@ -665,6 +666,6 @@ existing non-empty directory exits non-zero, which skips bootstrap and is
 named in the log, so a directory the image already carries fails closed rather
 than being overwritten or silently delivered from.
 
-Each skip path prints its reason and reaches `exit 0`. An absent
-`HARNESS_REPO_URL`, an empty one, an absent `git`, a failed clone, and a clone
-without `scripts/bootstrap.sh` are five distinct lines.
+Each skip path prints its reason and reaches `exit 0`. An absent `git`, a
+failed clone, and a clone without `scripts/bootstrap.sh` are three distinct
+lines. Neither an absent nor an empty `HARNESS_REPO_URL` skips bootstrap.

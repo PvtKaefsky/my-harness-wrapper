@@ -10,9 +10,9 @@ In this order:
    Environments.
 3. Start any session and read `/home/user/bootstrap.log`.
 
-The environment variables panel carries `HARNESS_REPO_URL` and the four
-identity variables `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`
-and `GIT_COMMITTER_EMAIL`. No repository needs attaching.
+The environment variables panel carries the four identity variables
+`GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
+`GIT_COMMITTER_EMAIL`. No repository needs attaching.
 
 The facts that fix that order:
 
@@ -33,12 +33,11 @@ the repository's. That failure is the signal to paste again.
 This repository is attached only to record or implement an environment change
 the user asked for.
 
-### If `HARNESS_REPO_URL` does not reach the setup script
+### Cloning a different repository
 
-The log's `HARNESS_REPO_URL ->` line decides it. Where that line reads `unset`
-or `set but empty` while the panel holds a value, give the pasted copy of
-`env/setup.sh` a second line reading `export HARNESS_REPO_URL=<url>`. The
-committed file stays without it.
+The init script assigns its own default clone URL where `HARNESS_REPO_URL` is
+unset or empty. To clone a different repository, edit that default URL in the
+pasted copy of `env/setup.sh`.
 
 ## The version line
 

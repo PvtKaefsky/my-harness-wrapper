@@ -8,7 +8,8 @@ What the sandbox is, and what the delivery path may assume about it.
    There is no `user` account. `/home/user` exists and is owned by `root:root`.
    Never use `runuser` or `su`, and never create accounts.
 2. **The init script fetches the repository itself.** It clones
-   `$HARNESS_REPO_URL` `--depth 1` into `/opt/my-harness-wrapper` and runs
+   `$HARNESS_REPO_URL`, or its own default where that variable is unset or
+   empty, `--depth 1` into `/opt/my-harness-wrapper`, and runs
    `scripts/bootstrap.sh` from there. No session needs the repository attached.
 3. **An attached repository is cloned under `/home/user`.** The environment
    manager clones each attached repository to `/home/user/<name>` before a
@@ -48,6 +49,13 @@ What the sandbox is, and what the delivery path may assume about it.
     raw commit objects settle it: neither of the two commits read that way
     carries a `gpgsig` header.
 
+11. **Panel variables do not reach the init script.** Three builds logged
+    `HARNESS_REPO_URL -> unset` while the environment variables panel held a
+    value, and each of those sessions' own environments held that variable.
+    The log line separates the variable's three states inside the init script;
+    it says nothing about what the panel holds, which is read from the panel.
+    The init script therefore carries its own default clone URL.
+
 ## The harness Stop hook
 
 `/root/.claude/stop-hook-git-check.sh` runs when a turn ends. It is not
@@ -82,11 +90,11 @@ The init script text lives in the environment dialog, not in this repository.
 `env/setup.sh` is the file that text is pasted from. Nothing in this repository
 executes it.
 
-The init script reads `HARNESS_REPO_URL` and never assigns it, so a value that
-reaches it is never overwritten. It logs the variable's state as `unset`,
-`set but empty` or `set`, the clone's exit status, and the cloned commit. An
-empty URL and a failed clone each skip bootstrap and are named in the log. The
-script always ends `exit 0`.
+The init script reads `HARNESS_REPO_URL` and assigns its own default only where
+that variable is unset or empty, so a value that reaches it is never
+overwritten. It logs the variable's state, which source the clone URL came
+from, the clone's exit status, and the cloned commit. A failed clone skips
+bootstrap and is named in the log. The script always ends `exit 0`.
 
 `scripts/bootstrap.sh` runs from `/opt/my-harness-wrapper`, as root, and is the
 only step that writes `/root/.claude`.
@@ -287,11 +295,6 @@ that records observations records the sandbox.
 
 ## Unresolved
 
-* Whether a variable set in the environment variables panel reaches the init
-  script. Two issue reports from May 2026 say such variables arrive empty
-  there, and the documentation promises them only to commands Claude runs.
-  The first build's `HARNESS_REPO_URL ->` log line decides it;
-  `docs/runbook.md` carries the fallback.
 * Whether a snapshot-restored session rewrites `/root/.claude/settings.json`.
 * Whether a snapshot-restored session rewrites `/root/.claude/stop-hook-git-check.sh`.
 * Whether a commit succeeds with `commit.gpgsign` set to `true`, given a 0-byte key file and a signer that is the environment manager's binary.
