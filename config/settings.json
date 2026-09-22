@@ -28,6 +28,18 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__github__create_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f /opt/my-harness-wrapper/scripts/attribution-guard.sh ]; then bash /opt/my-harness-wrapper/scripts/attribution-guard.sh; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "startup",

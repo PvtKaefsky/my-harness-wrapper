@@ -542,9 +542,15 @@ session carries the hook, whatever it has attached.
 
 ## scripts/attribution-guard.sh
 
-Blocks a pull request body carrying a Claude Code attribution line. Run by the
-`PreToolUse` hook `config/settings.json` registers, which passes the tool call
-to it on stdin as JSON.
+Blocks a pull request body carrying a Claude Code attribution line, and reports
+one that a pull request create call returns. Run by the `PreToolUse` and
+`PostToolUse` hooks `config/settings.json` registers, which pass the hook input
+to it on stdin as JSON. The `PostToolUse` hook matches
+`mcp__github__create_pull_request` only.
+
+An input whose `hook_event_name` is `PostToolUse` takes the path under
+"The PostToolUse path" below. Any other input, one with no `hook_event_name`
+among them, takes the `PreToolUse` path this table describes.
 
 | `tool_name` | What is scanned |
 | --- | --- |
@@ -600,11 +606,48 @@ not handled.
 | A body read from standard input, `-F -` or `--body-file -` | The path `-` is not a regular file, so it is skipped. |
 | A body-file path carrying a variable, a `~` or another shell expansion | The hook receives the command before the shell expands it, so the path is read literally and skipped where no such file exists. |
 | A relative body-file path after a `cd` in the same command | The path is resolved against the hook's working directory, not the directory the command changes to. |
-| A footer added to a pull request description after the tool call | The hook sees the tool call, and the footer is not in it. `docs/environment.md` records this under "What the harness supplies regardless". |
+| A footer added to a pull request description after the tool call | The `PreToolUse` path sees the tool call, and the footer is not in it. The `PostToolUse` path covers the create call. `docs/environment.md` records the footer under "What the harness supplies regardless". |
 
 Nothing is printed when the guard is inert — `jq` absent, or the script absent
 from the path the hook names — so a session cannot tell an inert guard from one
 that found nothing. `scripts/verify.sh` is what separates them.
+
+### The PostToolUse path
+
+It acts only on `mcp__github__create_pull_request`. Any other `tool_name` exits
+0.
+
+The first row that fits decides the outcome.
+
+| Input | Exit | Output |
+| --- | --- | --- |
+| Hook input over 1 MiB | 2 | That the input was not checked, and the instruction to resend the description unchanged through `mcp__github__update_pull_request`, on stderr. |
+| A string field named `body` in `tool_response`, at any depth, matching the pattern above | 2 | The match with up to 80 characters either side, and the same instruction, on stderr. |
+| One or more string fields named `body`, none matching | 0 | None. |
+| `tool_response` an object whose `isError` is `true`, or whose `error` is a non-empty string or object | 0 | None. |
+| Anything else | 2 | That no string field named `body` was found, and the same instruction, on stderr. |
+
+The depth search covers `tool_response` itself and every string in it that
+parses as JSON, one level deep, so a `body` inside a JSON-encoded text content
+block is found.
+
+The instruction line is
+`attribution-guard: resend the description this create call sent, unchanged, through mcp__github__update_pull_request.`
+
+These gaps are accepted, not handled.
+
+| Gap | Effect |
+| --- | --- |
+| A failure reported in any shape other than the two the table names | Read as a successful create with no `body`, so it draws the instruction. |
+| A `body` that is `null`, as for a pull request with an empty description | Not a string field, so it draws the instruction. |
+| A `body` inside a string that is JSON-encoded twice | Not found, so it draws the instruction. |
+| A footer added after the create call returns | Not in the response, so the guard does not see it. |
+| `jq` absent | The guard exits 0 before reading the event, as on the `PreToolUse` path. |
+
+Exit 2 on `PostToolUse` does not undo the create. It puts the stderr text in
+front of the session after the call has run.
+
+### The verify.sh assertion
 
 `scripts/verify.sh` runs the first live `PreToolUse` command whose text names
 `attribution-guard.sh` against a sample `gh pr create` body carrying the
@@ -620,14 +663,24 @@ live `settings.json` registers, so it trusts that file as much as the session
 running it already does. It tests the delivered hook, not this file, so it
 fails in a session whose snapshot predates the hook.
 
+A second assertion does the same for the first live `PostToolUse` command whose
+text names `attribution-guard.sh`. It feeds that command a
+`mcp__github__create_pull_request` response whose `body` carries the footer, and
+expects exit 2 with `attribution-guard: matched line in the response body ->` on
+stderr, which the guard prints only on a footer match. The
+selection, the broken-shell ambiguity and the trust in the live file are as
+above. A guard that predates the `PostToolUse` path scans the clean
+`tool_input` instead, exits 0, and fails the assertion.
+
 ## scripts/test-attribution-guard.sh
 
 Runs `scripts/attribution-guard.sh` from its own directory against a fixed set
 of cases. It is run by hand only. Neither `scripts/verify.sh` nor
 `scripts/session-check.sh` runs it.
 
-Each case pipes one JSON tool call into the guard, the input the `PreToolUse`
-hook passes. Body files are written into a `mktemp -d` directory, which is the
+Each case pipes one JSON hook input into the guard: a tool call as the
+`PreToolUse` hook passes it, or, for the create response cases, a
+`PostToolUse` event carrying `tool_response`. Body files are written into a `mktemp -d` directory, which is the
 working directory while the cases run and is removed on exit.
 
 | Line | What it reports |
@@ -637,8 +690,9 @@ working directory while the cases run and is removed on exit.
 | `<case> -> expected exit=N, actual ..., pass/FAIL` | One line per case. |
 | `fail -> N` | The number of failed cases. `not run` where the guard or `jq` is absent. |
 
-A case expecting exit 2 passes only where the guard's stderr also carries
-`attribution-guard: matched line ->`. The script exits 0 where every case
+A case expecting exit 2 passes only where the guard's stderr also carries its
+marker: `attribution-guard: matched line ->` for a `PreToolUse` case, and the
+resend instruction line for a `PostToolUse` case. The script exits 0 where every case
 passed, and 1 otherwise.
 
 | Case | Input | Expected exit |
@@ -657,6 +711,15 @@ passed, and 1 otherwise.
 | Pull request tool `body`, clean | A body with no footer | 0 |
 | `grep` for the footer | A command carrying the footer that is not a pull request operation | 0 |
 | Input that is not JSON | `not json` | 0 |
+| Create response with a `body` carrying the marker | A `body` ending in a `---` rule and the `Generated by` footer carrying a session link | 2 |
+| Create response with a clean `body` | A `body` with no footer | 0 |
+| Create response with no `body` | An `id` and a `url` only | 2 |
+| Create error response | `isError` set to `true` | 0 |
+| Create error response with an error string | A non-empty `error` string and no `body` | 0 |
+| Create response with an empty error and a `body` carrying the marker | An empty `error` string beside that `body` | 2 |
+| Create response over 1 MiB with a clean `body` | A `body` of 1,100,000 bytes with no footer | 2 |
+| Update response with a `body` carrying the marker | A `PostToolUse` event whose `tool_name` is `mcp__github__update_pull_request` | 0 |
+| Create response text content carrying a `body` with the marker | A text content block whose JSON-encoded text carries that `body` | 2 |
 
 ## config/plugins.tsv
 
@@ -688,9 +751,11 @@ fails on, and that is counted too.
 its exit-code rule as established fact 5.
 
 It is the only file the repository does not deliver. `BOOTSTRAP_VERSION` is
-the only signal that the pasted copy has fallen behind. It is bumped in the
-commit that changes what `env/setup.sh` does, never on its own. A mismatch
-means the pasted copy is older than the repository's, and a paste is due.
+bumped in the last commit of any change under `config/`, `scripts/` or `env/`,
+and the file is pasted after the merge. A mismatch between the manifest and the
+clone means a paste is due. A version number is never reused for different
+contents. `docs/runbook.md`, under "Deploying a change", carries the order and
+what the comparison cannot separate.
 
 It fetches the repository rather than reading an attached checkout. The clone
 URL comes from `HARNESS_REPO_URL` where that variable is set and non-empty, and

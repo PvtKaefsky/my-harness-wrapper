@@ -1,23 +1,29 @@
 # Runbook
 
-## Deploying a change under `config/`
+## Deploying a change
 
-In this order:
+A change sessions should receive is any change under `config/`, `scripts/` or
+`env/`. For one, in this order:
 
-1. Merge the round to `main`.
-2. Where the round changed what `env/setup.sh` does, paste the full contents of
-   `env/setup.sh`, read from `main`, unchanged, into the setup-script field of
-   the cloud environment at claude.ai → Settings → Environments. Where it did
-   not, skip this step.
-3. Start a session after the build and read `/home/user/bootstrap.log`. A round
-   that skipped step 2 triggers no build. It reaches a session at the next build
-   another trigger starts, and `docs/environment.md` lists the triggers under
-   "Snapshot caching".
+1. Bump the `export BOOTSTRAP_VERSION=` line of `env/setup.sh` in the round's
+   last commit.
+2. Merge the round to `main`.
+3. Paste the full contents of `env/setup.sh`, read from `main`, unchanged, into
+   the setup-script field of the cloud environment at claude.ai → Settings →
+   Environments.
+4. Start a session after the build and read `/home/user/bootstrap.log`.
 
-`BOOTSTRAP_VERSION` is bumped in the commit that changes what `env/setup.sh`
-does, never on its own. A mismatch means the pasted copy is older than the
-repository's, and a paste is due. The comparison does not separate an older
-pasted copy from a newer one, such as a copy pasted from an unmerged branch.
+A version number is never reused for different contents.
+
+A mismatch between the manifest and the clone, the `FAIL
+manifest.bootstrap_version` line of `scripts/verify.sh`, means a paste is due.
+The comparison does not separate an older pasted copy from a newer one. A copy
+pasted from an unmerged branch is the newer case: after the merge `main` holds
+the same text, which does not rebuild, so the next bumped change, or a build
+another trigger starts, is what delivers it. A match does not mean no paste is
+due. A restored session's manifest and clone both come from its snapshot's
+build, so they match while `main` carries a later bumped change no paste has
+delivered.
 
 The environment variables panel carries the four identity variables
 `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
@@ -31,8 +37,12 @@ The facts that fix that order:
   compared, so a bump to any other file changes nothing.
 * A rebuild clones the default branch as it stands at build time, so a paste
   made before the merge spends that version on the old tree.
-* A change outside `env/setup.sh` reaches the next build without a paste, and
-  no operator action triggers that build.
+* A merged change outside `env/setup.sh` is in the clone of the next build
+  without a paste. No operator action other than a paste triggers that build.
+* A restored session keeps the `/opt/my-harness-wrapper` clone its snapshot was
+  built with.
+* The only rebuild an operator controls is a change to the pasted text, so a
+  change reaches restored sessions only through a paste.
 * The first session after a paste builds the snapshot, whatever it is working
   on.
 * A session's log describes its own container, so the build's log is read in a
@@ -79,7 +89,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | --- | --- | --- |
 | `FAIL live config dir path` | The resolved config directory is not an absolute path. `CLAUDE_CONFIG_DIR` holds an empty or relative value, or it is unset and `HOME` is relative. The `CLAUDE_CONFIG_DIR ->` line above separates `unset`, `set but empty` and a value. | Unset it, or set an absolute path. |
 | `FAIL manifest: ... actual absent` | No bootstrap has run in the resolved config directory. | Read `/home/user/bootstrap.log`. The setup script was never pasted, the snapshot predates it, or the CLI reads a directory bootstrap never wrote. |
-| `FAIL manifest.commit`, both sides a commit | Bootstrap ran against an older commit than the repository now holds. | Expected while the snapshot is frozen. Force a rebuild when the delta touches `config/`. |
+| `FAIL manifest.commit`, both sides a commit | Bootstrap ran against an older commit than the repository now holds. | Expected while the snapshot is frozen. Where the delta touches `config/`, `scripts/` or `env/`, a paste is due. |
 | `FAIL manifest.commit: ... actual unresolved-manifest` | The manifest carries no readable `commit` field. | Re-run bootstrap. The manifest was hand-edited or its write failed. |
 | `FAIL manifest.commit: expected unresolved-repo` | `git -C <repo> rev-parse --short HEAD` produced nothing, so the repository being checked is absent or is not a git repository. | Read the path in the line. The deployed copy is missing, or `HARNESS_DIR` names something else. The two sides carry different defaults, so two unknowns never compare equal and pass. |
 | `FAIL expected version` | No expectation could be read from `env/setup.sh`. The `grep` line above names the state: `no such line`, `more than one line`, `not read`, `matched but produced no output`, `present and empty`, or `unparsed value`. | Fix the tree. On `not read`, the `test -f` line above reads `yes` only where a regular file exists that `grep` could not read; it reads `no` for an absent path, a directory, a dangling symlink and an unsearchable parent alike, separating none of those. |
@@ -101,6 +111,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL settings....: ..., <state>` | The state ends the line and names the cause: `does not carry`, `absent from the live file`, `absent from the delivered file`, `live top level is ...`, `delivered top level is ...`, `live file holds N JSON documents`, `delivered file holds N JSON documents`, or `not determined` where `jq` could not run. | Read the state. A document count other than one, or a non-object top level, is a corrupt file rather than a delivery that did not happen. |
 | `FAIL settings....: expected ... present in ...` | `config/settings.json` does not carry that key, or its top level is not an object. The `actual` value names which. | Fix the tree. This is a repository fault, not a session fault. |
 | `FAIL PreToolUse attribution guard` | The first live `PreToolUse` command naming `attribution-guard.sh` did not exit 2 on a `gh pr create` body carrying the Claude Code footer. The state ends the line: `exit=N` for a command that ran, `exit=2 without <marker>` for one that exited 2 without the guard's own stderr marker, `no PreToolUse command in <path> references attribution-guard.sh (jq exit=N)`, or `sample input not built (jq exit=N)`. | Read the state. `no PreToolUse command` reads the same for a live `settings.json` that registers no command naming the guard and for one `jq` could not read; the `(jq exit=N)` suffix separates them, `0` for the first and non-zero for the second. On either, the snapshot predates the hook: re-paste `env/setup.sh` and rebuild. `exit=0` means the hook is registered and the guard is not at the path it names. `exit=2 without <marker>` means the registered command is broken shell, `bash -c` exiting 2 on a syntax error. |
+| `FAIL PostToolUse attribution guard` | The first live `PostToolUse` command naming `attribution-guard.sh` did not exit 2 on a `mcp__github__create_pull_request` response whose `body` carries the Claude Code footer. The state ends the line in the same four forms as `FAIL PreToolUse attribution guard`, the marker being `attribution-guard: matched line in the response body ->`. The guard prints that marker only on a footer match, so exit 2 from its size cap or from a response with no `body` fails the check. | Read the state as for `FAIL PreToolUse attribution guard`. `exit=0` also means the guard at the path the command names predates its `PostToolUse` path: re-paste `env/setup.sh` and rebuild. |
 | `FAIL config/plugins.tsv` | No file at that path under the repository being checked. | Read the `test -f` line above it. The deployed copy is absent, incomplete, or `HARNESS_DIR` names another tree. |
 | `FAIL plugin: ... among the installed ids` | A plugin named in `config/plugins.tsv` is not among the ids `claude plugin list --json` reports. | Read the `claude plugin install ... -> exit=` line in `/home/user/bootstrap.log`, then re-run the install by hand for the current error. |
 | `FAIL plugin: ... expected an id list` | No id list could be read, so the plugin could not be tested. | Act on the `FAIL live config dir agreement` line above it. |

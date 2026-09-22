@@ -295,6 +295,31 @@ if [ "$GUARD_OK" != yes ]; then
   fail=1
 fi
 
+POST_OK=no
+POST_MARK='attribution-guard: matched line in the response body ->'
+POST_INPUT=$(jq -n --arg b "$GUARD_BODY" '{hook_event_name:"PostToolUse",tool_name:"mcp__github__create_pull_request",tool_input:{body:"what changed, in one sentence."},tool_response:{body:$b}}' 2>/dev/null); POST_IN_RC=$?
+POST_CMD=$(jq -r 'if type == "object" then ([.hooks.PostToolUse[]?.hooks[]? | select(.type == "command") | .command | select(type == "string" and contains("attribution-guard.sh"))] | .[0] // empty) else empty end' "$LIVE_SETTINGS" 2>/dev/null); POST_CMD_RC=$?
+if [ "$POST_IN_RC" -ne 0 ] || [ -z "$POST_INPUT" ]; then
+  POST_SHOW="sample input not built (jq exit=$POST_IN_RC)"
+elif [ "$POST_CMD_RC" -ne 0 ] || [ -z "$POST_CMD" ]; then
+  POST_SHOW="no PostToolUse command in $LIVE_SETTINGS references attribution-guard.sh (jq exit=$POST_CMD_RC)"
+else
+  POST_ERR=$(printf '%s' "$POST_INPUT" | bash -c "$POST_CMD" 2>&1 >/dev/null); POST_RC=$?
+  if [ "$POST_RC" -ne 2 ]; then
+    POST_SHOW="exit=$POST_RC"
+  elif printf '%s\n' "$POST_ERR" | grep -a -q -F -- "$POST_MARK"; then
+    POST_SHOW="exit=2 carrying $POST_MARK"
+    POST_OK=yes
+  else
+    POST_SHOW="exit=2 without $POST_MARK [$(sanitize "$POST_ERR")]"
+  fi
+fi
+echo "run the live PostToolUse command on a create response whose body carries the footer -> $POST_SHOW"
+if [ "$POST_OK" != yes ]; then
+  echo "FAIL PostToolUse attribution guard: expected exit=2 carrying $POST_MARK from the live PostToolUse command in $LIVE_SETTINGS on a create response whose body carries the footer, actual $POST_SHOW"
+  fail=1
+fi
+
 echo "test -f $REPO/config/plugins.tsv -> $([ -f "$REPO/config/plugins.tsv" ] && echo yes || echo no)"
 if [ -f "$REPO/config/plugins.tsv" ]; then
   while IFS=$'\t' read -r -u 3 mp_source plugin_id _rest || [ -n "${mp_source:-}" ]; do

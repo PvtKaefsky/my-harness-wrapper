@@ -1,7 +1,7 @@
 #!/bin/bash
 set -uo pipefail
 exec > /home/user/bootstrap.log 2>&1
-export BOOTSTRAP_VERSION=0.1.8
+export BOOTSTRAP_VERSION=0.1.10
 echo "BOOTSTRAP_VERSION=$BOOTSTRAP_VERSION"
 
 HARNESS_DIR=/opt/my-harness-wrapper

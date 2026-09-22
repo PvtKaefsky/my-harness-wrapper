@@ -28,8 +28,10 @@ into a session's Claude config directory.
 
 The init script fetches this repository itself, so no session needs it
 attached. It runs only in the session that builds the environment snapshot.
-Every later session restores that snapshot and skips it. A change under
-`config/` therefore reaches a session only after a rebuild.
+Every later session restores that snapshot and skips it, keeping the
+`/opt/my-harness-wrapper` clone that build made. A change under `config/`,
+`scripts/` or `env/` therefore reaches a session only after a rebuild. The only
+rebuild an operator controls is a change to the pasted init script text.
 
 ## Structure
 
@@ -42,7 +44,7 @@ Every later session restores that snapshot and skips it. A change under
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/session-check.sh` | Reports what a session starts with. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
-| `scripts/attribution-guard.sh` | Blocks a pull request body carrying a Claude Code attribution line. Run by the `PreToolUse` hook `config/settings.json` registers. |
+| `scripts/attribution-guard.sh` | Blocks a pull request body carrying a Claude Code attribution line, and tells the session to resend a description the create call returns with one. Run by the `PreToolUse` and `PostToolUse` hooks `config/settings.json` registers. |
 | `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, one line per case. Run by hand only. |
 | `README.md` | This file. |
 | `docs/` | Documentation. |
@@ -61,15 +63,14 @@ the same way. `docs/scripts.md` carries where the two loops diverge.
 
 ## Usage
 
-### Deploy a change under `config/`
+### Deploy a change
 
-Set the four identity variables in the environment variables panel, and merge
-to `main`. A change outside `env/setup.sh` reaches the next build without a
-paste, and no operator action triggers that build. A change to what
-`env/setup.sh` does bumps its `export BOOTSTRAP_VERSION=` line in the same
-commit, and the file's contents are pasted into the environment dialog
-unchanged after the merge. Nothing needs attaching. The full order, and the
-facts that fix it, are in `docs/runbook.md`.
+Set the four identity variables in the environment variables panel. A change
+under `config/`, `scripts/` or `env/` bumps the `export BOOTSTRAP_VERSION=`
+line of `env/setup.sh` in its last commit. After the merge to `main`, the
+file's contents are pasted into the environment dialog unchanged. A version
+number is never reused for different contents. Nothing needs attaching. The
+full order, and the facts that fix it, are in `docs/runbook.md`.
 
 ### Verify a session
 
