@@ -93,12 +93,12 @@ only step that writes `/root/.claude`.
 
 ## Waiting for a reviewer
 
-The Agent tool launches every reviewer asynchronously, including when called
-with `run_in_background: false`. Its result carries an agent id and the
-statement that the agent is working in the background.
+The Agent tool launches every agent asynchronously, reviewer or not, including
+when called with `run_in_background: false`. Its result carries an agent id and
+the statement that the agent is working in the background.
 
-Completion arrives as a task notification that re-invokes the session. Nothing
-is polled and no timer is set.
+Completion arrives as a task notification that re-invokes the session, for any
+agent the tool launched. Nothing is polled and no timer is set.
 
 The turn does not stay open across a review. Each completion notice opens a new
 turn, and the harness Stop hook blocks that turn once, for the staged changes
