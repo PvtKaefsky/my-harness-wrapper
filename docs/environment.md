@@ -232,10 +232,14 @@ Anthropic's documentation says the same of a repository's
 
 ## What the harness supplies regardless
 
-The harness injects its own attribution reminder asking for a `Co-Authored-By`
-trailer, whatever `config/settings.json`'s `attribution` keys hold. The
-payload's no-trailers rule is what keeps the trailer out of a commit.
-`scripts/verify.sh` checks that the setting is in the live file, not that it
+The harness injects its own attribution reminder. `sessionUrl: false` removes
+the `Claude-Session` line from it. `coAuthoredBy: false` removed neither the
+`Co-Authored-By` line nor the pull request footer, and `config/settings.json`
+no longer carries that key: it sets `attribution.commit` and `attribution.pr`
+to the empty string instead. Whether those two values remove the two lines is
+unchecked, no session having run under them. The payload's no-attribution rule
+is what has kept a line the reminder asks for out of a commit.
+`scripts/verify.sh` checks that each setting is in the live file, not that it
 takes effect.
 
 The harness's task line forbids pushing to a branch other than the one it
