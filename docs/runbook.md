@@ -139,7 +139,10 @@ its first reply.
 ## Before every commit
 
 Hand-run `scripts/bootstrap.sh`, `scripts/verify.sh` and
-`scripts/session-check.sh` before committing a change to them. `bash -n` is not
+`scripts/session-check.sh` before committing a change to them. Run
+`scripts/test-attribution-guard.sh` before committing a change to
+`scripts/attribution-guard.sh` or to the test script itself; it exits 0 only
+where every case passes. `bash -n` is not
 a gate here: it accepts invalid parameter expansion that fails at runtime.
 `shellcheck` is not installed in this sandbox. Never execute `env/setup.sh`; run
 `bash -n` on it, and exercise the branches a change touches by extracting them
