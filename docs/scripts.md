@@ -588,6 +588,7 @@ not handled.
 | A body-file path carrying a space | The path is read up to the first space, and the truncated path is then skipped as unreadable. |
 | A body file past its first mebibyte | Only the first mebibyte is read. |
 | A `--body-file` flag and its path on different lines of a continued command | Each token form is matched within one line. |
+| A footer added to a pull request description after the tool call | The hook sees the tool call, and the footer is not in it. `docs/environment.md` records this under "What the harness supplies regardless". |
 
 Nothing is printed when the guard is inert — `jq` absent, or the script absent
 from the path the hook names — so a session cannot tell an inert guard from one
