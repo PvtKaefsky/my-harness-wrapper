@@ -632,6 +632,11 @@ fails on, and that is counted too.
 `docs/environment.md` carries this script's provenance under "Delivery", and
 its exit-code rule as established fact 5.
 
+It is the only file the repository does not deliver. `BOOTSTRAP_VERSION` is
+the only signal that the pasted copy has fallen behind. It is bumped in the
+commit that changes what `env/setup.sh` does, never on its own. A mismatch
+means the pasted copy is older than the repository's, and a paste is due.
+
 It fetches the repository rather than reading an attached checkout. The clone
 URL comes from `HARNESS_REPO_URL` where that variable is set and non-empty, and
 from the script's own default, this repository's URL, where it is unset or

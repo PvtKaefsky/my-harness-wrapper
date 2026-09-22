@@ -4,11 +4,20 @@
 
 In this order:
 
-1. Merge the round to `main`, the `export BOOTSTRAP_VERSION=` bump included.
-2. Paste the full contents of `env/setup.sh`, read from `main`, unchanged, into
-   the setup-script field of the cloud environment at claude.ai → Settings →
-   Environments.
-3. Start any session and read `/home/user/bootstrap.log`.
+1. Merge the round to `main`.
+2. Where the round changed what `env/setup.sh` does, paste the full contents of
+   `env/setup.sh`, read from `main`, unchanged, into the setup-script field of
+   the cloud environment at claude.ai → Settings → Environments. Where it did
+   not, skip this step.
+3. Start a session after the build and read `/home/user/bootstrap.log`. A round
+   that skipped step 2 triggers no build. It reaches a session at the next build
+   another trigger starts, and `docs/environment.md` lists the triggers under
+   "Snapshot caching".
+
+`BOOTSTRAP_VERSION` is bumped in the commit that changes what `env/setup.sh`
+does, never on its own. A mismatch means the pasted copy is older than the
+repository's, and a paste is due. The comparison does not separate an older
+pasted copy from a newer one, such as a copy pasted from an unmerged branch.
 
 The environment variables panel carries the four identity variables
 `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
@@ -22,13 +31,12 @@ The facts that fix that order:
   compared, so a bump to any other file changes nothing.
 * A rebuild clones the default branch as it stands at build time, so a paste
   made before the merge spends that version on the old tree.
+* A change outside `env/setup.sh` reaches the next build without a paste, and
+  no operator action triggers that build.
 * The first session after a paste builds the snapshot, whatever it is working
   on.
 * A session's log describes its own container, so the build's log is read in a
   session started after the build, not in one already running.
-
-`scripts/verify.sh` fails the version comparison when the pasted script trails
-the repository's. That failure is the signal to paste again.
 
 This repository is attached only to record or implement an environment change
 the user asked for.

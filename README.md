@@ -61,11 +61,13 @@ the same way. `docs/scripts.md` carries where the two loops diverge.
 
 ### Deploy a change under `config/`
 
-Set the four identity variables in the environment variables panel. Bump the
-`export BOOTSTRAP_VERSION=` line in `env/setup.sh`,
-merge to `main`, then paste the file's contents into the environment dialog
-unchanged and start any session. Nothing needs attaching. The full order, and
-the facts that fix it, are in `docs/runbook.md`.
+Set the four identity variables in the environment variables panel, and merge
+to `main`. A change outside `env/setup.sh` reaches the next build without a
+paste, and no operator action triggers that build. A change to what
+`env/setup.sh` does bumps its `export BOOTSTRAP_VERSION=` line in the same
+commit, and the file's contents are pasted into the environment dialog
+unchanged after the merge. Nothing needs attaching. The full order, and the
+facts that fix it, are in `docs/runbook.md`.
 
 ### Verify a session
 
