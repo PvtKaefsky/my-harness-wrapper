@@ -543,9 +543,10 @@ session carries the hook, whatever it has attached.
 ## scripts/attribution-guard.sh
 
 Blocks a pull request body carrying a Claude Code attribution line, and reports
-one that a pull request create call returns. Run by the `PreToolUse` hook
-`config/settings.json` registers, which passes the tool call to it on stdin as
-JSON.
+one that a pull request create call returns. Run by the `PreToolUse` and
+`PostToolUse` hooks `config/settings.json` registers, which pass the hook input
+to it on stdin as JSON. The `PostToolUse` hook matches
+`mcp__github__create_pull_request` only.
 
 An input whose `hook_event_name` is `PostToolUse` takes the path under
 "The PostToolUse path" below. Any other input, one with no `hook_event_name`
@@ -614,8 +615,7 @@ that found nothing. `scripts/verify.sh` is what separates them.
 ### The PostToolUse path
 
 It acts only on `mcp__github__create_pull_request`. Any other `tool_name` exits
-0. `config/settings.json` registers no `PostToolUse` hook, so this path runs
-only on input piped to the script by hand.
+0.
 
 The first row that fits decides the outcome.
 
