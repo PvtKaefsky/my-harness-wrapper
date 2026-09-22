@@ -1,7 +1,8 @@
 # my-harness-wrapper
 
 A configuration source for Claude Code cloud sessions. It is not an
-application. It has no build, no tests, no package manifest and no CI.
+application. It has no build, no package manifest and no CI. Its one test
+script, `scripts/test-attribution-guard.sh`, is run by hand.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
 into a session's Claude config directory.
@@ -42,6 +43,7 @@ Every later session restores that snapshot and skips it. A change under
 | `scripts/session-check.sh` | Reports what a session starts with. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
 | `scripts/attribution-guard.sh` | Blocks a pull request body carrying a Claude Code attribution line. Run by the `PreToolUse` hook `config/settings.json` registers. |
+| `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, one line per case. Run by hand only. |
 | `README.md` | This file. |
 | `docs/` | Documentation. |
 
@@ -61,11 +63,13 @@ the same way. `docs/scripts.md` carries where the two loops diverge.
 
 ### Deploy a change under `config/`
 
-Set the four identity variables in the environment variables panel. Bump the
-`export BOOTSTRAP_VERSION=` line in `env/setup.sh`,
-merge to `main`, then paste the file's contents into the environment dialog
-unchanged and start any session. Nothing needs attaching. The full order, and
-the facts that fix it, are in `docs/runbook.md`.
+Set the four identity variables in the environment variables panel, and merge
+to `main`. A change outside `env/setup.sh` reaches the next build without a
+paste, and no operator action triggers that build. A change to what
+`env/setup.sh` does bumps its `export BOOTSTRAP_VERSION=` line in the same
+commit, and the file's contents are pasted into the environment dialog
+unchanged after the merge. Nothing needs attaching. The full order, and the
+facts that fix it, are in `docs/runbook.md`.
 
 ### Verify a session
 

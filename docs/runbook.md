@@ -4,11 +4,20 @@
 
 In this order:
 
-1. Merge the round to `main`, the `export BOOTSTRAP_VERSION=` bump included.
-2. Paste the full contents of `env/setup.sh`, read from `main`, unchanged, into
-   the setup-script field of the cloud environment at claude.ai → Settings →
-   Environments.
-3. Start any session and read `/home/user/bootstrap.log`.
+1. Merge the round to `main`.
+2. Where the round changed what `env/setup.sh` does, paste the full contents of
+   `env/setup.sh`, read from `main`, unchanged, into the setup-script field of
+   the cloud environment at claude.ai → Settings → Environments. Where it did
+   not, skip this step.
+3. Start a session after the build and read `/home/user/bootstrap.log`. A round
+   that skipped step 2 triggers no build. It reaches a session at the next build
+   another trigger starts, and `docs/environment.md` lists the triggers under
+   "Snapshot caching".
+
+`BOOTSTRAP_VERSION` is bumped in the commit that changes what `env/setup.sh`
+does, never on its own. A mismatch means the pasted copy is older than the
+repository's, and a paste is due. The comparison does not separate an older
+pasted copy from a newer one, such as a copy pasted from an unmerged branch.
 
 The environment variables panel carries the four identity variables
 `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
@@ -22,13 +31,12 @@ The facts that fix that order:
   compared, so a bump to any other file changes nothing.
 * A rebuild clones the default branch as it stands at build time, so a paste
   made before the merge spends that version on the old tree.
+* A change outside `env/setup.sh` reaches the next build without a paste, and
+  no operator action triggers that build.
 * The first session after a paste builds the snapshot, whatever it is working
   on.
 * A session's log describes its own container, so the build's log is read in a
   session started after the build, not in one already running.
-
-`scripts/verify.sh` fails the version comparison when the pasted script trails
-the repository's. That failure is the signal to paste again.
 
 This repository is attached only to record or implement an environment change
 the user asked for.
@@ -92,7 +100,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL settings....: actual no expectation could be read` | That key could not be read from `config/settings.json`. | Fix the tree. This is a repository fault, not a session fault. |
 | `FAIL settings....: ..., <state>` | The state ends the line and names the cause: `does not carry`, `absent from the live file`, `absent from the delivered file`, `live top level is ...`, `delivered top level is ...`, `live file holds N JSON documents`, `delivered file holds N JSON documents`, or `not determined` where `jq` could not run. | Read the state. A document count other than one, or a non-object top level, is a corrupt file rather than a delivery that did not happen. |
 | `FAIL settings....: expected ... present in ...` | `config/settings.json` does not carry that key, or its top level is not an object. The `actual` value names which. | Fix the tree. This is a repository fault, not a session fault. |
-| `FAIL PreToolUse attribution guard` | The live `PreToolUse` command did not exit 2 on a `gh pr create` body carrying the Claude Code footer. The state ends the line: `exit=N` for a command that ran, `exit=2 without <marker>` for one that exited 2 without the guard's own stderr marker, `no PreToolUse command in <path> (jq exit=N)`, or `sample input not built (jq exit=N)`. | Read the state. `no PreToolUse command` reads the same for a live `settings.json` that registers none and for one `jq` could not read; the `(jq exit=N)` suffix separates them, `0` for the first and non-zero for the second. On either, the snapshot predates the hook: re-paste `env/setup.sh` and rebuild. `exit=0` means the hook is registered and the guard is not at the path it names. `exit=2 without <marker>` means the registered command is broken shell, `bash -c` exiting 2 on a syntax error. |
+| `FAIL PreToolUse attribution guard` | The first live `PreToolUse` command naming `attribution-guard.sh` did not exit 2 on a `gh pr create` body carrying the Claude Code footer. The state ends the line: `exit=N` for a command that ran, `exit=2 without <marker>` for one that exited 2 without the guard's own stderr marker, `no PreToolUse command in <path> references attribution-guard.sh (jq exit=N)`, or `sample input not built (jq exit=N)`. | Read the state. `no PreToolUse command` reads the same for a live `settings.json` that registers no command naming the guard and for one `jq` could not read; the `(jq exit=N)` suffix separates them, `0` for the first and non-zero for the second. On either, the snapshot predates the hook: re-paste `env/setup.sh` and rebuild. `exit=0` means the hook is registered and the guard is not at the path it names. `exit=2 without <marker>` means the registered command is broken shell, `bash -c` exiting 2 on a syntax error. |
 | `FAIL config/plugins.tsv` | No file at that path under the repository being checked. | Read the `test -f` line above it. The deployed copy is absent, incomplete, or `HARNESS_DIR` names another tree. |
 | `FAIL plugin: ... among the installed ids` | A plugin named in `config/plugins.tsv` is not among the ids `claude plugin list --json` reports. | Read the `claude plugin install ... -> exit=` line in `/home/user/bootstrap.log`, then re-run the install by hand for the current error. |
 | `FAIL plugin: ... expected an id list` | No id list could be read, so the plugin could not be tested. | Act on the `FAIL live config dir agreement` line above it. |
@@ -131,7 +139,10 @@ its first reply.
 ## Before every commit
 
 Hand-run `scripts/bootstrap.sh`, `scripts/verify.sh` and
-`scripts/session-check.sh` before committing a change to them. `bash -n` is not
+`scripts/session-check.sh` before committing a change to them. Run
+`scripts/test-attribution-guard.sh` before committing a change to
+`scripts/attribution-guard.sh` or to the test script itself; it exits 0 only
+where every case passes. `bash -n` is not
 a gate here: it accepts invalid parameter expansion that fails at runtime.
 `shellcheck` is not installed in this sandbox. Never execute `env/setup.sh`; run
 `bash -n` on it, and exercise the branches a change touches by extracting them

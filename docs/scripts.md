@@ -554,7 +554,15 @@ to it on stdin as JSON.
 A body file is taken from four token forms: `--body-file <path>`,
 `--body-file=<path>`, `-F <name>=@<path>` for any field name, and
 `body=@<path>` after any flag spelling. A field named anything but `body` is
-recognised only after `-F`. One run of surrounding quotes is stripped from the
+recognised only after `-F`.
+
+In a command that runs `gh pr create` or `gh pr edit`, `-F` is the short form of
+`--body-file`, and the argument after it is taken as a body file in three
+spellings: `-F <path>`, `-F=<path>` and `-F<path>`. `gh` 2.101.0 accepts all
+three on both commands, and accepts `-F` clustered behind another short flag on
+`gh pr create`, as in `-dF<path>`. The guard covers the three spellings and not
+the clustered one. A `-F` token is recognised only at the start of the command
+or after whitespace. One run of surrounding quotes is stripped from the
 path. A path that is not a readable regular file is skipped. The first mebibyte
 of the file is scanned.
 
@@ -588,20 +596,67 @@ not handled.
 | A body-file path carrying a space | The path is read up to the first space, and the truncated path is then skipped as unreadable. |
 | A body file past its first mebibyte | Only the first mebibyte is read. |
 | A `--body-file` flag and its path on different lines of a continued command | Each token form is matched within one line. |
+| `-F` clustered behind another short flag, as in `-dF <path>` or `-dF<path>` | Only a `-F` token standing alone is recognised. |
+| A body read from standard input, `-F -` or `--body-file -` | The path `-` is not a regular file, so it is skipped. |
+| A body-file path carrying a variable, a `~` or another shell expansion | The hook receives the command before the shell expands it, so the path is read literally and skipped where no such file exists. |
+| A relative body-file path after a `cd` in the same command | The path is resolved against the hook's working directory, not the directory the command changes to. |
 | A footer added to a pull request description after the tool call | The hook sees the tool call, and the footer is not in it. `docs/environment.md` records this under "What the harness supplies regardless". |
 
 Nothing is printed when the guard is inert — `jq` absent, or the script absent
 from the path the hook names — so a session cannot tell an inert guard from one
 that found nothing. `scripts/verify.sh` is what separates them.
 
-`scripts/verify.sh` runs the live `PreToolUse` command against a sample
-`gh pr create` body carrying the footer, and expects exit 2 with the guard's
-own `attribution-guard: matched line ->` marker on stderr. The exit status
-alone does not distinguish a guard that matched from a `PreToolUse` command
-whose shell syntax is broken, `bash -c` exiting 2 for both. The assertion runs
-whatever command the live `settings.json` registers, so it trusts that file as
-much as the session running it already does. It tests the delivered hook, not
-this file, so it fails in a session whose snapshot predates the hook.
+`scripts/verify.sh` runs the first live `PreToolUse` command whose text names
+`attribution-guard.sh` against a sample `gh pr create` body carrying the
+footer, and expects exit 2 with the guard's own
+`attribution-guard: matched line ->` marker on stderr. Where no `PreToolUse`
+command names it, the check fails with a line saying so. The selection reads
+the command's text, not what it runs: a command naming the script without
+running it is selected and fails the exit check, and a command running the
+guard under another name is not selected. The exit status alone does not
+distinguish a guard that matched from a `PreToolUse` command whose shell syntax
+is broken, `bash -c` exiting 2 for both. The assertion runs the command the
+live `settings.json` registers, so it trusts that file as much as the session
+running it already does. It tests the delivered hook, not this file, so it
+fails in a session whose snapshot predates the hook.
+
+## scripts/test-attribution-guard.sh
+
+Runs `scripts/attribution-guard.sh` from its own directory against a fixed set
+of cases. It is run by hand only. Neither `scripts/verify.sh` nor
+`scripts/session-check.sh` runs it.
+
+Each case pipes one JSON tool call into the guard, the input the `PreToolUse`
+hook passes. Body files are written into a `mktemp -d` directory, which is the
+working directory while the cases run and is removed on exit.
+
+| Line | What it reports |
+| --- | --- |
+| `test -f <guard> -> yes/no` | Whether the guard is at the path the script reads. |
+| `command -v jq -> <path>/none` | Whether `jq` is on `PATH`. The cases are built with it. |
+| `<case> -> expected exit=N, actual ..., pass/FAIL` | One line per case. |
+| `fail -> N` | The number of failed cases. `not run` where the guard or `jq` is absent. |
+
+A case expecting exit 2 passes only where the guard's stderr also carries
+`attribution-guard: matched line ->`. The script exits 0 where every case
+passed, and 1 otherwise.
+
+| Case | Input | Expected exit |
+| --- | --- | --- |
+| `gh pr create --body`, three cases | A body ending in each footer form: `Generated with`, `Generated by`, and the session link | 2 |
+| `gh pr create --body-file <file>`, three cases | A body file ending in each footer form | 2 |
+| `gh pr create --body-file=<file>` | A body file ending in the `Generated by` footer | 2 |
+| `gh pr edit --body-file <file>` | The same file | 2 |
+| `gh pr create -F <file>`, `-F=<file>`, `-F<file>` and `-F "<file>"` | The same file | 2 |
+| `gh pr edit -F <file>` | The same file | 2 |
+| `gh api repos/o/r/pulls -F body=@<file>` | The same file | 2 |
+| Pull request tool `body`, three cases | A body ending in each footer form | 2 |
+| `gh pr create --body`, clean | A body with no footer | 0 |
+| `gh pr create --body-file <file>`, clean | A body file with no footer | 0 |
+| `gh pr create -F <file>`, clean | A body file with no footer | 0 |
+| Pull request tool `body`, clean | A body with no footer | 0 |
+| `grep` for the footer | A command carrying the footer that is not a pull request operation | 0 |
+| Input that is not JSON | `not json` | 0 |
 
 ## config/plugins.tsv
 
@@ -631,6 +686,11 @@ fails on, and that is counted too.
 
 `docs/environment.md` carries this script's provenance under "Delivery", and
 its exit-code rule as established fact 5.
+
+It is the only file the repository does not deliver. `BOOTSTRAP_VERSION` is
+the only signal that the pasted copy has fallen behind. It is bumped in the
+commit that changes what `env/setup.sh` does, never on its own. A mismatch
+means the pasted copy is older than the repository's, and a paste is due.
 
 It fetches the repository rather than reading an attached checkout. The clone
 URL comes from `HARNESS_REPO_URL` where that variable is set and non-empty, and
