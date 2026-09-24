@@ -313,6 +313,8 @@ sits in it at any depth and that it is not an error-shaped object. The
 description was read after the resend, not between the create and the resend,
 so whether that create appended the footer was not observed. After the resend
 the description read back exactly as sent, both `Closes` lines included.
+Pull request #15's description, read between its create and the resend, ended
+with the three footer lines; after the resend it read back exactly as sent.
 
 `scripts/attribution-guard.sh`'s `PreToolUse` path sees the tool call, not the
 footer the create call adds. Its `PostToolUse` path runs after the create call
@@ -347,7 +349,42 @@ issue tool.
 `mcp__github__issue_read` with `method` `get` returns a
 `closed_by_pull_requests` field. After pull request #7 was opened against
 `main` with `Closes #4` and `Closes #5` in its description, that field listed
-#7 on both issues. No tool the session holds reads an issue's timeline.
+#7 on both issues.
+
+### Labels, assignees and links
+
+Measured on issue #12 and pull request #15.
+
+| Fact | Observed |
+| --- | --- |
+| Label list | `accessibility`, `bug`, `documentation`, `duplicate`, `enhancement`, `good first issue`, `help wanted`, `invalid`, `question`, `wontfix`, each with `default` `true` |
+| Tool that read it | `curl` on `GET https://api.github.com/repos/<owner>/<repo>/labels`; no `mcp__github__` tool lists labels |
+| Issue create | `mcp__github__issue_write` `create` took `assignees` and `labels` in the create call; the readback showed both |
+| Pull request assignee and label | `mcp__github__issue_write` `update` on the pull request's number set both; `mcp__github__create_pull_request` takes neither |
+| Pull request description after that update | byte-identical to the body sent |
+| Account the session's GitHub access acts as | `PvtKaefsky`, the author of #12 and #15 |
+
+`curl` requests to `api.github.com` pass through the agent proxy, which
+authenticates them: REST reads and the issue timeline endpoint answer 200.
+
+`https://api.github.com/graphql` answers every request with HTTP 403, a query
+as well as the `createLinkedBranch` mutation, with this body:
+
+```
+{"message":"GitHub GraphQL is not available from Claude Code sessions; use the REST API (gh api repos/{owner}/{repo}/...). For review threads, auto-merge, and draft/ready-for-review use the CCR routes on api.github.com: GET /repos/{owner}/{repo}/pulls/{n}/ccr/review_threads, POST /repos/{owner}/{repo}/pulls/{n}/ccr/comments/{comment_id}/resolve (or /unresolve), PUT or DELETE /repos/{owner}/{repo}/pulls/{n}/ccr/auto_merge, POST /repos/{owner}/{repo}/pulls/{n}/ccr/ready_for_review, POST /repos/{owner}/{repo}/pulls/{n}/ccr/convert_to_draft.","documentation_url":"https://docs.anthropic.com/en/docs/claude-code/github-actions"}
+```
+
+`gh` is not installed. A branch carrying an issue number therefore cannot be
+created as a linked branch, and is renamed locally and pushed.
+
+What issue #12 showed, read through `mcp__github__issue_read` and the timeline
+endpoint:
+
+| When | `closed_by_pull_requests` | Timeline |
+| --- | --- | --- |
+| After the branch was pushed, before any commit | none | `assigned`, `labeled` |
+| After two pushed commits carrying `Refs: #12` | none | adds one `referenced` event per commit |
+| After pull request #15 opened with `Closes #12` | #15 | adds `cross-referenced` from #15 |
 
 ## Repositories outside the session's scope
 
