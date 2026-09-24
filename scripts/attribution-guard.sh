@@ -7,7 +7,7 @@ sanitize() { printf '%s' "$1" | LC_ALL=C tr '\n' ' ' | LC_ALL=C tr '\000-\037\17
 
 block() {
   printf 'attribution-guard: matched line -> %s\n' "$(sanitize "$1")" >&2
-  printf 'attribution-guard: remove that attribution line from the pull request body, then retry.\n' >&2
+  printf 'attribution-guard: remove that attribution line from the body, then retry.\n' >&2
   exit 2
 }
 
@@ -49,12 +49,13 @@ fi
 if [ "$TOOL" = Bash ]; then
   CMD=$(printf '%s' "$INPUT" | jq -r 'if (.tool_input | type) == "object" then (.tool_input.command // empty) else empty end' 2>/dev/null)
   if [ -z "$CMD" ]; then exit 0; fi
-  PR_OP=no
-  GH_PR=no
-  if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+pr[[:space:]]+(create|edit)([^[:alnum:]_-]|$)'; then PR_OP=yes; GH_PR=yes; fi
+  WRITE_OP=no
+  SHORT_F=no
+  if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+(pr|issue)[[:space:]]+(create|edit)([^[:alnum:]_-]|$)'; then WRITE_OP=yes; SHORT_F=yes; fi
+  if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+issue[[:space:]]+comment([^[:alnum:]_-]|$)'; then WRITE_OP=yes; SHORT_F=yes; fi
   if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+api([[:space:]]|$)' \
-     && printf '%s\n' "$CMD" | grep -a -q -E -- '/pulls([^[:alnum:]_-]|$)'; then PR_OP=yes; fi
-  if [ "$PR_OP" != yes ]; then exit 0; fi
+     && printf '%s\n' "$CMD" | grep -a -q -E -- '/(pulls|issues)([^[:alnum:]_-]|$)'; then WRITE_OP=yes; fi
+  if [ "$WRITE_OP" != yes ]; then exit 0; fi
   scan "$CMD"
   while IFS= read -r BODY_FILE; do
     if [ -z "$BODY_FILE" ]; then continue; fi
@@ -64,7 +65,7 @@ if [ "$TOOL" = Bash ]; then
       printf '%s\n' "$CMD" \
         | grep -a -o -E -- '--body-file[=[:space:]]+[^[:space:]]+|-F[=[:space:]]+[^[:space:]]+=@[^[:space:]]+|body=@[^[:space:]]+' \
         | sed -E 's/^--body-file[=[:space:]]+//; s/^.*=@//'
-      if [ "$GH_PR" = yes ]; then
+      if [ "$SHORT_F" = yes ]; then
         printf '%s\n' "$CMD" \
           | grep -a -o -E -- '(^|[[:space:]])-F[=[:space:]]*[^[:space:]]+' \
           | sed -E 's/^[[:space:]]*-F[=[:space:]]*//'
