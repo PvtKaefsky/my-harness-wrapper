@@ -281,12 +281,13 @@ a line the reminder asks for out of a commit.
 `scripts/verify.sh` checks that each setting is in the live file, not that it
 takes effect.
 
-No attribution reminder reached context in a session whose live settings
+No attribution reminder reached context in four sessions whose live settings
 carried `attribution.commit` and `attribution.pr` as empty strings and
-`sessionUrl` as `false`. No system reminder in it carried a `Co-Authored-By`
-line, a `Claude-Session` line or a pull request footer. That session ran CLI
-2.1.280. It is one session, so it does not separate the two keys taking effect
-from a CLI version that sends no reminder at all. The Bash tool's description
+`sessionUrl` as `false`. No system reminder in them carried a `Co-Authored-By`
+line, a `Claude-Session` line or a pull request footer. Three ran CLI 2.1.280,
+and the one that opened pull request #7 ran CLI 2.1.282. No session on either
+version has run without those keys, so the four do not separate the two keys
+taking effect from a CLI version that sends no reminder at all. The Bash tool's description
 still directs commit messages and pull request bodies to end with the
 attribution lines a system reminder gives, "when one is present".
 
@@ -302,11 +303,16 @@ on each of the three, and no later read showed it again.
 The create call's response carries two fields, `id` and `url`. The description
 is not among them. The update call's response carries the same two fields. These
 are the fields the tool result shows the session. Neither response carries a
-`body`. Where the `PostToolUse` hook receives the same fields, the guard's
-`PostToolUse` path draws its resend instruction on every successful create,
-whether or not the footer was appended. The shape the hook receives as
-`tool_response` has not been observed, no session having run with that hook
-registered.
+`body`. The guard's `PostToolUse` path draws its resend instruction on every
+successful create, whether or not the footer was appended.
+
+The hook fired on pull request #7's create. It reported that `tool_response`
+carries no string field named `body`, and drew the resend instruction. That
+report does not show the shape of `tool_response`, only that no string `body`
+sits in it at any depth and that it is not an error-shaped object. The
+description was read after the resend, not between the create and the resend,
+so whether that create appended the footer was not observed. After the resend
+the description read back exactly as sent, both `Closes` lines included.
 
 `scripts/attribution-guard.sh`'s `PreToolUse` path sees the tool call, not the
 footer the create call adds. Its `PostToolUse` path runs after the create call
@@ -327,6 +333,28 @@ The cost log, `~/.claude/metrics/costs.jsonl`, is appended by ECC's
 first turn. Each row is a cumulative snapshot for its session, carrying
 `estimated_cost_usd`, `session_id`, `timestamp` and `transcript_path` among its
 keys. No row carries a `total_cost_usd` field.
+
+## Issues
+
+`mcp__github__issue_write` with `method` `create` returns two fields, `id` and
+`url`. The body is not among them.
+
+Three creates have been observed, issues #4, #5 and #6. Each body read back
+through `mcp__github__issue_read` exactly as sent, with no line added. No
+resend was made. `config/settings.json` registers no `PostToolUse` hook for the
+issue tool.
+
+`mcp__github__issue_read` with `method` `get` returns a
+`closed_by_pull_requests` field. After pull request #7 was opened against
+`main` with `Closes #4` and `Closes #5` in its description, that field listed
+#7 on both issues. No tool the session holds reads an issue's timeline.
+
+## Repositories outside the session's scope
+
+A `mcp__github__get_file_contents` read of `cli/cli`, a repository not
+attached to the session, returned a tool error,
+`Access denied: repository "cli/cli" is not configured for this session`,
+naming the allowed repositories. The error carries no HTTP status.
 
 ## Instruction sources
 

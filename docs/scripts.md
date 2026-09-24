@@ -542,10 +542,12 @@ session carries the hook, whatever it has attached.
 
 ## scripts/attribution-guard.sh
 
-Blocks a pull request body carrying a Claude Code attribution line, and reports
-one that a pull request create call returns. Run by the `PreToolUse` and
+Blocks a pull request or issue body carrying a Claude Code attribution line, and
+reports one that a pull request create call returns. Run by the `PreToolUse` and
 `PostToolUse` hooks `config/settings.json` registers, which pass the hook input
-to it on stdin as JSON. The `PostToolUse` hook matches
+to it on stdin as JSON. The `PreToolUse` hook matches `Bash`,
+`mcp__github__create_pull_request`, `mcp__github__update_pull_request` and
+`mcp__github__issue_write`. The `PostToolUse` hook matches
 `mcp__github__create_pull_request` only.
 
 An input whose `hook_event_name` is `PostToolUse` takes the path under
@@ -554,7 +556,7 @@ among them, takes the `PreToolUse` path this table describes.
 
 | `tool_name` | What is scanned |
 | --- | --- |
-| `Bash` | The command, and every file it passes as a body, where the command runs `gh pr create`, `gh pr edit`, or `gh api` against an endpoint carrying `/pulls`. Any other command is left alone. |
+| `Bash` | The command, and every file it passes as a body, where the command runs `gh pr create`, `gh pr edit`, `gh issue create`, `gh issue edit`, `gh issue comment`, or `gh api` against an endpoint carrying `/pulls` or `/issues`. Any other command is left alone. |
 | Anything else | Every string in `tool_input`, at any depth. |
 
 A body file is taken from four token forms: `--body-file <path>`,
@@ -562,11 +564,13 @@ A body file is taken from four token forms: `--body-file <path>`,
 `body=@<path>` after any flag spelling. A field named anything but `body` is
 recognised only after `-F`.
 
-In a command that runs `gh pr create` or `gh pr edit`, `-F` is the short form of
-`--body-file`, and the argument after it is taken as a body file in three
-spellings: `-F <path>`, `-F=<path>` and `-F<path>`. `gh` 2.101.0 accepts all
-three on both commands, and accepts `-F` clustered behind another short flag on
-`gh pr create`, as in `-dF<path>`. The guard covers the three spellings and not
+In a command that runs `gh pr create`, `gh pr edit`, `gh issue create`,
+`gh issue edit` or `gh issue comment`, `-F` is the short form of `--body-file`,
+and the argument after it is taken as a body file in three spellings:
+`-F <path>`, `-F=<path>` and `-F<path>`. `gh` 2.101.0 accepts all three on both
+`gh pr` commands, and accepts `-F` clustered behind another short flag on
+`gh pr create`, as in `-dF<path>`. `gh` 2.63.2 opens the named file as the body
+for all three spellings on each of the three `gh issue` commands. The guard covers the three spellings and not
 the clustered one. A `-F` token is recognised only at the start of the command
 or after whitespace. One run of surrounding quotes is stripped from the
 path. A path that is not a readable regular file is skipped. The first mebibyte
@@ -581,9 +585,11 @@ The match is case-insensitive, against `Generated (with|by) \[?Claude Code` and
 | Nothing matched | 0 | None. |
 | Input that is not a JSON object, carries no `tool_name`, or arrives with no `jq` on `PATH` | 0 | None. |
 
-Scoping the `Bash` branch to pull request operations keeps documentation
-quoting the footer writable. A `grep` for the footer text is not a pull request
-operation, and is not scanned.
+Scoping the `Bash` branch to pull request and issue writes keeps documentation
+quoting the footer writable. A `grep` for the footer text, or a `gh issue list`
+searching for it, is not such a write, and is not scanned. A `gh api` read
+against a `/pulls` or `/issues` endpoint is scanned like a write, so one whose
+command carries the pattern is blocked.
 
 A matched line goes to stderr through the same control-byte replacement
 `scripts/verify.sh` uses, so a body carrying ESC or CR cannot rewrite the line
@@ -591,14 +597,14 @@ an operator reads. The line printed is a line of the body or of a body file, so
 a body file the command names by mistake can put one of its lines in front of
 the session.
 
-These paths reach a pull request body without being scanned. Each is accepted,
+These paths reach a pull request or issue body without being scanned. Each is accepted,
 not handled.
 
 | Path | Why it is missed |
 | --- | --- |
 | `--body "$(cat notes.md)"`, a heredoc, or any other shell substitution | The hook receives the command before the shell expands it, so the body text is not in what it reads. |
-| `curl`, `wget` or a script posting to `/repos/<owner>/<repo>/pulls` | Neither `gh pr` nor `gh api` appears in the command, so the command is not classified as a pull request operation. |
-| `gh api graphql` mutating a pull request | The endpoint is `/graphql`, and the classifier requires `/pulls`. |
+| `curl`, `wget` or a script posting to `/repos/<owner>/<repo>/pulls` or `/issues` | None of `gh pr`, `gh issue` or `gh api` appears in the command, so the command is not classified as a write. |
+| `gh api graphql` mutating a pull request or an issue | The endpoint is `/graphql`, and the classifier requires `/pulls` or `/issues`. |
 | A body-file path carrying a space | The path is read up to the first space, and the truncated path is then skipped as unreadable. |
 | A body file past its first mebibyte | Only the first mebibyte is read. |
 | A `--body-file` flag and its path on different lines of a continued command | Each token form is matched within one line. |
@@ -606,6 +612,8 @@ not handled.
 | A body read from standard input, `-F -` or `--body-file -` | The path `-` is not a regular file, so it is skipped. |
 | A body-file path carrying a variable, a `~` or another shell expansion | The hook receives the command before the shell expands it, so the path is read literally and skipped where no such file exists. |
 | A relative body-file path after a `cd` in the same command | The path is resolved against the hook's working directory, not the directory the command changes to. |
+| An issue comment through `mcp__github__add_issue_comment` or `mcp__github__update_issue_comment` | Neither tool is in the `PreToolUse` matcher, so the guard does not run. |
+| An issue created or edited through any tool but `mcp__github__issue_write` and `Bash` | The `PreToolUse` matcher names no other issue tool, so the guard does not run. |
 | A footer added to a pull request description after the tool call | The `PreToolUse` path sees the tool call, and the footer is not in it. The `PostToolUse` path covers the create call. `docs/environment.md` records the footer under "What the harness supplies regardless". |
 
 Nothing is printed when the guard is inert — `jq` absent, or the script absent
@@ -615,7 +623,7 @@ that found nothing. `scripts/verify.sh` is what separates them.
 ### The PostToolUse path
 
 It acts only on `mcp__github__create_pull_request`. Any other `tool_name` exits
-0.
+0, the issue tool among them, so an issue create has no `PostToolUse` path.
 
 The first row that fits decides the outcome.
 
@@ -711,6 +719,17 @@ passed, and 1 otherwise.
 | Pull request tool `body`, clean | A body with no footer | 0 |
 | `grep` for the footer | A command carrying the footer that is not a pull request operation | 0 |
 | Input that is not JSON | `not json` | 0 |
+| `gh issue create --body`, three cases | A body ending in each footer form | 2 |
+| `gh issue create --body-file <file>`, `-F <file>`, `-F=<file>` and `-F<file>` | A body file ending in the `Generated by` footer | 2 |
+| `gh issue create -F "<file>"` | The same file | 2 |
+| `gh issue edit --body-file <file>` and `-F <file>` | The same file | 2 |
+| `gh issue comment --body-file <file>` and `-F <file>` | The same file | 2 |
+| `gh api repos/o/r/issues -F body=@<file>` | The same file | 2 |
+| Issue tool `body`, three cases | An `mcp__github__issue_write` create whose `body` ends in each footer form | 2 |
+| `gh issue create --body`, clean | A body with no footer | 0 |
+| Issue tool `body`, clean | A body with no footer | 0 |
+| `gh issue list` searching for the footer | A command carrying the footer that is not a write | 0 |
+| `gh issue commentary` with a body file carrying the footer | A subcommand name that only begins with `comment` | 0 |
 | Create response with a `body` carrying the marker | A `body` ending in a `---` rule and the `Generated by` footer carrying a session link | 2 |
 | Create response with a clean `body` | A `body` with no footer | 0 |
 | Create response with no `body` | An `id` and a `url` only | 2 |
