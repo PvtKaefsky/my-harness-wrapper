@@ -31,7 +31,8 @@ delivered.
 
 The environment variables panel carries the four identity variables
 `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
-`GIT_COMMITTER_EMAIL`. No repository needs attaching.
+`GIT_COMMITTER_EMAIL`, and `HARNESS_ASSIGNEE`, the GitHub login that created
+issues and pull requests are assigned to. No repository needs attaching.
 
 The facts that fix that order:
 
@@ -125,6 +126,8 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL git AUTHOR identity` / `FAIL git COMMITTER identity`, `... other than the harness default` | The identity is the harness's own, not the operator's. | The panel pair is absent or holds that address, so `git var` fell through to `/root/.gitconfig`. Set the four variables in the panel. |
 | `FAIL git identity agreement` | Author and committer name different identities. | Set all four panel variables to one pair. |
 | `compare GIT_AUTHOR_IDENT ... -> not run` | One role produced no usable identity, so the agreement test did not run. | Act on that role's `FAIL git ... identity` line above it. |
+| `FAIL HARNESS_ASSIGNEE: ... set and non-empty` | `HARNESS_ASSIGNEE` is unset or empty. The `actual` value separates `unset` and `set but empty`. | Set it in the environment variables panel to the GitHub login that issues and pull requests are assigned to. |
+| `FAIL HARNESS_ASSIGNEE: ... a GitHub login of at most 39 ...` | The value is not a login's form. The line ends with each cause: a character other than a letter, digit or hyphen, a leading or trailing hyphen, consecutive hyphens, or its length in bytes. | Correct the value in the panel. |
 | `FAIL git commit.gpgsign` / `FAIL git tag.gpgsign` | The effective value inside the clone is not `false`. | Read as `actual [true]`, something re-enabled signing; `docs/environment.md` records what is known about signing here and what is not. Read as `unset`, bootstrap's write did not reach this session. |
 
 In the session that first creates these files, verify fails on the missing

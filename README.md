@@ -65,12 +65,13 @@ the same way. `docs/scripts.md` carries where the two loops diverge.
 
 ### Deploy a change
 
-Set the four identity variables in the environment variables panel. A change
-under `config/`, `scripts/` or `env/` bumps the `export BOOTSTRAP_VERSION=`
-line of `env/setup.sh` in its last commit. After the merge to `main`, the
-file's contents are pasted into the environment dialog unchanged. A version
-number is never reused for different contents. Nothing needs attaching. The
-full order, and the facts that fix it, are in `docs/runbook.md`.
+Set the four identity variables and `HARNESS_ASSIGNEE` in the environment
+variables panel. A change under `config/`, `scripts/` or `env/` bumps the
+`export BOOTSTRAP_VERSION=` line of `env/setup.sh` in its last commit. After
+the merge to `main`, the file's contents are pasted into the environment dialog
+unchanged. A version number is never reused for different contents. Nothing
+needs attaching. The full order, and the facts that fix it, are in
+`docs/runbook.md`.
 
 ### Verify a session
 
