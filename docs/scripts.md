@@ -545,7 +545,9 @@ session carries the hook, whatever it has attached.
 Blocks a pull request or issue body carrying a Claude Code attribution line, and
 reports one that a pull request create call returns. Run by the `PreToolUse` and
 `PostToolUse` hooks `config/settings.json` registers, which pass the hook input
-to it on stdin as JSON. The `PostToolUse` hook matches
+to it on stdin as JSON. The `PreToolUse` hook matches `Bash`,
+`mcp__github__create_pull_request`, `mcp__github__update_pull_request` and
+`mcp__github__issue_write`. The `PostToolUse` hook matches
 `mcp__github__create_pull_request` only.
 
 An input whose `hook_event_name` is `PostToolUse` takes the path under
@@ -610,6 +612,8 @@ not handled.
 | A body read from standard input, `-F -` or `--body-file -` | The path `-` is not a regular file, so it is skipped. |
 | A body-file path carrying a variable, a `~` or another shell expansion | The hook receives the command before the shell expands it, so the path is read literally and skipped where no such file exists. |
 | A relative body-file path after a `cd` in the same command | The path is resolved against the hook's working directory, not the directory the command changes to. |
+| An issue comment through `mcp__github__add_issue_comment` or `mcp__github__update_issue_comment` | Neither tool is in the `PreToolUse` matcher, so the guard does not run. |
+| An issue created or edited through any tool but `mcp__github__issue_write` and `Bash` | The `PreToolUse` matcher names no other issue tool, so the guard does not run. |
 | A footer added to a pull request description after the tool call | The `PreToolUse` path sees the tool call, and the footer is not in it. The `PostToolUse` path covers the create call. `docs/environment.md` records the footer under "What the harness supplies regardless". |
 
 Nothing is printed when the guard is inert — `jq` absent, or the script absent
