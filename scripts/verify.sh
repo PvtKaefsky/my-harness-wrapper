@@ -431,6 +431,33 @@ elif [ "$ROLE_IDENT_AUTHOR" != "$ROLE_IDENT_COMMITTER" ]; then
 else
   echo "compare GIT_AUTHOR_IDENT against GIT_COMMITTER_IDENT -> yes, both $ROLE_IDENT_AUTHOR"
 fi
+ASSIGNEE_STATE=$(ident_var_state HARNESS_ASSIGNEE)
+if [ "$ASSIGNEE_STATE" != set ]; then
+  echo "HARNESS_ASSIGNEE -> $ASSIGNEE_STATE"
+  echo "FAIL HARNESS_ASSIGNEE: expected a GitHub login set and non-empty, actual $ASSIGNEE_STATE"
+  fail=1
+else
+  ASSIGNEE_SHOW="[$(sanitize "$HARNESS_ASSIGNEE")]"
+  echo "HARNESS_ASSIGNEE -> $ASSIGNEE_SHOW"
+  ASSIGNEE_WHY=""
+  case "$HARNESS_ASSIGNEE" in
+    *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-]*) ASSIGNEE_WHY="$ASSIGNEE_WHY, a character other than a letter, digit or hyphen" ;;
+  esac
+  case "$HARNESS_ASSIGNEE" in
+    -*|*-) ASSIGNEE_WHY="$ASSIGNEE_WHY, a leading or trailing hyphen" ;;
+  esac
+  case "$HARNESS_ASSIGNEE" in
+    *--*) ASSIGNEE_WHY="$ASSIGNEE_WHY, consecutive hyphens" ;;
+  esac
+  ASSIGNEE_LEN=$(printf '%s' "$HARNESS_ASSIGNEE" | LC_ALL=C wc -c | tr -d ' ')
+  if [ "$ASSIGNEE_LEN" -gt 39 ]; then
+    ASSIGNEE_WHY="$ASSIGNEE_WHY, $ASSIGNEE_LEN bytes"
+  fi
+  if [ -n "$ASSIGNEE_WHY" ]; then
+    echo "FAIL HARNESS_ASSIGNEE: expected a GitHub login of at most 39 letters, digits and single hyphens with no leading or trailing hyphen, actual $ASSIGNEE_SHOW with${ASSIGNEE_WHY#,}"
+    fail=1
+  fi
+fi
 for SIGN_KEY in commit.gpgsign tag.gpgsign; do
   have_sign=$(git -C "$REPO" config --get "$SIGN_KEY" 2>/dev/null); SIGN_RC=$?
   if [ "$REPO_RC" -ne 0 ]; then

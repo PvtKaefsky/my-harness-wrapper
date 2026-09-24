@@ -407,6 +407,32 @@ error string is never compared as if it were an address. Where either role did
 not parse, the agreement test prints `not run` and names which role, rather than
 finding two identical diagnostic strings and reporting them as one identity.
 
+### The assignee login
+
+`HARNESS_ASSIGNEE` is the GitHub login that `config/CLAUDE.md`'s Issues rules
+assign created issues and pull requests to. The assertion runs after the
+identity agreement test.
+
+| State | Line |
+| --- | --- |
+| Unset | `FAIL HARNESS_ASSIGNEE: expected a GitHub login set and non-empty, actual unset` |
+| Set but empty | `FAIL HARNESS_ASSIGNEE: expected a GitHub login set and non-empty, actual set but empty` |
+| Set, not a login's form | `FAIL HARNESS_ASSIGNEE: expected a GitHub login of at most 39 letters, digits and single hyphens with no leading or trailing hyphen, actual [<value>] with <causes>` |
+| Set, a login's form | no `FAIL` line |
+
+The causes are listed together where several hold:
+
+| Cause | Test |
+| --- | --- |
+| `a character other than a letter, digit or hyphen` | a character outside `A-Z`, `a-z`, `0-9` and `-`, spelled out rather than as a range so the locale cannot widen it |
+| `a leading or trailing hyphen` | the value starts or ends with `-` |
+| `consecutive hyphens` | the value contains `--` |
+| `<N> bytes` | the value is longer than 39 bytes |
+
+The value is printed through `sanitize` on its own `HARNESS_ASSIGNEE ->` line;
+a login is not a secret. The assertion tests the login's form, not that the
+account exists.
+
 ### The signing keys
 
 Both keys are checked, because bootstrap writes both. `docs/environment.md`,
