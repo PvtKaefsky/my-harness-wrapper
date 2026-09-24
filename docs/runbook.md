@@ -15,6 +15,10 @@ A change sessions should receive is any change under `config/`, `scripts/` or
 
 A version number is never reused for different contents.
 
+Merging a pull request closes the issues its description names with `Closes`.
+An issue still open after the merge means the base was not the default branch,
+or the line was lost from the description.
+
 A mismatch between the manifest and the clone, the `FAIL
 manifest.bootstrap_version` line of `scripts/verify.sh`, means a paste is due.
 The comparison does not separate an older pasted copy from a newer one. A copy
