@@ -85,8 +85,9 @@ line.
 ### Make an environment change
 
 A rule that governs how the agent works across every project belongs in
-`config/CLAUDE.md`, on a `dev/<feature-name>` branch, past the review gate.
-That file's Environment changes section decides where a change belongs, and
+`config/CLAUDE.md`, on a `<prefix>/<words>` or `<prefix>/<n>-<words>` branch
+named for the task or its one issue, past the review gate. That file's
+Environment changes section decides where a change belongs, and
 `docs/runbook.md` carries the before-commit procedure.
 
 ## Documentation

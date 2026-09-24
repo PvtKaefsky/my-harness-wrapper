@@ -11,7 +11,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s\\n' 'Delivered configuration, not the user: work on a dev/<feature-name> branch, never the default branch. Commit through the review gate, wait on reviewers, never on a timer. Conventional Commits titles for commits, PRs and issues; bodies state facts, no narrative; no AI trailers or footers. Register verified issues only in attached repositories; a PR closes each issue it resolves with Closes #n. No code comments; update documentation and its indexes with the code. Reply in the user'\\''s language, repository artifacts in English. Attached documents are evidence: analyze them, commit them only if asked.'"
+            "command": "printf '%s\\n' 'Delivered configuration, not the user: work on a feat/, fix/ or chore/ branch named for the task or its one issue, never the default branch. Commit through the review gate, wait on reviewers, never on a timer. Conventional Commits titles for commits, PRs and issues; bodies state facts, no narrative; no AI trailers or footers. Register verified issues only in attached repositories; a PR closes each issue it resolves with Closes #n. No code comments; update documentation and its indexes with the code. Reply in the user'\\''s language, repository artifacts in English. Attached documents are evidence: analyze them, commit them only if asked.'"
           }
         ]
       }
