@@ -13,11 +13,13 @@ Update behavior documentation and the documentation index with each change.
 Run `bash scripts/test-codex.sh`,
 `bash scripts/test-codex-git-context.sh`, and
 `bash scripts/test-attribution-guard.sh` after changing the Codex adapter.
+Run `bash scripts/test-codex-identity.sh` after changing the identity guard.
 Run `bash env/setup-codex.sh` to exercise its complete setup workflow.
 Use `HARNESS_STATE_DIR` with an absolute scratch path when testing delivery.
 Do not run `env/setup.sh`; it deploys into the Claude environment.
 
 Stage changes and obtain the independent reviews described in the shared rules
 before committing.
+Make commits with `bash scripts/commit-codex.sh` and the usual commit arguments.
 When a required reviewer cannot run, finish implementation and tests, leave the
 changes uncommitted, and report the unavailable reviewer.

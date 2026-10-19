@@ -6,7 +6,8 @@ are run by hand or by the Codex setup script.
 
 The repository holds a Claude payload in `config/`, a Codex payload in
 `config/codex/`, and separate scripts that deliver each one.
-The Codex adapter delivers shared instructions and verifies their integrity.
+The Codex adapter delivers shared instructions, verifies their integrity, and
+provides a commit command that checks the environment's Git identity.
 It does not install ECC or register automatic hooks.
 Its setup, startup, limitations, and exact Environment UI text are in
 [`docs/codex.md`](docs/codex.md).
@@ -83,6 +84,16 @@ Save the startup instructions from `docs/codex.md` in the Codex environment.
 The setup script prepares files; the saved startup instructions tell the agent
 to read the deployed policy in each task.
 Verification of those files does not establish that a managed task loaded them.
+
+Make commits from the target repository through the identity guard:
+
+```bash
+bash /workspace/my-harness-wrapper/scripts/commit-codex.sh -F /tmp/commit-message.txt
+```
+
+All four author and committer identity variables must be set in the environment.
+The guard rejects missing identity before Git can use global defaults.
+It is an explicit command; it does not install a Git hook.
 
 ### Deploy a Claude change
 

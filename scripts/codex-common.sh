@@ -58,7 +58,8 @@ codex_source_digest() {
     cd -- "$CODEX_WRAPPER_ROOT" || exit
     sha256sum -- config/codex/AGENTS.md config/codex/version env/setup-codex.sh \
       scripts/codex-common.sh scripts/bootstrap-codex.sh scripts/verify-codex.sh \
-      scripts/session-check-codex.sh scripts/check-codex-attribution.sh | sha256sum | cut -d ' ' -f 1
+      scripts/session-check-codex.sh scripts/check-codex-attribution.sh \
+      scripts/check-codex-identity.sh scripts/commit-codex.sh | sha256sum | cut -d ' ' -f 1
   )
 }
 

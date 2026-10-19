@@ -16,14 +16,17 @@ It does not install a Codex CLI, ECC, reviewer agents, MCP servers, or hooks.
 | `AGENTS.md` | Instructions for developing this wrapper repository. |
 | `config/codex/AGENTS.md` | Shared policy read by the agent in each task. |
 | `config/codex/version` | Adapter version in `major.minor.patch` form. |
-| `env/setup-codex.sh` | Runs both test suites, installs the payload, and checks delivery. |
+| `env/setup-codex.sh` | Runs the regression suites, installs the payload, and checks delivery. |
 | `scripts/codex-common.sh` | Source fingerprint, state validation, and manifest validation. |
 | `scripts/bootstrap-codex.sh` | Creates or refreshes an owned delivery release. |
 | `scripts/verify-codex.sh` | Verifies delivery and reports unverified runtime integrations. |
 | `scripts/session-check-codex.sh` | Runs verification and names the instruction file to read. |
 | `scripts/check-codex-attribution.sh` | Checks one prepared message or body file. |
+| `scripts/check-codex-identity.sh` | Requires explicit environment identity and checks Git's resolved roles. |
+| `scripts/commit-codex.sh` | Checks identity before invoking Git in the caller's repository. |
 | `scripts/test-codex.sh` | Tests delivery, failure handling, and explicit attribution checking in a temporary Git repository. |
 | `scripts/test-codex-git-context.sh` | Checks that inherited Git selectors cannot redirect fixture commits or source discovery. |
+| `scripts/test-codex-identity.sh` | Exercises blocked and successful commits with conflicting global identity settings. |
 
 ## Environment UI
 
@@ -140,7 +143,8 @@ The manifest records the adapter version, full source commit, checkout dirty
 flag at installation, source fingerprint, and payload checksum.
 It contains no environment variables or credential values.
 The source fingerprint covers the payload, version, setup, bootstrap,
-verification, startup, common helpers, and explicit attribution checker.
+verification, startup, common helpers, explicit attribution checker, identity
+checker, and guarded commit command.
 The dirty flag describes installation time and is not a live status check.
 An installation made with uncommitted files reports a `NOTE`; the recorded
 commit alone does not reproduce those files.
@@ -158,6 +162,40 @@ A checksum match distinguishes matching bytes from changed bytes.
 It does not establish who produced the files or that Codex read them.
 A matching commit identifies the local source revision; it does not establish
 remote freshness or reproducibility of uncommitted files.
+
+## Commit identity
+
+From the target repository, use the guarded command with the usual commit
+arguments:
+
+```bash
+bash /workspace/my-harness-wrapper/scripts/commit-codex.sh -F /tmp/commit-message.txt
+```
+
+The command checks `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`,
+and `GIT_COMMITTER_EMAIL` before invoking Git.
+Each must be exported, nonempty, and contain a non-whitespace character.
+Both Git roles must resolve to the corresponding variables and name the same
+identity.
+Diagnostics name missing or mismatched variables without printing their values.
+The command exits one without invoking `git commit` when a check fails.
+Global `user.name` and `user.email` do not satisfy the required variables.
+Correct missing values in environment settings and recheck after they reach the
+running task.
+
+Check identity without making a commit:
+
+```bash
+bash /workspace/my-harness-wrapper/scripts/check-codex-identity.sh
+```
+
+The guard preserves the caller's working directory, Git context, commit
+arguments, signing configuration, and Git's exit status.
+Explicit author-selection options retain Git's usual behavior.
+The guard does not rewrite commits or verify GitHub's email-to-account mapping.
+It is an explicit command, not an installed Git or Codex hook.
+Raw `git commit` can bypass it; the shared policy requires the guarded command.
+Delivery setup and verification remain usable without a personal identity.
 
 ## Attribution
 
@@ -214,6 +252,7 @@ References:
 bash scripts/test-attribution-guard.sh
 bash scripts/test-codex.sh
 bash scripts/test-codex-git-context.sh
+bash scripts/test-codex-identity.sh
 bash env/setup-codex.sh
 ```
 
