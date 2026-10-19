@@ -3,6 +3,9 @@
 This file carries what each script does, and the facts behind the shape of each
 step. `docs/runbook.md` carries how to run them and how to read their output.
 
+Codex scripts are documented in `docs/codex.md`.
+The sections below describe the Claude implementation.
+
 ## scripts/bootstrap.sh
 
 Delivers `config/` into the session config directory. Run as root by
