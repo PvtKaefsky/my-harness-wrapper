@@ -1,5 +1,8 @@
 # Runbook
 
+This runbook describes Claude delivery.
+`docs/codex.md` describes Codex delivery and its separate setup script.
+
 ## Deploying a change
 
 A change sessions should receive is any change under `config/`, `scripts/` or
