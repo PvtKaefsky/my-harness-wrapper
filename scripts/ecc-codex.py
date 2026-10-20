@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import errno
 import hashlib
 import json
 import os
@@ -499,24 +500,92 @@ def safe_directory(path, owned=False, writable=False):
         raise
 
 
-def user_skill_scope(writable=False):
+def scope_has_repository(directory):
+    try:
+        os.stat(".git", dir_fd=directory, follow_symlinks=False)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def user_skill_home(writable=False):
     value = os.environ.get("HOME")
     if not value:
         raise ValueError("ECC_SKILL_HOME_UNAVAILABLE")
     home = Path(value)
     if redact(value) != value or str(home) != value:
         raise ValueError("ECC_SKILL_HOME_UNSAFE")
-    fds = []
     try:
-        for path in (home, home / ".agents", home / ".agents/skills"):
-            fds.append(safe_directory(path, owned=True, writable=writable))
-            for parent in (path, *path.parents):
-                if (parent / ".git").is_file() or (parent / ".git/HEAD").exists():
-                    raise ValueError("ECC_SKILL_SCOPE_INSIDE_REPOSITORY")
-        return home, fds.pop()
-    finally:
-        for fd in fds:
+        fd = safe_directory(home, owned=True, writable=writable)
+    except FileNotFoundError as error:
+        raise ValueError("ECC_SKILL_HOME_ABSENT") from error
+    except OSError as error:
+        if error.errno in (errno.ENOTDIR, errno.ELOOP):
+            raise ValueError("ECC_SKILL_HOME_PATH_UNSAFE") from error
+        raise
+    try:
+        for parent in (home, *home.parents):
+            if (parent / ".git").is_file() or (parent / ".git/HEAD").exists():
+                raise ValueError("ECC_SKILL_SCOPE_INSIDE_REPOSITORY")
+        if writable:
+            temporary = ".ecc-write-" + uuid.uuid4().hex
+            try:
+                probe = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=fd)
+            except OSError as error:
+                raise PermissionError("ECC_SKILL_HOME_WRITE_FAILED") from error
+            os.close(probe)
+            os.unlink(temporary, dir_fd=fd)
+        return home, fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def user_skill_scope(writable=False, create=False):
+    home, fd = user_skill_home(writable=writable)
+    try:
+        for name in (".agents", "skills"):
+            if create:
+                try:
+                    os.mkdir(name, mode=0o700, dir_fd=fd)
+                    os.fsync(fd)
+                except FileExistsError:
+                    pass
+            try:
+                child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            except FileNotFoundError as error:
+                raise ValueError("ECC_SKILL_SCOPE_PARENT_MISSING") from error
+            except OSError as error:
+                if error.errno in (errno.ENOTDIR, errno.ELOOP):
+                    raise ValueError("ECC_SKILL_SCOPE_PATH_UNSAFE") from error
+                raise
             os.close(fd)
+            fd = child
+            info = os.fstat(fd)
+            if info.st_uid != os.getuid() or info.st_mode & 0o022 or info.st_mode & 0o500 != 0o500:
+                raise PermissionError("ECC_SKILL_DIRECTORY_OWNERSHIP_OR_MODE")
+            if writable and info.st_mode & 0o200 == 0:
+                raise PermissionError("ECC_SKILL_DIRECTORY_READ_ONLY")
+            if scope_has_repository(fd):
+                raise ValueError("ECC_SKILL_SCOPE_INSIDE_REPOSITORY")
+        return home, fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def check_skill_scope(home, scope, target=None):
+    current_home, current = user_skill_scope()
+    try:
+        if current_home != home or (os.fstat(current).st_dev, os.fstat(current).st_ino) != (os.fstat(scope).st_dev, os.fstat(scope).st_ino):
+            raise ValueError("ECC_SKILL_SCOPE_CHANGED")
+        if target is not None:
+            actual = os.stat(SKILL, dir_fd=current, follow_symlinks=False)
+            expected = os.fstat(target)
+            if (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino):
+                raise ValueError("ECC_SKILL_DESTINATION_CHANGED")
+    finally:
+        os.close(current)
 
 
 def skill_names(directory, maximum):
@@ -558,6 +627,36 @@ class SkillRecorder(Recorder):
                              hook_trust=UNVERIFIED, hook_execution=UNVERIFIED, ecc_readiness="ECC NOT READY", events=[])
 
 
+def bundled_skill_source(recorder):
+    root = Path(__file__).absolute().parents[1] / "config/codex/ecc-python-patterns"
+    recorder.data.update(skill_source=str(root), source_kind="wrapper-vendored-one-skill")
+    try:
+        source_fd = safe_directory(root, owned=True)
+    except FileNotFoundError as error:
+        raise ValueError("ECC_SKILL_PINNED_SOURCE_UNAVAILABLE") from error
+    try:
+        payloads = {}
+        for name, expected in SKILL_FILES.items():
+            try:
+                payload = read_regular(name, LIMIT, dir_fd=source_fd)
+            except FileNotFoundError as error:
+                raise ValueError("ECC_SKILL_SOURCE_" + ("SKILL" if name == "SKILL.md" else "LICENSE") + "_ABSENT") from error
+            if hashlib.sha256(payload).hexdigest() != expected:
+                raise ValueError("ECC_SKILL_SOURCE_" + ("SKILL" if name == "SKILL.md" else "LICENSE") + "_BYTES_MISMATCH")
+            payloads[name] = payload
+        metadata = json.loads(read_regular("source.json", LIMIT, dir_fd=source_fd))
+        expected_files = {name: dict(upstream_path="skills/python-patterns/SKILL.md" if name == "SKILL.md" else name,
+                                     sha256=expected) for name, expected in SKILL_FILES.items()}
+        if not isinstance(metadata, dict) or metadata.get("repository") != SOURCE or metadata.get("commit") != SHA or metadata.get("files") != expected_files or not isinstance(metadata.get("verification"), str) or not metadata["verification"]:
+            raise ValueError("ECC_SKILL_SOURCE_METADATA_INVALID")
+        if skill_names(source_fd, 3) != {*SKILL_FILES, "source.json"}:
+            raise ValueError("ECC_SKILL_SOURCE_RESOURCES_CONFLICT")
+        recorder.data.update(source_files=dict(SKILL_FILES), source_metadata=metadata)
+        return payloads["SKILL.md"], payloads["LICENSE"]
+    finally:
+        os.close(source_fd)
+
+
 def skill_setup(state, commit, digest):
     directory = evidence_directory(state, create=True, name="ecc-skill-probe")
     try:
@@ -587,43 +686,21 @@ def skill_setup(state, commit, digest):
     try:
         if binding_missing:
             raise ValueError("ECC_SKILL_SCOPE_BINDING_MISSING")
-        native_dir = evidence_directory(state)
-        native = json.loads(read_regular(native_dir / "status.json", STATUS_LIMIT, private=True))
-        native_log = read_regular(native_dir / "diagnostic.log", LOG_LIMIT, private=True)
-        if not isinstance(native, dict) or native.get("complete") is not True or native.get("source_commit") != commit or native.get("source_sha256") != digest or native.get("upstream_sha") != SHA or hashlib.sha256(native_log).hexdigest() != native.get("log_sha256"):
-            raise ValueError("ECC_SKILL_SOURCE_EVIDENCE_UNAVAILABLE")
-        source = native.get("marketplace_path")
-        if not isinstance(source, str) or redact(source) != source or native.get("effective_revision") != SHA:
-            raise ValueError("ECC_SKILL_PINNED_SOURCE_UNAVAILABLE")
-        root = Path(source)
-        recorder.data["skill_source"] = str(root / "skills" / SKILL)
-        try:
-            source_fd = safe_directory(root / "skills" / SKILL, owned=True)
-        except FileNotFoundError as error:
-            raise ValueError("ECC_SKILL_SOURCE_ABSENT") from error
-        try:
-            if skill_names(source_fd, 1) != {"SKILL.md"}:
-                raise ValueError("ECC_SKILL_SOURCE_RESOURCES_CONFLICT")
-            content = read_regular("SKILL.md", LIMIT, dir_fd=source_fd)
-        finally:
-            os.close(source_fd)
-        root_fd = safe_directory(root, owned=True)
-        try:
-            license_bytes = read_regular("LICENSE", LIMIT, dir_fd=root_fd)
-        finally:
-            os.close(root_fd)
-        actual = recorder.run("skill-source-revision", ["git", "-c", "core.fsmonitor=false", "-C", str(root), "rev-parse", "HEAD"]).strip()
-        if actual != SHA:
-            raise ValueError("ECC_SKILL_SOURCE_REVISION_MISMATCH")
-        recorder.data["source_files"] = {"SKILL.md": hashlib.sha256(content).hexdigest(),
-                                         "LICENSE": hashlib.sha256(license_bytes).hexdigest()}
-        if recorder.data["source_files"] != SKILL_FILES:
-            raise ValueError("ECC_SKILL_SOURCE_BYTES_MISMATCH")
-        home, scope = user_skill_scope(writable=True)
+        content, license_bytes = bundled_skill_source(recorder)
+        home, home_fd = user_skill_home(writable=True)
+        os.close(home_fd)
         destination = home / ".agents/skills" / SKILL
         recorder.data.update(home=str(home), destination=str(destination))
         if binding is not None and binding["home"] != str(home):
             raise ValueError("ECC_SKILL_HOME_CHANGED")
+        if binding is None:
+            binding = dict(schema_version=1, upstream_sha=SHA, skill_name=SKILL, uid=os.getuid(),
+                           home=str(home), destination=str(destination))
+            atomic_write(directory / "scope.json", (json.dumps(binding, indent=2) + "\n").encode())
+            recorder.data["placement_home"] = str(home)
+            recorder.note("skill-scope-bound", "initial placement HOME retained across blocked and interrupted attempts")
+        home, scope = user_skill_scope(writable=True, create=True)
+        check_skill_scope(home, scope)
         try:
             info = os.stat(SKILL, dir_fd=scope, follow_symlinks=False)
             preexisting = True
@@ -636,12 +713,6 @@ def skill_setup(state, commit, digest):
         if preexisting:
             if not previous or previous.get("placement") != "PLACED" or previous.get("safely_delivered") is not True or previous.get("destination") != str(destination) or previous.get("home") != str(home):
                 raise ValueError("ECC_SKILL_DESTINATION_COLLISION")
-        if binding is None:
-            binding = dict(schema_version=1, upstream_sha=SHA, skill_name=SKILL, uid=os.getuid(),
-                           home=str(home), destination=str(destination))
-            atomic_write(directory / "scope.json", (json.dumps(binding, indent=2) + "\n").encode())
-            recorder.data["placement_home"] = str(home)
-            recorder.note("skill-scope-bound", "initial placement HOME retained across blocked and interrupted attempts")
         if not preexisting:
             os.mkdir(SKILL, mode=0o700, dir_fd=scope)
         target = os.open(SKILL, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=scope)
@@ -661,6 +732,7 @@ def skill_setup(state, commit, digest):
                 finally:
                     os.unlink(temporary, dir_fd=target)
             os.fsync(target)
+        check_skill_scope(home, scope, target)
         recorder.data.update(delivered_files=skill_bytes(target), destination_uid=info.st_uid,
                              destination_mode=oct(stat.S_IMODE(info.st_mode)), placement="PLACED", safely_delivered=True)
         recorder.data["complete"] = True
@@ -697,6 +769,7 @@ def skill_status(state, commit, digest):
         info = os.fstat(target)
         if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700 or info.st_uid != data.get("destination_uid") or oct(stat.S_IMODE(info.st_mode)) != data.get("destination_mode"):
             raise PermissionError("ECC_SKILL_DESTINATION_OWNERSHIP_OR_MODE")
+        check_skill_scope(home, scope, target)
         if skill_bytes(target) != data.get("delivered_files"):
             raise ValueError("ECC_SKILL_DELIVERY_EVIDENCE_MISMATCH")
         print(f"ECC_SKILL_FILES_PERSISTED: {destination / 'SKILL.md'}; sha256={SKILL_SHA256}")

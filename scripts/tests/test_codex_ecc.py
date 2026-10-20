@@ -39,7 +39,7 @@ class Fixture:
         (self.bin / "codex").chmod(0o700)
         self.env = dict(os.environ, HOME=str(self.home), HARNESS_STATE_DIR=str(self.state),
                         PATH=f"{self.bin}:{os.environ['PATH']}", ECC_TEST_CASE=name,
-                        ECC_TEST_FIXTURES=str(ROOT / "scripts/tests/fixtures"),
+                        ECC_TEST_FIXTURES=str(ROOT / "config/codex/ecc-python-patterns"),
                         GIT_CONFIG_GLOBAL=str(self.home / "gitconfig"), GIT_CONFIG_NOSYSTEM="1")
         self.env["CODEX_HOME"] = str(self.home / ".codex")
         for key in tuple(self.env):

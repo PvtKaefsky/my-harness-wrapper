@@ -8,7 +8,8 @@ The Claude implementation remains separate.
 Setup runs without root access.
 The native ECC diagnostic probe uses supported native CLI registration commands.
 A separate temporary skills-only experiment copies one unchanged pinned skill
-and its upstream license into an already existing user skill scope during setup.
+and its upstream license from a wrapper-owned offline source into user scope during setup.
+It securely creates only missing `.agents` and `.agents/skills` parents in an owned writable HOME.
 It does not change project files, Git identity, or Git signing settings.
 It does not install a Codex CLI or reviewer agents or approve hook trust.
 Its bounded ECC installation attempt and retained evidence are described in
@@ -20,6 +21,7 @@ Its bounded ECC installation attempt and retained evidence are described in
 | --- | --- |
 | `AGENTS.md` | Instructions for developing this wrapper repository. |
 | `config/codex/AGENTS.md` | Shared policy read by the agent in each task. |
+| `config/codex/ecc-python-patterns/` | One pinned upstream skill, MIT license and source verification metadata; shared by setup and tests. |
 | `config/codex/version` | Adapter version in `major.minor.patch` form. |
 | `env/setup-codex.sh` | Runs regression suites, installs the payload, captures native ECC and one-skill diagnostics, and checks delivery. |
 | `scripts/codex-common.sh` | Source fingerprint, state validation, and manifest validation. |
@@ -30,7 +32,7 @@ Its bounded ECC installation attempt and retained evidence are described in
 | `scripts/ecc-codex.py` | Runs native probes, bounded user-skill placement, and read-only task measurement with separate evidence. |
 | `scripts/test-codex-ecc.sh` | Runs deterministic setup/startup and deletion regressions through isolated copies of the real setup path. |
 | `scripts/test-codex-ecc-skill.sh` | Tests real setup placement, separate-process measurement, negative controls, and deletion acceptance. |
-| `scripts/tests/` | ECC test runners, bounded fake CLI, and pinned upstream skill/license data fixtures outside discovery roots. |
+| `scripts/tests/` | ECC test runners and bounded fake native CLI; tests use the same Codex-owned skill source as setup. |
 | `scripts/check-codex-attribution.sh` | Checks one prepared message or body file. |
 | `scripts/check-codex-identity.sh` | Requires explicit environment identity and checks Git's resolved roles. |
 | `scripts/commit-codex.sh` | Checks identity before invoking Git in the caller's repository. |
@@ -168,7 +170,10 @@ flag at installation, source fingerprint, and payload checksum.
 It contains no environment variables or credential values.
 The source fingerprint covers the payload, version, setup, bootstrap,
 verification, startup, common helpers, explicit attribution checker, identity
-checker, guarded commit command, ECC helpers, both ECC suites, and pinned upstream skill/license data fixtures.
+checker, guarded commit command, ECC helpers, both ECC suites, and the pinned
+Codex-owned skill, license and provenance metadata.
+An absent or symlinked pinned source file contributes an `UNAVAILABLE` path marker
+to the fingerprint so skill setup can retain its named source blocker.
 ECC diagnostics are not part of the adapter release or its manifest.
 The dirty flag describes installation time and is not a live status check.
 An installation made with uncommitted files reports a `NOTE`; the recorded

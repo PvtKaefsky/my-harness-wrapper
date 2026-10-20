@@ -11,7 +11,8 @@ provides a commit command that checks the environment's Git identity.
 Its bounded setup probe attempts pinned native ECC registration and retains
 private diagnostics outside the checkout.
 A temporary skills-only experiment places unchanged pinned `python-patterns`
-bytes in the existing current user scope `$HOME/.agents/skills` during setup.
+bytes from a wrapper-owned offline source into `$HOME/.agents/skills` during setup.
+It securely creates missing `.agents` and `skills` parents in an owned writable HOME.
 It measures file persistence separately from provider discovery and invocation.
 It does not certify full ECC support.
 Task startup reads that evidence and blocks ordinary project work while ECC
@@ -98,8 +99,13 @@ fresh diagnostic task using the acceptance instructions in `docs/codex-ecc.md`.
 ECC evidence lives at `/workspace/.harness-wrapper/ecc-setup/status.json` and
 `diagnostic.log`, or under the selected absolute `HARNESS_STATE_DIR`.
 Separate one-skill evidence lives in `ecc-skill-probe/` under the same state.
-The user skill root must already exist, be owned and writable, and pass path and
-collision checks; a blocker does not select another installation path.
+HOME must already exist, be owned and writable, and pass path checks.
+Setup creates only missing `.agents` and `.agents/skills` directories.
+Existing scope directories must pass ownership, permission and collision checks.
+A blocker does not select another installation path.
+The pinned one-skill source and MIT license are promoted regression fixtures in
+`config/codex/ecc-python-patterns/`; setup does not fetch a skill source.
+This limited vendoring does not deliver the native ECC plugin.
 [`docs/codex-ecc.md`](docs/codex-ecc.md) describes evidence, privacy, readiness,
 and the diagnostic-only exception.
 This diagnostic instrumentation refers to issue #22 and does not resolve it.

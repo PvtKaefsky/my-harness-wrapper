@@ -56,14 +56,22 @@ codex_validate_state() {
 codex_source_digest() {
   (
     cd -- "$CODEX_WRAPPER_ROOT" || exit
-    sha256sum -- config/codex/AGENTS.md config/codex/version env/setup-codex.sh \
-      scripts/codex-common.sh scripts/bootstrap-codex.sh scripts/verify-codex.sh \
-      scripts/session-check-codex.sh scripts/check-codex-attribution.sh \
-      scripts/check-codex-identity.sh scripts/commit-codex.sh \
-      scripts/ecc-codex.sh scripts/ecc-codex.py scripts/test-codex-ecc.sh \
-      scripts/tests/test_codex_ecc.py scripts/tests/fake_codex_ecc.py \
-      scripts/test-codex-ecc-skill.sh scripts/tests/test_codex_ecc_skill.py \
-      scripts/tests/fixtures/python-patterns.md scripts/tests/fixtures/ECC-LICENSE.txt | sha256sum | cut -d ' ' -f 1
+    {
+      sha256sum -- config/codex/AGENTS.md config/codex/version env/setup-codex.sh \
+        scripts/codex-common.sh scripts/bootstrap-codex.sh scripts/verify-codex.sh \
+        scripts/session-check-codex.sh scripts/check-codex-attribution.sh \
+        scripts/check-codex-identity.sh scripts/commit-codex.sh \
+        scripts/ecc-codex.sh scripts/ecc-codex.py scripts/test-codex-ecc.sh \
+        scripts/tests/test_codex_ecc.py scripts/tests/fake_codex_ecc.py \
+        scripts/test-codex-ecc-skill.sh scripts/tests/test_codex_ecc_skill.py || exit
+      for source in config/codex/ecc-python-patterns/{SKILL.md,LICENSE,source.json}; do
+        if [ -f "$source" ] && [ ! -L "$source" ]; then
+          sha256sum -- "$source" || exit
+        else
+          printf 'UNAVAILABLE  %s\n' "$source"
+        fi
+      done
+    } | sha256sum | cut -d ' ' -f 1
   )
 }
 

@@ -41,8 +41,8 @@ def package():
              "hooks/codex-hooks.json": "{}", "assets/ecc-icon.svg": "stub icon", "assets/hero.png": "stub image"}
     fixtures = Path(os.environ["ECC_TEST_FIXTURES"])
     if scenario != "skill-source-absent":
-        files["skills/python-patterns/SKILL.md"] = (fixtures / "python-patterns.md").read_text()
-    files["LICENSE"] = (fixtures / "ECC-LICENSE.txt").read_text()
+        files["skills/python-patterns/SKILL.md"] = (fixtures / "SKILL.md").read_text()
+    files["LICENSE"] = (fixtures / "LICENSE").read_text()
     if scenario == "skill-source-changed":
         files["skills/python-patterns/SKILL.md"] += "changed\n"
     for name, content in files.items():
@@ -97,7 +97,7 @@ elif args[:4] == ["plugin", "marketplace", "add", "affaan-m/ECC"]:
         print("proxy connection refused", file=sys.stderr)
         sys.exit(8)
     if scenario == "readonly":
-        print("Read-only file system: native configuration", file=sys.stderr)
+        print("Error: failed to create marketplace install directory /run/codex-environment/codex-home/.tmp/marketplaces: Read-only file system (os error 30)", file=sys.stderr)
         sys.exit(13)
     if scenario == "redaction":
         print("Authorization: Bearer credential-value", file=sys.stderr)
