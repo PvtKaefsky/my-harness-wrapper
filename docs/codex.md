@@ -5,9 +5,12 @@
 The adapter delivers shared working instructions for Codex cloud tasks.
 It verifies the delivered payload against the source checkout.
 The Claude implementation remains separate.
-Setup runs without root access and without writing managed Codex configuration.
+Setup runs without root access.
+The ECC diagnostic probe uses only supported native CLI registration commands.
 It does not change project files, Git identity, or Git signing settings.
-It does not install a Codex CLI, ECC, reviewer agents, MCP servers, or hooks.
+It does not install a Codex CLI or reviewer agents or approve hook trust.
+Its bounded ECC installation attempt and retained evidence are described in
+[`codex-ecc.md`](codex-ecc.md).
 
 ## Files
 
@@ -16,11 +19,15 @@ It does not install a Codex CLI, ECC, reviewer agents, MCP servers, or hooks.
 | `AGENTS.md` | Instructions for developing this wrapper repository. |
 | `config/codex/AGENTS.md` | Shared policy read by the agent in each task. |
 | `config/codex/version` | Adapter version in `major.minor.patch` form. |
-| `env/setup-codex.sh` | Runs the regression suites, installs the payload, and checks delivery. |
+| `env/setup-codex.sh` | Runs regression suites, installs the payload, captures ECC diagnostics, and checks delivery. |
 | `scripts/codex-common.sh` | Source fingerprint, state validation, and manifest validation. |
 | `scripts/bootstrap-codex.sh` | Creates or refreshes an owned delivery release. |
 | `scripts/verify-codex.sh` | Verifies delivery and reports unverified runtime integrations. |
-| `scripts/session-check-codex.sh` | Runs verification and names the instruction file to read. |
+| `scripts/session-check-codex.sh` | Verifies delivery, names the policy, reads retained setup evidence, and fails closed on ECC readiness. |
+| `scripts/ecc-codex.sh` | Validates owned state and holds its lock for setup capture or read-only evidence consumption. |
+| `scripts/ecc-codex.py` | Runs bounded native probes, atomically records redacted evidence, and reports task readiness. |
+| `scripts/test-codex-ecc.sh` | Runs deterministic setup/startup and deletion regressions through isolated copies of the real setup path. |
+| `scripts/tests/` | ECC test runner and bounded fake native Codex executable. |
 | `scripts/check-codex-attribution.sh` | Checks one prepared message or body file. |
 | `scripts/check-codex-identity.sh` | Requires explicit environment identity and checks Git's resolved roles. |
 | `scripts/commit-codex.sh` | Checks identity before invoking Git in the caller's repository. |
@@ -36,7 +43,7 @@ Select the Codex implementation branch while testing an unmerged adapter.
 Use `main` after the implementation is merged.
 `feat/claude-harness` preserves the original Claude implementation.
 
-Paste this into the setup script field (`install_script`):
+The current setup script field (`install_script`) stays exactly as follows:
 
 ```bash
 #!/usr/bin/env bash
@@ -69,9 +76,11 @@ The payload is outside project roots and is read explicitly by those instruction
 Copying it does not register global Codex instructions.
 When `HARNESS_STATE_DIR` is customized, update the startup payload path to match.
 
-Setup requires Bash, Git, jq, and GNU/Linux utilities including `flock`,
+Setup requires Bash, Git, jq, Python 3.9 or newer, and GNU/Linux utilities including `flock`,
 `realpath`, `sha256sum`, and `mv -T`.
-It does not download packages or require new credentials.
+The setup-only ECC probe can download its pinned native marketplace and plugin
+through the configured CLI and network policy.
+It does not request new credentials or change network policy.
 Existing GitHub authentication supplies attached-repository access.
 Keep existing network settings unless another integration needs a destination.
 
@@ -82,9 +91,9 @@ Enter personal values in environment settings when those actions are required.
 Delivery verification does not assert that identity or forge access is configured.
 No credential values belong in setup scripts or this repository.
 
-After setup and review, save and publish the environment through the product.
-Start a new task and confirm that it reads the shared payload and runs the
-startup check.
+Deployment requires the reviewed source to reach the checkout selected by a
+subsequent actual Environment build.
+Publication and a fresh task are product-only acceptance boundaries.
 Publishing, restoration, and managed-task instruction loading require their own
 verification; a passing local setup does not establish them.
 
@@ -98,6 +107,9 @@ Symlinked state paths are rejected.
 .harness-wrapper/
   .owner
   .lock
+  ecc-setup/
+    diagnostic.log
+    status.json
   releases/
     release.<generated-id>/
       AGENTS.md
@@ -137,14 +149,20 @@ bash /workspace/my-harness-wrapper/scripts/verify-codex.sh
 
 Exit zero means the delivery checks passed.
 Exit nonzero means a required check failed.
-The session check preserves this status.
+The session check reports delivery verification and retained ECC evidence
+separately, preserving a delivery failure's exit status.
+Otherwise it returns nonzero while ECC readiness is not demonstrated.
+The setup script ends with delivery-only verification so an expected ECC probe
+failure permits a diagnostic task to read the retained evidence.
+Wrapper build and integrity failures remain fatal.
 
 The manifest records the adapter version, full source commit, checkout dirty
 flag at installation, source fingerprint, and payload checksum.
 It contains no environment variables or credential values.
 The source fingerprint covers the payload, version, setup, bootstrap,
 verification, startup, common helpers, explicit attribution checker, identity
-checker, and guarded commit command.
+checker, guarded commit command, ECC helpers, and ECC regression fixtures.
+ECC diagnostics are not part of the adapter release or its manifest.
 The dirty flag describes installation time and is not a live status check.
 An installation made with uncommitted files reports a `NOTE`; the recorded
 commit alone does not reproduce those files.
@@ -226,8 +244,11 @@ codex plugin add ecc@ecc
 codex plugin list --json
 ```
 
-These are optional integration commands, not adapter setup steps.
-Run them only through a supported writable configuration location.
+The repository-owned setup probe uses native commands with the selected fixed
+upstream SHA, after inspecting the setup executable's supported options.
+It never falls back to floating main.
+Task startup only reads retained evidence and never invokes plugin modification
+commands.
 The CLI's installation state does not establish managed cloud task discovery.
 Do not relocate or overwrite managed `CODEX_HOME` to force installation.
 ECC's native hook documentation requires review and trust separately from plugin
@@ -239,7 +260,11 @@ If a required reviewer cannot run, finish implementation and tests, leave the
 changes uncommitted, and ask how to proceed.
 Claude reviewer names and model identifiers are not automatically Codex roles.
 The adapter does not create role definitions or a Codex tool-event adapter.
-Automatic blocking and post-create attribution handling remain unimplemented.
+Automatic attribution blocking and post-create attribution handling remain
+unimplemented.
+The explicit startup command blocks ordinary work while ECC is not ready.
+See [`codex-ecc.md`](codex-ecc.md) for the diagnostic-only exception and the
+separate skill and hook acceptance stages.
 
 References:
 
@@ -253,6 +278,7 @@ bash scripts/test-attribution-guard.sh
 bash scripts/test-codex.sh
 bash scripts/test-codex-git-context.sh
 bash scripts/test-codex-identity.sh
+bash scripts/test-codex-ecc.sh
 bash env/setup-codex.sh
 ```
 
