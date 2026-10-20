@@ -9,7 +9,7 @@ import sys
 
 SHA = "76aaa77df6adc5b889e689007bf99b9a4f74af34"
 scenario = os.environ.get("ECC_TEST_CASE", "success")
-home = Path.home() / ".codex"
+home = Path(os.environ["CODEX_HOME"])
 home.mkdir(exist_ok=True)
 record = home / "fake.json"
 state = json.loads(record.read_text()) if record.exists() else {"marketplace": False, "installed": False, "installs": 0, "adds": 0}
@@ -39,6 +39,12 @@ def package():
              ".claude-plugin/marketplace.json": json.dumps({"name": "ecc", "plugins": [{"name": "ecc", "source": "./"}]}),
              "skills/configure-ecc/SKILL.md": "stub skill; never invoked\n", ".mcp.json": "{}",
              "hooks/codex-hooks.json": "{}", "assets/ecc-icon.svg": "stub icon", "assets/hero.png": "stub image"}
+    fixtures = Path(os.environ["ECC_TEST_FIXTURES"])
+    if scenario != "skill-source-absent":
+        files["skills/python-patterns/SKILL.md"] = (fixtures / "python-patterns.md").read_text()
+    files["LICENSE"] = (fixtures / "ECC-LICENSE.txt").read_text()
+    if scenario == "skill-source-changed":
+        files["skills/python-patterns/SKILL.md"] += "changed\n"
     for name, content in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)

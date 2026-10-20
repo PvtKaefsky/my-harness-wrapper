@@ -10,6 +10,10 @@ The Codex adapter delivers shared instructions, verifies their integrity, and
 provides a commit command that checks the environment's Git identity.
 Its bounded setup probe attempts pinned native ECC registration and retains
 private diagnostics outside the checkout.
+A temporary skills-only experiment places unchanged pinned `python-patterns`
+bytes in the existing current user scope `$HOME/.agents/skills` during setup.
+It measures file persistence separately from provider discovery and invocation.
+It does not certify full ECC support.
 Task startup reads that evidence and blocks ordinary project work while ECC
 runtime acceptance is unverified.
 Hook trust remains separate.
@@ -88,9 +92,14 @@ Save the startup instructions from `docs/codex.md` in the Codex environment.
 The setup script prepares files; the saved startup instructions tell the agent
 to read the deployed policy in each task.
 Verification of those files does not establish that a managed task loaded them.
-The existing four-line Environment setup launcher needs no change.
+The existing four-line Environment setup launcher and saved startup field stay unchanged.
+After review and merge, the operator republishes the Environment and starts a
+fresh diagnostic task using the acceptance instructions in `docs/codex-ecc.md`.
 ECC evidence lives at `/workspace/.harness-wrapper/ecc-setup/status.json` and
 `diagnostic.log`, or under the selected absolute `HARNESS_STATE_DIR`.
+Separate one-skill evidence lives in `ecc-skill-probe/` under the same state.
+The user skill root must already exist, be owned and writable, and pass path and
+collision checks; a blocker does not select another installation path.
 [`docs/codex-ecc.md`](docs/codex-ecc.md) describes evidence, privacy, readiness,
 and the diagnostic-only exception.
 This diagnostic instrumentation refers to issue #22 and does not resolve it.

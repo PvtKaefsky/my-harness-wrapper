@@ -4,10 +4,12 @@
 
 ECC is required for ordinary Codex coding tasks.
 Issue [#22](https://github.com/PvtKaefsky/my-harness-wrapper/issues/22) remains open.
-This change instruments a native installation feasibility test.
+The native installation probe and temporary one-skill feasibility experiment
+retain separate setup evidence.
 It does not certify full ECC integration.
 
-The existing four-line Environment launcher in `docs/codex.md` stays unchanged.
+The existing four-line Environment launcher and saved startup field in
+`docs/codex.md` stay unchanged.
 `env/setup-codex.sh` owns the setup probe.
 No Environment UI edit or manual log copying is needed.
 The source must reach the selected checkout before the next actual Environment
@@ -21,7 +23,10 @@ or persistence into fresh tasks.
 | Path | Contents |
 | --- | --- |
 | `${HARNESS_STATE_DIR-/workspace/.harness-wrapper}/ecc-setup/status.json` | Structured status for the latest setup probe. |
-| `${HARNESS_STATE_DIR-/workspace/.harness-wrapper}/ecc-setup/diagnostic.log` | Bounded redacted phase, attempt, exit, and diagnostic details. |
+| `${HARNESS_STATE_DIR-/workspace/.harness-wrapper}/ecc-setup/diagnostic.log` | Bounded redacted native phase, attempt, exit, and diagnostic details. |
+| `${HARNESS_STATE_DIR-/workspace/.harness-wrapper}/ecc-skill-probe/status.json` | Separate one-skill setup placement record; never runtime discovery acceptance. |
+| `${HARNESS_STATE_DIR-/workspace/.harness-wrapper}/ecc-skill-probe/diagnostic.log` | Bounded redacted skill placement events, checks, and blockers. |
+| `${HARNESS_STATE_DIR-/workspace/.harness-wrapper}/ecc-skill-probe/scope.json` | Private write-once binding to the initial placement HOME and destination. |
 
 Evidence lives outside source repositories and immutable delivery releases.
 It is excluded from Git and the adapter release manifest.
@@ -165,22 +170,151 @@ Its retained record must then be checked by a fresh Cloud task.
 If files do not survive that boundary, startup reports missing evidence.
 No restoration mechanism is invented or configured by this change.
 
-Fresh-task acceptance still requires discovering and safely invoking a loaded
-representative ECC skill, such as asking `$configure-ecc` for options without
-applying configuration.
+The bounded experiment requires the specific provider-dispatched
+`$python-patterns` action below.
+It does not establish full-ECC fresh-task acceptance.
 Plugin listing and readable `SKILL.md` alone cannot satisfy that acceptance.
 Hook trust and execution require separate supported verification.
 This task does not approve hooks, publish an Environment, or merge its PR.
 
+## Temporary user-skill experiment
+
+This experiment refers to issue #22 and leaves it open.
+It is a diagnostic-only exception to the ordinary-task readiness gate.
+Only Environment setup calls `scripts/ecc-codex.sh skill-setup`.
+It reuses the verified native marketplace checkout recorded by the setup probe.
+It does not clone ECC again or change native registration/cache results.
+A verified source can support placement even when native plugin installation fails.
+Missing, incomplete, or stale native source evidence blocks placement.
+
+The selected upstream directory is `skills/python-patterns` at the pinned SHA.
+Inspection at that revision found only `SKILL.md` and no local resource references.
+Its frontmatter name is `python-patterns`.
+Its unchanged bytes have SHA-256
+`103e0130dac33a49d26705fc5a2df804980fcab6a0138d65bc7f370a987d49f6`.
+The EAFP/LBYL description exercise needs no commands, scripts, or dependencies.
+The only extra delivered file is the unchanged upstream MIT `LICENSE` notice,
+SHA-256 `326146379f01bb137c0a5d3c54770c1aa31076705c8b88a7f6b26a460f6221b2`.
+The skill's frontmatter and contents are not rewritten.
+The source directory must contain exactly that one upstream skill file.
+No other skills, agent definitions, MCP servers, hooks, plugin manifests, or
+installers are copied into user scope.
+The pinned skill and license under `scripts/tests/fixtures/` are test data,
+not repository-scoped discovery installations.
+
+The only destination is `$HOME/.agents/skills/python-patterns` for the execution user.
+`HOME`, `.agents`, and `.agents/skills` must already exist as ordinary directories.
+They must be owned by that user, owner-readable/searchable/writable, and not
+writable by group or others.
+Every path component is opened without following symlinks.
+Ancestors must belong to the execution user or the filesystem root's owner and
+cannot be writable by group or others unless sticky, as with `/tmp`.
+The root owner is read from `/` to support mapped UIDs in managed containers.
+The destination cannot be inside a source or target repository.
+Missing or unsafe scope, read-only scope, changed HOME, and symlink escape produce
+BLOCKED without path redirection, sudo, or scope creation.
+Setup creates the intended skill directory mode 0700 and files mode 0600.
+Bounded file writes are published without replacing preexisting files.
+An existing skill is reused only when a complete prior wrapper placement record,
+the same HOME/destination, exact bounded contents, ownership, modes, and hashes match.
+Even byte-identical preexisting content without that record is a collision.
+Conflicting and interrupted placements are preserved rather than repaired or deleted.
+The scope binding is written before touching the destination and is never replaced.
+Blocked or interrupted attempt records cannot redirect a later retry to another HOME.
+A missing binding alongside any existing attempt record is BLOCKED and is not
+reinitialized, including when HOME changed or the record is incomplete.
+Malformed or unsafe binding is a fatal evidence-storage error and is preserved.
+
+The independent `ecc-skill-probe` record binds its log with SHA-256 and records
+wrapper source identity, upstream pin, exact source and destination, skill name,
+source/delivered checksums, destination owner/mode, prior presence, safe delivery,
+and setup completeness.
+It uses the existing state validation, exclusive setup lock, bounded redaction,
+private evidence files, and atomic evidence replacement.
+Skill source commands have a 30-second total budget and ten-second per-command limit.
+Each copied file is capped at 64 KiB.
+Source and destination directory listings stop at the first excess entry.
+Native discovery, invocation, MCP, and hook trust/execution remain UNVERIFIED.
+No placement state is called runtime VERIFIED or ECC READY.
+Unsafe evidence storage remains fatal; expected placement blockers return 2 and
+allow delivery verification to finish.
+
+Task startup calls `scripts/ecc-codex.sh skill-status` under the shared state lock.
+It validates the setup record and compares actual ordinary destination bytes,
+owner and modes without opening their text into the conversational context.
+It performs no installation or repair and writes no task-time evidence.
+Its output is the task-time observation; it does not retrospectively prove setup.
+It returns 2 even when every filesystem check passes.
+
+| Boundary/status | Evidence and interpretation |
+| --- | --- |
+| Setup `PLACED` / `ECC_SKILL_SETUP_PLACED` | Setup copied pinned bytes, or reused a matching previously owned placement; provider loading is unverified. |
+| Setup `BLOCKED` / `ECC_SKILL_SETUP_BLOCKED` | Named source, scope, ownership, permission, or collision blocker; preserve state. |
+| `ECC_SKILL_FILES_PERSISTED` | This process found matching ordinary files at the recorded HOME path; local fixture observations do not prove Cloud persistence. |
+| `ECC_SKILL_PLACEMENT_MISSING` | Setup evidence or delivered files are absent; no placement/persistence acceptance. |
+| `ECC_SKILL_EVIDENCE_INCOMPLETE`, `ECC_SKILL_EVIDENCE_STALE`, `ECC_SKILL_EVIDENCE_INVALID` | Partial, stale, or malformed setup evidence blocks measurement. |
+| `ECC_SKILL_HOME_CHANGED`, `ECC_SKILL_BYTES_CHANGED`, `ECC_SKILL_MEASUREMENT_BLOCKED` | Current path/bytes or safe measurement differ; do not repair from task startup. |
+| `ECC_SKILL_NATIVE_DISCOVERY_NOT_OBSERVED` | Shell measurement cannot observe provider inventory/selectors. |
+| `ECC_SKILL_INVOCATION_UNVERIFIED` | Shell measurement cannot observe a provider-dispatched skill action. |
+
+A checksum match distinguishes equal from changed bytes; it cannot distinguish
+scanned, unscanned, or actually invoked skills.
+Provider inventory must name `python-patterns` with the matching source/path;
+a duplicate name at another scope is insufficient.
+A provider invocation marker and relevant read-only response establish skill use;
+a manually read skill or an agent's unsupported assertion cannot establish it.
+Plugin listing absence alone does not disprove filesystem skill discovery.
+One-skill success cannot certify the ECC plugin, MCP, reviewers, or hooks.
+
+## Operator publication and fresh-task acceptance
+
+The operator reviews and merges the PR, then republishes the Environment using
+the existing launcher and saved startup instructions, then starts a fresh task.
+A repository merge does not publish an Environment.
+Any necessary UI field change is a separate operator decision.
+Local fixture results precede this boundary and claim no live Cloud acceptance.
+The user decides whether to retain or extend this temporary mechanism afterward.
+
+Use this follow-up task after publication:
+
+```text
+Diagnostic-only acceptance for Refs: #22; ordinary project work stays blocked.
+Record the actual wrapper checkout SHA and config/codex/version.
+Run scripts/session-check-codex.sh once; exit 2 is expected.
+Read both retained ecc-setup and ecc-skill-probe status/log records.
+Record actual HOME, destination, owner/mode and SHA-256; compare to setup.
+Inspect the provider-native skill inventory/selectors BEFORE manually opening
+SKILL.md; retain bounded exact output and the python-patterns source/path.
+Attempt exactly one provider-native action if its dispatch path is available:
+$python-patterns Explain EAFP versus LBYL in two sentences without executing
+commands or modifying anything.
+Record its provider invocation marker and response separately from file hashes.
+If no invocation path is exposed, record BLOCKED and exact discovery output.
+Record native plugin listing, MCP, hooks and reviewers separately as observed
+or UNVERIFIED; keep ECC NOT READY and issue #22 open.
+Do not install, repair, move, register or trust anything from this task.
+```
+
+The expected transitions are setup PLACED, fresh-task file MATCH, then separately
+provider discovery and actual invocation, or a named blocker at any boundary.
+Read the inventory before manually reading skill text to avoid treating copied
+text as evidence that the provider loaded the skill.
+If the user-level path fails live, report that exact outcome and the next
+architecture choice for the user's decision; do not auto-install elsewhere.
+Native plugin-state disappearance was observed in a prior live task; its precise
+platform lifecycle mechanism remains unestablished.
+
 ## Regression coverage
 
-`bash scripts/test-codex-ecc.sh` is registered in the setup workflow.
+`bash scripts/test-codex-ecc.sh` and `bash scripts/test-codex-ecc-skill.sh` are
+registered in the setup workflow.
 Its fixtures execute isolated copies of `env/setup-codex.sh` followed by
 `scripts/session-check-codex.sh` as separate processes.
 The copied suite entry points are replaced with successful stubs to avoid
 recursive suite execution; the real suites run independently and in complete
 setup validation.
-Only the fake native CLI uses the isolated test HOME.
+The fake CLI uses an explicit isolated native `CODEX_HOME`.
+Placement uses an isolated test `HOME`; neither selects the managed native home.
 Its fabricated marketplace Git metadata and cache are deterministic fixtures,
 not Cloud installation evidence.
 The tests cover CLI and installation failures, source/ref conflicts, cache and
@@ -192,7 +326,23 @@ Deletion regressions disable the probe call and startup consumption separately.
 They require failures named `ECC_SETUP_EVIDENCE_MISSING` and
 `ECC_TASK_READINESS_NOT_CONSUMED`, then verify restored behavior.
 
+The skill suite checks unrelated-skill preservation, repeat setup, missing or
+changed source, revision mismatch, absent HOME/scope, read-only and symlinked
+scope, unsafe HOME ancestors, colliding and byte-identical unowned skills, partial/log-mismatched
+evidence, changed bytes/permissions, repeated HOME differences, missing or unsafe
+scope bindings, and unsafe evidence storage.
+It runs real setup and separate task processes with the pinned upstream bytes.
+Deletion of the real setup placement call must produce
+`ECC_SKILL_PLACEMENT_MISSING`; deletion of task measurement must produce
+`ECC_SKILL_FILES_NOT_PERSISTED`; deletion of the discovery instruction produces
+`ECC_SKILL_TASK_MEASUREMENT_NOT_CONSUMED`; reinstatement must pass.
+No fixture invokes a native provider skill.
+
 References:
 
 * [Pinned native ECC guide](https://github.com/affaan-m/ECC/blob/76aaa77df6adc5b889e689007bf99b9a4f74af34/.codex-plugin/README.md)
 * [Pinned native manifest](https://github.com/affaan-m/ECC/blob/76aaa77df6adc5b889e689007bf99b9a4f74af34/.codex-plugin/plugin.json)
+
+* [Codex documented local skill scopes](https://learn.chatgpt.com/docs/build-skills)
+* [Codex Cloud setup/task lifecycle](https://learn.chatgpt.com/docs/environments/cloud-environment)
+* [Pinned python-patterns](https://github.com/affaan-m/ECC/blob/76aaa77df6adc5b889e689007bf99b9a4f74af34/skills/python-patterns/SKILL.md)
