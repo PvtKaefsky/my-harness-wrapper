@@ -182,10 +182,23 @@ This task does not approve hooks, publish an Environment, or merge its PR.
 This experiment refers to issue #22 and leaves it open.
 It is a diagnostic-only exception to the ordinary-task readiness gate.
 Only Environment setup calls `scripts/ecc-codex.sh skill-setup`.
-It reuses the verified native marketplace checkout recorded by the setup probe.
-It does not clone ECC again or change native registration/cache results.
-A verified source can support placement even when native plugin installation fails.
-Missing, incomplete, or stale native source evidence blocks placement.
+The wrapper owns the offline source in `config/codex/ecc-python-patterns/`.
+It promotes the byte-identical regression fixtures from wrapper commit
+`348d838668adee598ec360aff203a23e686b771d`, with no duplicate test copy.
+This deliberate limited vendoring supplies exactly one skill and its MIT license.
+It does not authorize a copy of the ECC repository or its native plugin.
+Setup and deterministic tests consume the same source bytes.
+`source.json` records `affaan-m/ECC`, the exact GitHub commit, upstream file paths,
+checksums and the 2026-10-20 direct forge comparison record.
+Hash equality alone cannot establish upstream provenance.
+The source bytes and metadata participate in `codex_source_digest`.
+Missing or symlinked source files contribute a named unavailable-path fingerprint.
+The skill-source reader validates metadata and both pinned hashes before placement.
+It performs no network fetch, native CLI command or marketplace lookup.
+Native setup and its failure evidence remain separate and unchanged.
+A missing marketplace path, failed native registration or incomplete native record
+cannot prevent the independent skill source from being checked.
+Reject the PR if an independently pinned network-fetching skill source is preferred.
 
 The selected upstream directory is `skills/python-patterns` at the pinned SHA.
 Inspection at that revision found only `SKILL.md` and no local resource references.
@@ -196,23 +209,32 @@ The EAFP/LBYL description exercise needs no commands, scripts, or dependencies.
 The only extra delivered file is the unchanged upstream MIT `LICENSE` notice,
 SHA-256 `326146379f01bb137c0a5d3c54770c1aa31076705c8b88a7f6b26a460f6221b2`.
 The skill's frontmatter and contents are not rewritten.
-The source directory must contain exactly that one upstream skill file.
+The bundled source directory contains exactly `SKILL.md`, `LICENSE` and `source.json`.
+Only the first two files are delivered to user scope.
 No other skills, agent definitions, MCP servers, hooks, plugin manifests, or
 installers are copied into user scope.
-The pinned skill and license under `scripts/tests/fixtures/` are test data,
-not repository-scoped discovery installations.
+The Codex-owned source directory is outside provider discovery roots.
 
 The only destination is `$HOME/.agents/skills/python-patterns` for the execution user.
-`HOME`, `.agents`, and `.agents/skills` must already exist as ordinary directories.
-They must be owned by that user, owner-readable/searchable/writable, and not
+`HOME` must already exist as an ordinary owned user directory.
+Setup checks actual HOME writability with an exclusive private temporary file;
+mode bits alone do not establish writability.
+Existing `.agents` and `.agents/skills` must be ordinary owned directories.
+HOME and both scope parents must be owner-readable/searchable/writable and not
 writable by group or others.
+Setup creates only missing `.agents` and `.agents/skills` parents mode 0700,
+relative to validated open directory descriptors without following symlinks.
+Existing contents and modes are preserved; unsafe paths are never repaired.
+The write-once HOME binding precedes scope-parent creation.
+A different HOME is rejected before scope creation.
+The scope is reopened and its device/inode compared before and after placement.
 Every path component is opened without following symlinks.
 Ancestors must belong to the execution user or the filesystem root's owner and
 cannot be writable by group or others unless sticky, as with `/tmp`.
 The root owner is read from `/` to support mapped UIDs in managed containers.
 The destination cannot be inside a source or target repository.
-Missing or unsafe scope, read-only scope, changed HOME, and symlink escape produce
-BLOCKED without path redirection, sudo, or scope creation.
+Missing HOME, unsafe ancestors, read-only scope, changed HOME and symlink escape
+produce BLOCKED without path redirection or sudo.
 Setup creates the intended skill directory mode 0700 and files mode 0600.
 Bounded file writes are published without replacing preexisting files.
 An existing skill is reused only when a complete prior wrapper placement record,
@@ -231,7 +253,7 @@ source/delivered checksums, destination owner/mode, prior presence, safe deliver
 and setup completeness.
 It uses the existing state validation, exclusive setup lock, bounded redaction,
 private evidence files, and atomic evidence replacement.
-Skill source commands have a 30-second total budget and ten-second per-command limit.
+Skill setup performs bounded local filesystem operations and runs no source commands.
 Each copied file is capped at 64 KiB.
 Source and destination directory listings stop at the first excess entry.
 Native discovery, invocation, MCP, and hook trust/execution remain UNVERIFIED.
@@ -250,6 +272,12 @@ It returns 2 even when every filesystem check passes.
 | --- | --- |
 | Setup `PLACED` / `ECC_SKILL_SETUP_PLACED` | Setup copied pinned bytes, or reused a matching previously owned placement; provider loading is unverified. |
 | Setup `BLOCKED` / `ECC_SKILL_SETUP_BLOCKED` | Named source, scope, ownership, permission, or collision blocker; preserve state. |
+| `ECC_SKILL_PINNED_SOURCE_UNAVAILABLE` | Bundled source directory is absent; native marketplace state cannot supply a fallback. |
+| `ECC_SKILL_SOURCE_SKILL_ABSENT`, `ECC_SKILL_SOURCE_LICENSE_ABSENT` | Required bundled file is absent. |
+| `ECC_SKILL_SOURCE_SKILL_BYTES_MISMATCH`, `ECC_SKILL_SOURCE_LICENSE_BYTES_MISMATCH` | Bundled file does not match its pinned checksum. |
+| `ECC_SKILL_HOME_WRITE_FAILED` | Actual exclusive HOME write failed; mode bits did not establish writability. |
+| `ECC_SKILL_SCOPE_PARENT_MISSING`, `ECC_SKILL_SCOPE_PATH_UNSAFE` | Scope parent is missing during measurement or unsafe to open; startup never creates it. |
+| `ECC_SKILL_SCOPE_CHANGED`, `ECC_SKILL_DESTINATION_CHANGED` | The reopened path no longer identifies the open scope or destination; preserve it. |
 | `ECC_SKILL_FILES_PERSISTED` | This process found matching ordinary files at the recorded HOME path; local fixture observations do not prove Cloud persistence. |
 | `ECC_SKILL_PLACEMENT_MISSING` | Setup evidence or delivered files are absent; no placement/persistence acceptance. |
 | `ECC_SKILL_EVIDENCE_INCOMPLETE`, `ECC_SKILL_EVIDENCE_STALE`, `ECC_SKILL_EVIDENCE_INVALID` | Partial, stale, or malformed setup evidence blocks measurement. |
@@ -282,13 +310,15 @@ Diagnostic-only acceptance for Refs: #22; ordinary project work stays blocked.
 Record the actual wrapper checkout SHA and config/codex/version.
 Run scripts/session-check-codex.sh once; exit 2 is expected.
 Read both retained ecc-setup and ecc-skill-probe status/log records.
-Record actual HOME, destination, owner/mode and SHA-256; compare to setup.
 Inspect the provider-native skill inventory/selectors BEFORE manually opening
 SKILL.md; retain bounded exact output and the python-patterns source/path.
+Then record actual HOME, destination, owner/mode and SHA-256; compare to setup.
 Attempt exactly one provider-native action if its dispatch path is available:
 $python-patterns Explain EAFP versus LBYL in two sentences without executing
 commands or modifying anything.
 Record its provider invocation marker and response separately from file hashes.
+Report missing inventory items or absent dispatch markers as BLOCKED with exact
+bounded output; neither is a successful discovery or invocation.
 If no invocation path is exposed, record BLOCKED and exact discovery output.
 Record native plugin listing, MCP, hooks and reviewers separately as observed
 or UNVERIFIED; keep ECC NOT READY and issue #22 open.
@@ -326,9 +356,11 @@ Deletion regressions disable the probe call and startup consumption separately.
 They require failures named `ECC_SETUP_EVIDENCE_MISSING` and
 `ECC_TASK_READINESS_NOT_CONSUMED`, then verify restored behavior.
 
-The skill suite checks unrelated-skill preservation, repeat setup, missing or
-changed source, revision mismatch, absent HOME/scope, read-only and symlinked
-scope, unsafe HOME ancestors, colliding and byte-identical unowned skills, partial/log-mismatched
+The skill suite checks native read-only failure without a marketplace path,
+secure missing-parent creation, unrelated contents, repetition and parent metadata,
+missing/wrong bundled skill or license, invalid source metadata, independence from
+absent/divergent native source bytes, absent HOME, read-only and symlinked scope,
+unsafe HOME ancestors, colliding and byte-identical unowned skills, partial/log-mismatched
 evidence, changed bytes/permissions, repeated HOME differences, missing or unsafe
 scope bindings, and unsafe evidence storage.
 It runs real setup and separate task processes with the pinned upstream bytes.
@@ -336,6 +368,14 @@ Deletion of the real setup placement call must produce
 `ECC_SKILL_PLACEMENT_MISSING`; deletion of task measurement must produce
 `ECC_SKILL_FILES_NOT_PERSISTED`; deletion of the discovery instruction produces
 `ECC_SKILL_TASK_MEASUREMENT_NOT_CONSUMED`; reinstatement must pass.
+Deleting the independent source-selection route reinstates the native-source
+prerequisite and must fail the primary read-only regression with
+`ECC_SKILL_PINNED_SOURCE_UNAVAILABLE`.
+Deleting parent creation must fail it with `ECC_SKILL_SCOPE_PARENT_MISSING`.
+Each deletion is confined to disposable fixture source and restored before a
+passing setup/startup acceptance rerun.
+A blocked source attempt without a binding uses a fresh scratch state after
+restoration, preserving the missing-binding rejection policy.
 No fixture invokes a native provider skill.
 
 References:
