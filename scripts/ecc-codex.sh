@@ -2,12 +2,12 @@
 set -euo pipefail
 
 source "$(dirname -- "${BASH_SOURCE[0]}")/codex-common.sh"
-case "${1-}" in setup|status) ;; *) codex_fail 'expected ECC setup or status'; exit 1 ;; esac
+case "${1-}" in setup|status|skill-setup|skill-status) ;; *) codex_fail 'expected ECC setup, status, skill-setup or skill-status'; exit 1 ;; esac
 [ "$#" -eq 1 ] || { codex_fail 'unexpected ECC arguments'; exit 1; }
 codex_require_tools
 codex_validate_path
 codex_validate_state
-if [ "$1" = setup ]; then
+if [ "$1" = setup ] || [ "$1" = skill-setup ]; then
   exec 9<> "$CODEX_WRAPPER_STATE/.lock"
   flock -w 10 -x 9
 else

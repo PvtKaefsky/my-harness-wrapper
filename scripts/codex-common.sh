@@ -61,7 +61,9 @@ codex_source_digest() {
       scripts/session-check-codex.sh scripts/check-codex-attribution.sh \
       scripts/check-codex-identity.sh scripts/commit-codex.sh \
       scripts/ecc-codex.sh scripts/ecc-codex.py scripts/test-codex-ecc.sh \
-      scripts/tests/test_codex_ecc.py scripts/tests/fake_codex_ecc.py | sha256sum | cut -d ' ' -f 1
+      scripts/tests/test_codex_ecc.py scripts/tests/fake_codex_ecc.py \
+      scripts/test-codex-ecc-skill.sh scripts/tests/test_codex_ecc_skill.py \
+      scripts/tests/fixtures/python-patterns.md scripts/tests/fixtures/ECC-LICENSE.txt | sha256sum | cut -d ' ' -f 1
   )
 }
 

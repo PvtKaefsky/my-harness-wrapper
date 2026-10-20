@@ -8,6 +8,9 @@ printf 'Instructions: %s/current/AGENTS.md\n' "${HARNESS_STATE_DIR-/workspace/.h
 printf 'Read this file and the target repository AGENTS.md before starting the task.\n'
 readiness=0
 bash "$root/scripts/ecc-codex.sh" status || readiness=$?
+skill_readiness=0
+bash "$root/scripts/ecc-codex.sh" skill-status || skill_readiness=$?
+if [ "$readiness" -eq 0 ] || [ "$readiness" -eq 2 ]; then readiness=$skill_readiness; fi
 if [ "$readiness" -ne 0 ] && [ "$readiness" -ne 2 ]; then
   printf 'ECC NOT READY: setup evidence could not be safely checked; ordinary project work blocked\n'
 fi

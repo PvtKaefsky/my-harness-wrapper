@@ -6,7 +6,9 @@ The adapter delivers shared working instructions for Codex cloud tasks.
 It verifies the delivered payload against the source checkout.
 The Claude implementation remains separate.
 Setup runs without root access.
-The ECC diagnostic probe uses only supported native CLI registration commands.
+The native ECC diagnostic probe uses supported native CLI registration commands.
+A separate temporary skills-only experiment copies one unchanged pinned skill
+and its upstream license into an already existing user skill scope during setup.
 It does not change project files, Git identity, or Git signing settings.
 It does not install a Codex CLI or reviewer agents or approve hook trust.
 Its bounded ECC installation attempt and retained evidence are described in
@@ -19,15 +21,16 @@ Its bounded ECC installation attempt and retained evidence are described in
 | `AGENTS.md` | Instructions for developing this wrapper repository. |
 | `config/codex/AGENTS.md` | Shared policy read by the agent in each task. |
 | `config/codex/version` | Adapter version in `major.minor.patch` form. |
-| `env/setup-codex.sh` | Runs regression suites, installs the payload, captures ECC diagnostics, and checks delivery. |
+| `env/setup-codex.sh` | Runs regression suites, installs the payload, captures native ECC and one-skill diagnostics, and checks delivery. |
 | `scripts/codex-common.sh` | Source fingerprint, state validation, and manifest validation. |
 | `scripts/bootstrap-codex.sh` | Creates or refreshes an owned delivery release. |
 | `scripts/verify-codex.sh` | Verifies delivery and reports unverified runtime integrations. |
 | `scripts/session-check-codex.sh` | Verifies delivery, names the policy, reads retained setup evidence, and fails closed on ECC readiness. |
 | `scripts/ecc-codex.sh` | Validates owned state and holds its lock for setup capture or read-only evidence consumption. |
-| `scripts/ecc-codex.py` | Runs bounded native probes, atomically records redacted evidence, and reports task readiness. |
+| `scripts/ecc-codex.py` | Runs native probes, bounded user-skill placement, and read-only task measurement with separate evidence. |
 | `scripts/test-codex-ecc.sh` | Runs deterministic setup/startup and deletion regressions through isolated copies of the real setup path. |
-| `scripts/tests/` | ECC test runner and bounded fake native Codex executable. |
+| `scripts/test-codex-ecc-skill.sh` | Tests real setup placement, separate-process measurement, negative controls, and deletion acceptance. |
+| `scripts/tests/` | ECC test runners, bounded fake CLI, and pinned upstream skill/license data fixtures outside discovery roots. |
 | `scripts/check-codex-attribution.sh` | Checks one prepared message or body file. |
 | `scripts/check-codex-identity.sh` | Requires explicit environment identity and checks Git's resolved roles. |
 | `scripts/commit-codex.sh` | Checks identity before invoking Git in the caller's repository. |
@@ -110,6 +113,10 @@ Symlinked state paths are rejected.
   ecc-setup/
     diagnostic.log
     status.json
+  ecc-skill-probe/
+    diagnostic.log
+    scope.json
+    status.json
   releases/
     release.<generated-id>/
       AGENTS.md
@@ -161,7 +168,7 @@ flag at installation, source fingerprint, and payload checksum.
 It contains no environment variables or credential values.
 The source fingerprint covers the payload, version, setup, bootstrap,
 verification, startup, common helpers, explicit attribution checker, identity
-checker, guarded commit command, ECC helpers, and ECC regression fixtures.
+checker, guarded commit command, ECC helpers, both ECC suites, and pinned upstream skill/license data fixtures.
 ECC diagnostics are not part of the adapter release or its manifest.
 The dirty flag describes installation time and is not a live status check.
 An installation made with uncommitted files reports a `NOTE`; the recorded
@@ -247,8 +254,10 @@ codex plugin list --json
 The repository-owned setup probe uses native commands with the selected fixed
 upstream SHA, after inspecting the setup executable's supported options.
 It never falls back to floating main.
-Task startup only reads retained evidence and never invokes plugin modification
-commands.
+Task startup reads retained evidence and the recorded user-skill bytes.
+It never installs, overwrites, links, moves, or registers plugins or skills.
+Native inventory and a provider-dispatched invocation require a fresh diagnostic
+task after operator-controlled publication, as specified in `codex-ecc.md`.
 The CLI's installation state does not establish managed cloud task discovery.
 Do not relocate or overwrite managed `CODEX_HOME` to force installation.
 ECC's native hook documentation requires review and trust separately from plugin
@@ -279,6 +288,7 @@ bash scripts/test-codex.sh
 bash scripts/test-codex-git-context.sh
 bash scripts/test-codex-identity.sh
 bash scripts/test-codex-ecc.sh
+bash scripts/test-codex-ecc-skill.sh
 bash env/setup-codex.sh
 ```
 

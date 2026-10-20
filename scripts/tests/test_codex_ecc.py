@@ -28,7 +28,7 @@ class Fixture:
         self.root = self.work / "source"
         for directory in ("config", "scripts", "env"):
             shutil.copytree(ROOT / directory, self.root / directory)
-        for suite in ("test-attribution-guard.sh", "test-codex.sh", "test-codex-git-context.sh", "test-codex-identity.sh", "test-codex-ecc.sh"):
+        for suite in ("test-attribution-guard.sh", "test-codex.sh", "test-codex-git-context.sh", "test-codex-identity.sh", "test-codex-ecc.sh", "test-codex-ecc-skill.sh"):
             (self.root / "scripts" / suite).write_text("#!/usr/bin/env bash\nexit 0\n")
         self.home = self.work / "home"
         self.home.mkdir()
@@ -39,8 +39,9 @@ class Fixture:
         (self.bin / "codex").chmod(0o700)
         self.env = dict(os.environ, HOME=str(self.home), HARNESS_STATE_DIR=str(self.state),
                         PATH=f"{self.bin}:{os.environ['PATH']}", ECC_TEST_CASE=name,
+                        ECC_TEST_FIXTURES=str(ROOT / "scripts/tests/fixtures"),
                         GIT_CONFIG_GLOBAL=str(self.home / "gitconfig"), GIT_CONFIG_NOSYSTEM="1")
-        self.env.pop("CODEX_HOME", None)
+        self.env["CODEX_HOME"] = str(self.home / ".codex")
         for key in tuple(self.env):
             if key.startswith("GIT_") and key not in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM"):
                 self.env.pop(key)
@@ -68,7 +69,7 @@ class Fixture:
     def contract(self):
         code, output = self.run("scripts/session-check-codex.sh")
         assert "ECC_SETUP_EVIDENCE_MISSING" not in output, "ECC_SETUP_EVIDENCE_MISSING"
-        assert code == 2 and "ECC NOT READY" in output, "ECC_TASK_READINESS_NOT_CONSUMED"
+        assert code == 2 and "ECC NOT READY" in output and "ECC setup evidence:" in output, "ECC_TASK_READINESS_NOT_CONSUMED"
         return output
 
 
