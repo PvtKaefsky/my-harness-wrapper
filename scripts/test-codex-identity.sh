@@ -56,6 +56,14 @@ fi
 [ "$before" = "$(sha256sum < .git/index)" ] || { printf 'FAIL rejected commit changed index\n' >&2; exit 1; }
 printf 'PASS rejected commits leave HEAD unborn and the index unchanged\n'
 passes=$((passes + 1))
+export HARNESS_REVIEW_FILE="$work/review.json"
+python3 -I - "$HARNESS_REVIEW_FILE" <<'PY'
+import json
+import subprocess
+import sys
+tree = subprocess.check_output(['git', 'write-tree'], text=True).strip()
+json.dump({'tree': tree, 'source_commit': '', 'provider': 'native-codex', 'implementer_id': 'fixture-author', 'reviews': [{'reviewer_id': 'fixture-reviewer', 'tree': tree, 'verdict': 'APPROVED', 'findings': [], 'roles': ['general'], 'evidence': 'Synthetic local identity-test fixture, not provider acceptance.'}]}, open(sys.argv[1], 'w'))
+PY
 expect_status 'valid identity permits the commit' 0 env GIT_CONFIG_COUNT=1 \
   GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false bash "$committer" -m 'test: guarded commit'
 expected="$GIT_AUTHOR_NAME <$GIT_AUTHOR_EMAIL>"
@@ -63,6 +71,18 @@ expected="$GIT_AUTHOR_NAME <$GIT_AUTHOR_EMAIL>"
 [ "$(git show -s --format='%cn <%ce>')" = "$expected" ] || { printf 'FAIL unexpected commit committer\n' >&2; exit 1; }
 printf 'PASS committed author and committer use the environment identity\n'
 passes=$((passes + 1))
+python3 -I - "$HARNESS_REVIEW_FILE" <<'PY'
+import json
+import subprocess
+import sys
+p = sys.argv[1]
+with open(p) as stream:
+    record = json.load(stream)
+record['source_commit'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+with open(p, 'w') as stream:
+    json.dump(record, stream)
+PY
 expect_status 'underlying Git failure is preserved' 1 env GIT_CONFIG_COUNT=1 \
   GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false bash "$committer" -m 'test: nothing staged'
+grep -q 'nothing to commit' "$work/output" || { printf 'FAIL expected actual Git failure\n' >&2; exit 1; }
 printf 'PASS %s identity guard checks\n' "$passes"

@@ -37,6 +37,24 @@ codex_validate_path() {
   case "$CODEX_WRAPPER_STATE/" in
     "$CODEX_WRAPPER_ROOT/"*) codex_fail 'state must be outside the source checkout'; return 1 ;;
   esac
+  python3 -I - "$CODEX_WRAPPER_STATE" <<'PY'
+import os
+import stat
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+for forbidden in [Path.home(), Path('/etc/codex'), Path('/run/codex-environment'), *([Path(os.environ['CODEX_HOME'])] if os.environ.get('CODEX_HOME') else [])]:
+    if p == forbidden or forbidden in p.parents:
+        sys.exit('FAIL STATE_LOCATION_FORBIDDEN: user or managed configuration path')
+for directory in [*reversed(p.parents), p]:
+    marker = directory / '.git'
+    if marker.is_file() or marker.is_symlink() or (marker.is_dir() and next(marker.iterdir(), None) is not None):
+        sys.exit('FAIL STATE_TARGET_REPOSITORY_FORBIDDEN: preserve target repository')
+    if directory.exists():
+        mode = directory.stat().st_mode
+        if directory.is_symlink() or directory.stat().st_uid not in {os.getuid(), Path('/').stat().st_uid} or (mode & 0o022 and not mode & stat.S_ISVTX):
+            sys.exit('FAIL state ancestor ownership or permissions are unsafe')
+PY
 }
 
 codex_validate_state() {
@@ -51,28 +69,26 @@ codex_validate_state() {
     [ -f "$CODEX_WRAPPER_STATE/.lock" ] && [ ! -L "$CODEX_WRAPPER_STATE/.lock" ] || {
       codex_fail 'state layout is invalid'; return 1;
     }
+  python3 -I - "$CODEX_WRAPPER_STATE" <<'PY'
+import os
+import stat
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+for directory in [*reversed(p.parents), p]:
+    mode = directory.stat().st_mode
+    if directory.is_symlink() or directory.stat().st_uid not in {os.getuid(), Path('/').stat().st_uid} or (mode & 0o022 and not mode & stat.S_ISVTX):
+        sys.exit('FAIL state ancestor ownership or permissions are unsafe')
+for child in [p, p / '.owner', p / '.lock', p / 'releases']:
+    if child.stat().st_uid != os.getuid() or child.stat().st_mode & 0o077:
+        sys.exit('FAIL state ownership or permissions are unsafe')
+if set(x.name for x in p.iterdir()) - {'.owner', '.lock', 'releases', 'current'}:
+    sys.exit('FAIL state layout contains unrelated files; preserve it and choose another HARNESS_STATE_DIR')
+PY
 }
 
 codex_source_digest() {
-  (
-    cd -- "$CODEX_WRAPPER_ROOT" || exit
-    {
-      sha256sum -- config/codex/AGENTS.md config/codex/version env/setup-codex.sh \
-        scripts/codex-common.sh scripts/bootstrap-codex.sh scripts/verify-codex.sh \
-        scripts/session-check-codex.sh scripts/check-codex-attribution.sh \
-        scripts/check-codex-identity.sh scripts/commit-codex.sh \
-        scripts/ecc-codex.sh scripts/ecc-codex.py scripts/test-codex-ecc.sh \
-        scripts/tests/test_codex_ecc.py scripts/tests/fake_codex_ecc.py \
-        scripts/test-codex-ecc-skill.sh scripts/tests/test_codex_ecc_skill.py || exit
-      for source in config/codex/ecc-python-patterns/{SKILL.md,LICENSE,source.json}; do
-        if [ -f "$source" ] && [ ! -L "$source" ]; then
-          sha256sum -- "$source" || exit
-        else
-          printf 'UNAVAILABLE  %s\n' "$source"
-        fi
-      done
-    } | sha256sum | cut -d ' ' -f 1
-  )
+  python3 -I "$CODEX_WRAPPER_ROOT/scripts/pack-codex.py" fingerprint
 }
 
 codex_current_release() {
@@ -90,15 +106,28 @@ codex_current_release() {
 
 codex_validate_release() {
   local manifest="$CODEX_WRAPPER_RELEASE/manifest.json" payload="$CODEX_WRAPPER_RELEASE/AGENTS.md" expected
+  python3 -I - "$CODEX_WRAPPER_RELEASE" <<'PY'
+import os
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+if set(x.name for x in p.iterdir()) != {'AGENTS.md', 'manifest.json'}:
+    sys.exit('FAIL release layout is incomplete or contains unrelated files')
+for child in [p, p / 'AGENTS.md', p / 'manifest.json']:
+    if child.is_symlink() or child.stat().st_uid != os.getuid() or child.stat().st_mode & 0o077:
+        sys.exit('FAIL release ownership or permissions are unsafe')
+PY
   [ -f "$manifest" ] && [ ! -L "$manifest" ] && [ -f "$payload" ] && [ ! -L "$payload" ] || {
     codex_fail 'release payload or manifest is absent or is a symlink'; return 1;
   }
   jq -e -s '
     length == 1 and (.[0] |
-      type == "object" and .schema_version == 1 and .adapter == "codex" and
+      type == "object" and .schema_version == 2 and .adapter == "codex" and
       (.version | type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and
       (.source_commit | type == "string" and test("^[0-9a-f]{40,64}$")) and
       (.source_dirty | type == "boolean") and
+      (.source_checkout | type == "string" and startswith("/")) and
+      (.pack_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
       (.source_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
       (.payload_sha256 | type == "string" and test("^[0-9a-f]{64}$")))
   ' "$manifest" >/dev/null || { codex_fail 'manifest is malformed'; return 1; }

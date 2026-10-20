@@ -2,17 +2,8 @@
 set -euo pipefail
 
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
-delivery=0
-bash "$root/scripts/verify-codex.sh" || delivery=$?
+bash "$root/scripts/verify-codex.sh"
 printf 'Instructions: %s/current/AGENTS.md\n' "${HARNESS_STATE_DIR-/workspace/.harness-wrapper}"
-printf 'Read this file and the target repository AGENTS.md before starting the task.\n'
-readiness=0
-bash "$root/scripts/ecc-codex.sh" status || readiness=$?
-skill_readiness=0
-bash "$root/scripts/ecc-codex.sh" skill-status || skill_readiness=$?
-if [ "$readiness" -eq 0 ] || [ "$readiness" -eq 2 ]; then readiness=$skill_readiness; fi
-if [ "$readiness" -ne 0 ] && [ "$readiness" -ne 2 ]; then
-  printf 'ECC NOT READY: setup evidence could not be safely checked; ordinary project work blocked\n'
-fi
-if [ "$delivery" -ne 0 ]; then exit "$delivery"; fi
-exit "$readiness"
+printf 'Read the delivered policy and target repository AGENTS.md before starting the task.\n'
+cat -- "$root/config/codex/cloud-pack/CATALOG.md"
+printf 'WORKFLOW_CATALOG_CONSUMED=EMITTED_FOR_AGENT_READ; agent selection/application still requires task evidence\n'
