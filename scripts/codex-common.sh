@@ -20,7 +20,7 @@ codex_fail() {
 
 codex_require_tools() {
   local tool
-  for tool in git jq sha256sum mktemp realpath flock cmp; do
+  for tool in git jq sha256sum mktemp realpath flock cmp python3; do
     command -v "$tool" >/dev/null || { codex_fail "dependency: $tool is unavailable"; return 1; }
   done
 }
@@ -59,7 +59,9 @@ codex_source_digest() {
     sha256sum -- config/codex/AGENTS.md config/codex/version env/setup-codex.sh \
       scripts/codex-common.sh scripts/bootstrap-codex.sh scripts/verify-codex.sh \
       scripts/session-check-codex.sh scripts/check-codex-attribution.sh \
-      scripts/check-codex-identity.sh scripts/commit-codex.sh | sha256sum | cut -d ' ' -f 1
+      scripts/check-codex-identity.sh scripts/commit-codex.sh \
+      scripts/ecc-codex.sh scripts/ecc-codex.py scripts/test-codex-ecc.sh \
+      scripts/tests/test_codex_ecc.py scripts/tests/fake_codex_ecc.py | sha256sum | cut -d ' ' -f 1
   )
 }
 

@@ -8,7 +8,11 @@ The repository holds a Claude payload in `config/`, a Codex payload in
 `config/codex/`, and separate scripts that deliver each one.
 The Codex adapter delivers shared instructions, verifies their integrity, and
 provides a commit command that checks the environment's Git identity.
-It does not install ECC or register automatic hooks.
+Its bounded setup probe attempts pinned native ECC registration and retains
+private diagnostics outside the checkout.
+Task startup reads that evidence and blocks ordinary project work while ECC
+runtime acceptance is unverified.
+Hook trust remains separate.
 Its setup, startup, limitations, and exact Environment UI text are in
 [`docs/codex.md`](docs/codex.md).
 
@@ -48,7 +52,7 @@ rebuild an operator controls is a change to the pasted init script text.
 | `config/codex/` | The Codex instruction payload and adapter version. |
 | `AGENTS.md` | Development instructions for Codex working in this repository. |
 | `env/setup.sh` | The init script pasted into the environment dialog. It clones this repository and is the only version source. |
-| `env/setup-codex.sh` | Tests and installs the Codex adapter from the attached checkout. |
+| `env/setup-codex.sh` | Tests and installs the Codex adapter, then captures a bounded ECC setup probe. |
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/session-check.sh` | Reports what a session starts with. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
@@ -84,6 +88,12 @@ Save the startup instructions from `docs/codex.md` in the Codex environment.
 The setup script prepares files; the saved startup instructions tell the agent
 to read the deployed policy in each task.
 Verification of those files does not establish that a managed task loaded them.
+The existing four-line Environment setup launcher needs no change.
+ECC evidence lives at `/workspace/.harness-wrapper/ecc-setup/status.json` and
+`diagnostic.log`, or under the selected absolute `HARNESS_STATE_DIR`.
+[`docs/codex-ecc.md`](docs/codex-ecc.md) describes evidence, privacy, readiness,
+and the diagnostic-only exception.
+This diagnostic instrumentation refers to issue #22 and does not resolve it.
 
 Make commits from the target repository through the identity guard:
 

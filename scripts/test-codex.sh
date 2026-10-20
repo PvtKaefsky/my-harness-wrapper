@@ -43,7 +43,7 @@ expect_status 'installed payload verifies' 0 bash "$verify"
 first=$(readlink -- "$HARNESS_STATE_DIR/current")
 expect_status 'repeat bootstrap' 0 bash "$bootstrap"
 expect_status 'repeat bootstrap reuses the release' 0 test "$first" = "$(readlink -- "$HARNESS_STATE_DIR/current")"
-expect_status 'startup verifies delivery' 0 bash "$session"
+expect_status 'startup verifies delivery and blocks missing ECC evidence' 2 bash "$session"
 expect_status 'runtime integration limitations are reported' 0 grep -q '^UNVERIFIED ' "$work/output"
 
 printf '\nlocal edit\n' >> "$HARNESS_STATE_DIR/current/AGENTS.md"
