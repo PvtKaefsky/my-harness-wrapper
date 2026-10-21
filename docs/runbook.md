@@ -85,7 +85,7 @@ The `Wrapper regression` job has read-only contents permission and a twenty-minu
 Checkout is pinned, disables credential persistence and Git safe-directory changes, and selects `github.sha`.
 The identity step compares checked-out HEAD with `GITHUB_SHA` before testing.
 For pull requests this is GitHub's tested merge commit; record it separately from the PR branch SHA and the run API's `head_sha`.
-Each of the five existing suites and full `env/setup-codex.sh` has a named Bash step.
+Each of the five existing suites, native skill suite and full `env/setup-codex.sh` has a named Bash step.
 Setup uses a fresh canonical `/tmp/wrapper-ci.XXXXXX/state` outside checkouts, homes and managed configuration.
 The runner retains scratch state until disposal.
 No upstream installer runs and no target repository is changed.
@@ -124,3 +124,9 @@ When GitHub reports account billing or spending restrictions, CI acceptance is `
 Only the account operator can correct GitHub Actions billing/spending problems.
 The pending action is to correct the reported account restriction and then rerun the wrapper checks at the reviewed revision.
 Do not hide the failed conclusion or replace it with local fixture results.
+
+## Native preparation boundary
+
+Use [native skill delivery](native-skills.md) for the operator-only HOME exception, offline inspection, rollback and fresh-task acceptance prompt.
+Neither local suites nor hosted CI certify provider-native discovery or invocation.
+Issue #30 remains open until independent runtime acceptance.

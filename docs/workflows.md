@@ -32,6 +32,14 @@ Hosted wrapper regression checks use the existing suites and isolated setup thro
 Their execution is independent of pack delivery and provider capabilities.
 Use the per-capability statuses in [Codex delivery](codex.md) and the actual-run procedure in [the runbook](runbook.md).
 
+## Optional native entry point
+
+The separate wrapper-owned `harness-python-patterns` source adds metadata to the exact reviewed Python body without changing this pack.
+Only operator-approved Environment preparation may link that source into the documented user-scope discovery location.
+Source/link verification and actual fresh-task provider discovery/invocation have separate gates in [native skill delivery](native-skills.md).
+The explicit pack reader remains the verified functional fallback when the link is absent or ignored.
+The other 36 adapted skills remain explicit reads.
+
 ## Hook outcomes
 
 Every upstream hook script is excluded from execution.
