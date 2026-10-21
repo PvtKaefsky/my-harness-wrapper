@@ -81,7 +81,9 @@ At completion report the selected workflow, concrete output, checks, and separat
 The start skill is agent-facing instruction text, not a shell lifecycle hook.
 Its delivery and consumption require actual task evidence.
 Setup is offline and runs no upstream installer.
-It writes no personal home, managed configuration, shared plugin cache or target-project files.
+Default setup writes no personal home, managed configuration, shared plugin cache or target-project files.
+The only HOME exception is the operator-approved preparation pointer described in [native skill delivery](native-skills.md).
+Normal tasks do not install or repair it; source/link verification never proves provider discovery.
 
 ## Readiness
 
@@ -119,7 +121,7 @@ No comparison, inventory count or unrelated passing capability supplies a numeri
 | Hosted CI | Workflow/run/job IDs, source identities, executed step names and conclusions from GitHub plus failing exit from logs where available | YAML tests, an empty step list, neutral or skipped conclusions do not pass hosted acceptance. |
 | Environment setup | Full setup exit, canonical isolated state path and delivery verification | A local setup does not publish an Environment or establish a fresh-task start skill. |
 | Live Cloud instruction use | Verified instruction ID/read reference and concrete task output | Installed Markdown and matching hashes do not establish conversational use. |
-| Native skills | Actual provider discovery/dispatch evidence | This pack registers no native selectors; file reads are not native discovery. |
+| Native skills | Actual provider discovery/dispatch evidence | The pack registers no selectors; the separate opt-in native pointer requires fresh-task acceptance in `native-skills.md`. |
 | Independent provider review | Native invocation/completion, reviewer identity, explicit approval and exact staged tree | Mock receipts and a passing JSON checker do not establish provider review. |
 | Automatic hooks | Actual registered/trusted event and its provider execution evidence | This pack provisions no automatic hooks; explicit commands are not hook events. |
 | Connected MCP tools | Current tool inventory and successful authorized invocation reference | Pack files do not register servers or prove other tools work. |

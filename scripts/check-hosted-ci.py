@@ -11,6 +11,7 @@ COMMANDS = {
     "Identity suite": "bash scripts/test-codex-identity.sh",
     "Attribution suite": "bash scripts/test-codex-attribution.sh",
     "Cloud pack suite": "bash scripts/test-cloud-pack.sh",
+    "Native skill suite": "python3 -I scripts/tests/test_native_skills.py",
     "Environment setup": 'scratch=$(mktemp -d /tmp/wrapper-ci.XXXXXX)\nscratch=$(cd -- "$scratch" && pwd -P)\nHARNESS_STATE_DIR="$scratch/state" bash env/setup-codex.sh',
     "Hosted CI contract tests": "python3 -I scripts/tests/test_hosted_ci.py",
 }

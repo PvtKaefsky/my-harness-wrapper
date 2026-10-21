@@ -63,6 +63,17 @@ class HostedCI(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     CI.check_workflow(workflow)
 
+    def test_native_suite_deletion_red_green(self):
+        workflow = self.workflow()
+        steps = workflow['jobs']['regression']['steps']
+        workflow['jobs']['regression']['steps'] = [s for s in steps if s['name'] != 'Native skill suite']
+        with self.assertRaisesRegex(ValueError, 'HOSTED_SUITE_COVERAGE_MISSING: Native skill suite'):
+            CI.check_workflow(workflow)
+        print('DELETION NATIVE CI RED HOSTED_SUITE_COVERAGE_MISSING: Native skill suite', flush=True)
+        workflow['jobs']['regression']['steps'] = steps
+        CI.check_workflow(workflow)
+        print('DELETION NATIVE CI GREEN', flush=True)
+
     def test_required_commands_preserve_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

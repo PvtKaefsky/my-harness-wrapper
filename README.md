@@ -10,8 +10,10 @@ It contains 37 skills, 14 role briefs, 21 explicit workflows and 24 rule files.
 These counts describe readable instructions, not registered provider components.
 The upstream MIT license, source paths, source hashes, exclusion inventory and derivative hashes accompany the pack.
 
-Setup writes only wrapper-owned delivery state, normally `/workspace/.harness-wrapper`.
-It runs no upstream installer and writes no user, managed configuration, plugin-cache or target-repository files.
+Default setup writes only wrapper-owned delivery state, normally `/workspace/.harness-wrapper`.
+It runs no upstream installer and writes no managed configuration, plugin-cache or target-repository files.
+Operator-approved Environment preparation may explicitly opt in to one user-scope discovery symlink for the tracked `harness-python-patterns` skill.
+See [native skill delivery](docs/native-skills.md) for source checks, safe provisioning, rollback and fresh-task acceptance.
 A missing wrapper checkout is a dependency failure.
 A matching checksum proves matching bytes, not agent use or provider acceptance.
 
@@ -33,7 +35,7 @@ The pack installs no automatic hooks, native skill selectors or MCP servers.
 | Path | Purpose |
 | --- | --- |
 | `AGENTS.md` | Wrapper development policy. |
-| `config/codex/` | Shared policy, version, manifest anchor and audited workflow pack. |
+| `config/codex/` | Shared policy, version, manifest anchor, audited workflow pack and one native skill. |
 | `env/setup-codex.sh` | Complete offline checks and delivery setup. |
 | `scripts/` | Integrity, startup, explicit safety gates and isolated regression suites. |
 | `docs/` | [Documentation index](docs/README.md). |

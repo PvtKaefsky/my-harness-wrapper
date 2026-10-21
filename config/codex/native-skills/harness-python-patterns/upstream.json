@@ -1,0 +1,35 @@
+{
+  "adapted_path": "skills/python-patterns/SKILL.md",
+  "adapted_sha256": "f86af34957267dd80a2191f1c24e77ea8c159094cb746eefb226980550e06180",
+  "commit": "d468c521f1a76e7b05d446d805f6ad2afa8ed066",
+  "files": {
+    "LICENSE": {
+      "audit_hits": {
+        "agent_assumptions": 0,
+        "execution_assumptions": 0,
+        "legacy_runtime": 0,
+        "user_state": 0
+      },
+      "category": "metadata",
+      "reason": "License notice or package identity only.",
+      "sha256": "326146379f01bb137c0a5d3c54770c1aa31076705c8b88a7f6b26a460f6221b2",
+      "status": "non-executable"
+    },
+    "skills/python-patterns/SKILL.md": {
+      "audit_hits": {
+        "agent_assumptions": 0,
+        "execution_assumptions": 0,
+        "legacy_runtime": 0,
+        "user_state": 0
+      },
+      "category": "skills",
+      "reason": "Topic-based rewrite; runtime APIs, model selection, global state, unsafe execution and automatic activation removed.",
+      "sha256": "df0c0abbbd0e6a01811d1b1d10d8fa7a8a19ce73afdc9432d24843f62649cdd2",
+      "status": "adapted"
+    }
+  },
+  "pack_manifest_sha256": "0c0ac39398519b7fda517b4e8a23acedb9b14f2f2d269706094a03a2ed612881",
+  "package_version": "1.7.0-codex.0",
+  "repository": "forever94yu/everything-codex-code",
+  "schema_version": 1
+}

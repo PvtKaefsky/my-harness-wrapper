@@ -15,7 +15,9 @@ The current-task provider exposes native agent collaboration and connected GitHu
 Their actual invocation is separate from pack delivery.
 No fork-provided MCP, native skill dispatch or automatic shell-hook registration is established by this repository.
 The runtime's managed home and configuration remain provider-owned.
-No setup step writes to those locations or requests elevated privileges.
+Default setup writes no home or managed configuration and requests no elevated privileges.
+Operator-approved preparation may create only the user-scope `harness-python-patterns` discovery pointer under [the native delivery contract](native-skills.md).
+A denied or unsafe pointer stops native provisioning without a target-local or managed-configuration fallback.
 
 Commit operations require the existing explicit author/committer environment identity.
 Forge assignment uses `HARNESS_ASSIGNEE` when present.
