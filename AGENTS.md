@@ -5,18 +5,18 @@ Read `config/codex/AGENTS.md` for the shared working rules and
 Read `docs/codex.md` for the Codex delivery contract.
 
 This checkout is the wrapper source repository.
-Preserve the Claude implementation when changing the Codex adapter.
+This repository supports managed Codex Cloud only.
 Use `feat/` branches for features and Conventional Commits for commit titles.
 Code has no comments except interpreter, tool, and required license directives.
 Update behavior documentation and the documentation index with each change.
 
 Run `bash scripts/test-codex.sh`,
 `bash scripts/test-codex-git-context.sh`, and
-`bash scripts/test-attribution-guard.sh` after changing the Codex adapter.
+`bash scripts/test-codex-attribution.sh` after changing the Codex adapter.
 Run `bash scripts/test-codex-identity.sh` after changing the identity guard.
 Run `bash env/setup-codex.sh` to exercise its complete setup workflow.
 Use `HARNESS_STATE_DIR` with an absolute scratch path when testing delivery.
-Do not run `env/setup.sh`; it deploys into the Claude environment.
+Run `bash scripts/test-cloud-pack.sh` for pack and real-path acceptance checks.
 
 Stage changes and obtain the independent reviews described in the shared rules
 before committing.

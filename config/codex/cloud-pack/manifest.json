@@ -1,0 +1,602 @@
+{
+  "commit": "d468c521f1a76e7b05d446d805f6ad2afa8ed066",
+  "files": {
+    "CATALOG.md": {
+      "sha256": "2831f4ceeba5e713dd887edcd901f1eef1aad471d3f745309138a0a403578ebe",
+      "upstream_paths": []
+    },
+    "LICENSE": {
+      "sha256": "326146379f01bb137c0a5d3c54770c1aa31076705c8b88a7f6b26a460f6221b2",
+      "upstream_paths": [
+        "LICENSE"
+      ]
+    },
+    "catalog.json": {
+      "sha256": "24c245d53db633c0d3b33d750e54e3f09d2e4924750af74b6a24d8e585b82ad8",
+      "upstream_paths": []
+    },
+    "roles/architect.md": {
+      "sha256": "91d35dd29fab2fb247e4722eab33d834b728434e561360a0d0cf1d761966a3a8",
+      "upstream_paths": [
+        "agents/architect.md"
+      ]
+    },
+    "roles/build-error-resolver.md": {
+      "sha256": "dcade4ccfc73f1d6f293fe61b23bf10cd9adc085efb36c9f86b6b675e9d40940",
+      "upstream_paths": [
+        "agents/build-error-resolver.md"
+      ]
+    },
+    "roles/chief-of-staff.md": {
+      "sha256": "bb89bc5dcf1284ac9c6104303793d299662606ae478ed8589ffb67d5ff11cc5c",
+      "upstream_paths": [
+        "agents/chief-of-staff.md"
+      ]
+    },
+    "roles/code-reviewer.md": {
+      "sha256": "3c21a5f1d3f18d341b9036916ee172f342e6b8da343aea4bdb2f26f698d7f92d",
+      "upstream_paths": [
+        "agents/code-reviewer.md"
+      ]
+    },
+    "roles/database-reviewer.md": {
+      "sha256": "758973d9a6fc2afcf534f968f105c223674dba7d90cbc947a68f1ea0c1f2b2d0",
+      "upstream_paths": [
+        "agents/database-reviewer.md"
+      ]
+    },
+    "roles/doc-updater.md": {
+      "sha256": "29f155a9b93baac3d14d3d763328ec818eb39ec0b59b5fbe56f04540145c7b87",
+      "upstream_paths": [
+        "agents/doc-updater.md"
+      ]
+    },
+    "roles/e2e-runner.md": {
+      "sha256": "a2a4505f08c1b9aede2519d6f195a18aa11bcfc1337a06653db2bdfb61b10dbe",
+      "upstream_paths": [
+        "agents/e2e-runner.md"
+      ]
+    },
+    "roles/go-build-resolver.md": {
+      "sha256": "501642f6c955425409df139fcf1a9730fb240970a4ba42114e97a99c067331da",
+      "upstream_paths": [
+        "agents/go-build-resolver.md"
+      ]
+    },
+    "roles/go-reviewer.md": {
+      "sha256": "255d540842b2c403224cca2c50d5c062615d317f6eff99a499e4ea950e86db5f",
+      "upstream_paths": [
+        "agents/go-reviewer.md"
+      ]
+    },
+    "roles/planner.md": {
+      "sha256": "24201d277e093c9a3fd582c3306a3804336d6ef1090879cbce60e6ad914ede44",
+      "upstream_paths": [
+        "agents/planner.md"
+      ]
+    },
+    "roles/python-reviewer.md": {
+      "sha256": "5be2d90c7d465f877960951bc4faae51ae6954b265cf49e48c7659a224689c50",
+      "upstream_paths": [
+        "agents/python-reviewer.md"
+      ]
+    },
+    "roles/refactor-cleaner.md": {
+      "sha256": "c52a1b0d7b49ca4969570d201cf4ed6c917489bff60fab9e78de345c62e6f29a",
+      "upstream_paths": [
+        "agents/refactor-cleaner.md"
+      ]
+    },
+    "roles/security-reviewer.md": {
+      "sha256": "cdb501d8579bdde484f32e257ad4f0716a1ddfab3c80a14fd7891d0ac7beb066",
+      "upstream_paths": [
+        "agents/security-reviewer.md"
+      ]
+    },
+    "roles/tdd-guide.md": {
+      "sha256": "cbc724f23bd8fca6238b408bdd80059121bc99bdca61d154359dc3680a2311e3",
+      "upstream_paths": [
+        "agents/tdd-guide.md"
+      ]
+    },
+    "rules/common/agents.md": {
+      "sha256": "17ec3cfcb9495a6f86edb33ba4b4e5120f41deb3d1b03e228390a865abbaf053",
+      "upstream_paths": [
+        "rules/common/agents.md"
+      ]
+    },
+    "rules/common/coding-style.md": {
+      "sha256": "f9495a54f4a2954077005e35824e65e48478e4b1e2024d74436c34a35045debf",
+      "upstream_paths": [
+        "rules/common/coding-style.md"
+      ]
+    },
+    "rules/common/development-workflow.md": {
+      "sha256": "ba1092831b56a7f7721fd9600e4784a348c4f4feb70ed4bb89b5720fbf1aee8e",
+      "upstream_paths": [
+        "rules/common/development-workflow.md"
+      ]
+    },
+    "rules/common/git-workflow.md": {
+      "sha256": "fd4f941ccd319894521398d3262b80ee0b891e16085f1542c445c3966484f731",
+      "upstream_paths": [
+        "rules/common/git-workflow.md"
+      ]
+    },
+    "rules/common/patterns.md": {
+      "sha256": "9075249cc12bc27e67576eb15e2c8b62e06533d0ef9db96c20e1ee83ce3211a2",
+      "upstream_paths": [
+        "rules/common/patterns.md"
+      ]
+    },
+    "rules/common/performance.md": {
+      "sha256": "d8607daab28fedb2ab94fb35b0843b509d8c6a3e8c422efb74a6d8bf63c492dc",
+      "upstream_paths": [
+        "rules/common/performance.md"
+      ]
+    },
+    "rules/common/security.md": {
+      "sha256": "c650b04a8a46003f39b51cddb116daa148dd05ab70fc3fb9be3576eaaeb952f9",
+      "upstream_paths": [
+        "rules/common/security.md"
+      ]
+    },
+    "rules/common/testing.md": {
+      "sha256": "9a87ab70efdf356aceea117e87305e9b5a7ea09fca7e93700761a4f8704a1d92",
+      "upstream_paths": [
+        "rules/common/testing.md"
+      ]
+    },
+    "rules/golang/coding-style.md": {
+      "sha256": "4fc96fdb8c8886789427f94f152f3bae7df09782df4c06994be24e7ac334b7a5",
+      "upstream_paths": [
+        "rules/golang/coding-style.md"
+      ]
+    },
+    "rules/golang/patterns.md": {
+      "sha256": "3650c8dd6ef18123dbdd7466842f1ee1da03cc8eb3c9eb51584f5f2b929654bd",
+      "upstream_paths": [
+        "rules/golang/patterns.md"
+      ]
+    },
+    "rules/golang/security.md": {
+      "sha256": "8c671adbb00314b8b173ed402f8935699682e01540477adee0336ef5cf56cc2a",
+      "upstream_paths": [
+        "rules/golang/security.md"
+      ]
+    },
+    "rules/golang/testing.md": {
+      "sha256": "04e9de9a5177eb8e8b607a81c122a6787043eb04a71a96a4fe0d9dc25feeb3c0",
+      "upstream_paths": [
+        "rules/golang/testing.md"
+      ]
+    },
+    "rules/python/coding-style.md": {
+      "sha256": "c33f1b05eb7e3cb2770d851de75ee826d3a909db21b77297396b831f3012c677",
+      "upstream_paths": [
+        "rules/python/coding-style.md"
+      ]
+    },
+    "rules/python/patterns.md": {
+      "sha256": "d87bb15837b1c1d18f6e469051180484a1d3233bd5d2bf70480b0c93e20d1f08",
+      "upstream_paths": [
+        "rules/python/patterns.md"
+      ]
+    },
+    "rules/python/security.md": {
+      "sha256": "c8238d0879c5a4a99c5019778205aa34e5585c83d006e4a70580bb2843287a4f",
+      "upstream_paths": [
+        "rules/python/security.md"
+      ]
+    },
+    "rules/python/testing.md": {
+      "sha256": "62487201c944234d51d8b68e0729d8ed07fdbb000c3d5866affbf71058724be1",
+      "upstream_paths": [
+        "rules/python/testing.md"
+      ]
+    },
+    "rules/swift/coding-style.md": {
+      "sha256": "5754ea480538a896ff855b073d311f324c646b6a5288c5dd4d6d7fbd4f9ea9d7",
+      "upstream_paths": [
+        "rules/swift/coding-style.md"
+      ]
+    },
+    "rules/swift/patterns.md": {
+      "sha256": "7d53f3459fa8d3fa336358890c118956d71235f6681f01a2e4f4e4eb22615c80",
+      "upstream_paths": [
+        "rules/swift/patterns.md"
+      ]
+    },
+    "rules/swift/security.md": {
+      "sha256": "031940248400221661e16bb5c842c693cf101829efab59793f373cde5882209c",
+      "upstream_paths": [
+        "rules/swift/security.md"
+      ]
+    },
+    "rules/swift/testing.md": {
+      "sha256": "2316ece30303877b16bfc74d27cb1deb58c70ba0e20387ebb22bb67ec3154608",
+      "upstream_paths": [
+        "rules/swift/testing.md"
+      ]
+    },
+    "rules/typescript/coding-style.md": {
+      "sha256": "f2f1d11dbdb51b31c7763804edf448d22669cb77c78e4dc1d1248172fee5f198",
+      "upstream_paths": [
+        "rules/typescript/coding-style.md"
+      ]
+    },
+    "rules/typescript/patterns.md": {
+      "sha256": "b77a7f1f35019450fc67104e7b5fce7f5cda18cdb3c3d1260ff5d6ea6b22d5cd",
+      "upstream_paths": [
+        "rules/typescript/patterns.md"
+      ]
+    },
+    "rules/typescript/security.md": {
+      "sha256": "f17d4b1bb85268e7ae364d71adcd5c80589858497c5973dd7827558d3c1cd71a",
+      "upstream_paths": [
+        "rules/typescript/security.md"
+      ]
+    },
+    "rules/typescript/testing.md": {
+      "sha256": "e0cdf845db26f4b6ce0f9cdb43e137a8e1d75956ce09aee7a8a663a73729cb04",
+      "upstream_paths": [
+        "rules/typescript/testing.md"
+      ]
+    },
+    "skills/api-design/SKILL.md": {
+      "sha256": "00f696cbbb7e4231f2ea5e5cb1fe77e3b8810514d0ce343acd2763b4ac45ebcd",
+      "upstream_paths": [
+        "skills/api-design/SKILL.md"
+      ]
+    },
+    "skills/backend-patterns/SKILL.md": {
+      "sha256": "f45cc4f0565a061794b947a14ebedb50a7592b6d1615a2f607b38df33389d54c",
+      "upstream_paths": [
+        "skills/backend-patterns/SKILL.md"
+      ]
+    },
+    "skills/coding-standards/SKILL.md": {
+      "sha256": "2206e875d269c1826d108952a4cf205cac1e5e3cbd65114602c06757b7a74039",
+      "upstream_paths": [
+        "skills/coding-standards/SKILL.md"
+      ]
+    },
+    "skills/content-hash-cache-pattern/SKILL.md": {
+      "sha256": "99cf08137df0d9c0e1a6fcd0217ea5d85825e5f9def6d14c0f3c2a34cc961b39",
+      "upstream_paths": [
+        "skills/content-hash-cache-pattern/SKILL.md"
+      ]
+    },
+    "skills/cpp-coding-standards/SKILL.md": {
+      "sha256": "8ea34560aadcf79e8ad93267d0082a589b47e36ee09579fae9d46fe6d5236a65",
+      "upstream_paths": [
+        "skills/cpp-coding-standards/SKILL.md"
+      ]
+    },
+    "skills/cpp-testing/SKILL.md": {
+      "sha256": "e8f8a2779ecf721a8cbac6c93f03c5edb1c2327e14c451f51f0e8eddeea0ea40",
+      "upstream_paths": [
+        "skills/cpp-testing/SKILL.md"
+      ]
+    },
+    "skills/database-migrations/SKILL.md": {
+      "sha256": "53b484a8215711865fb3604857ef1928d89b10d0357a4dbfce4eb8a8d0f40b3b",
+      "upstream_paths": [
+        "skills/database-migrations/SKILL.md"
+      ]
+    },
+    "skills/deployment-patterns/SKILL.md": {
+      "sha256": "0f7c87676b190ac743572dd9a9af1630ce8ff1e40f549a8ec5e04592e8469adc",
+      "upstream_paths": [
+        "skills/deployment-patterns/SKILL.md"
+      ]
+    },
+    "skills/django-patterns/SKILL.md": {
+      "sha256": "ebb51b9020615f9276544c0115262f16a635fae03957248e79014e3f47036fca",
+      "upstream_paths": [
+        "skills/django-patterns/SKILL.md"
+      ]
+    },
+    "skills/django-security/SKILL.md": {
+      "sha256": "338da535e433d651dc1b120f198b353a98d6b7cc607cbe40f2e527ab24eae447",
+      "upstream_paths": [
+        "skills/django-security/SKILL.md"
+      ]
+    },
+    "skills/django-tdd/SKILL.md": {
+      "sha256": "b39a4d82b232313e86a025868fbc5ea278851115546c42cdaeb705b3284cc437",
+      "upstream_paths": [
+        "skills/django-tdd/SKILL.md"
+      ]
+    },
+    "skills/django-verification/SKILL.md": {
+      "sha256": "0e440f3c14db960a57717cc7bba551d5858bab97949af93f71c511393fd49c05",
+      "upstream_paths": [
+        "skills/django-verification/SKILL.md"
+      ]
+    },
+    "skills/docker-patterns/SKILL.md": {
+      "sha256": "37057a4671715bd03fc021f5411587334dd945f51fce53f3834e22a659be4343",
+      "upstream_paths": [
+        "skills/docker-patterns/SKILL.md"
+      ]
+    },
+    "skills/e2e-testing/SKILL.md": {
+      "sha256": "68d04ed905dff24fa16b02e471497b9547fcab070e2cd18334b2e31001a07822",
+      "upstream_paths": [
+        "skills/e2e-testing/SKILL.md"
+      ]
+    },
+    "skills/eval-harness/SKILL.md": {
+      "sha256": "7bfaeb73928b20ae011680c4f2e35c9b6d756b9b78a535fad72824dd214baaf9",
+      "upstream_paths": [
+        "skills/eval-harness/SKILL.md"
+      ]
+    },
+    "skills/frontend-patterns/SKILL.md": {
+      "sha256": "653f321764f8c6cf548624452fd35813b1ddb119c1db537bb7c3285bb6ad3b1c",
+      "upstream_paths": [
+        "skills/frontend-patterns/SKILL.md"
+      ]
+    },
+    "skills/golang-patterns/SKILL.md": {
+      "sha256": "8a69691be32effb98c2105cf12f2c8cfff1056bb1b884ffd317d29e065c2dcf7",
+      "upstream_paths": [
+        "skills/golang-patterns/SKILL.md"
+      ]
+    },
+    "skills/golang-testing/SKILL.md": {
+      "sha256": "54e0ff35f4646fb5e09c79f5c0a349a4169fd1b70a10727aa5ecfd61d7756937",
+      "upstream_paths": [
+        "skills/golang-testing/SKILL.md"
+      ]
+    },
+    "skills/iterative-retrieval/SKILL.md": {
+      "sha256": "f80f6b57a2ffb237f3596884dc0fc91e9c2877130aad4e617bb9a35639d0936e",
+      "upstream_paths": [
+        "skills/iterative-retrieval/SKILL.md"
+      ]
+    },
+    "skills/java-coding-standards/SKILL.md": {
+      "sha256": "2e0b3b6c171c7c86965c884ccb2dcb63c30a2d1e0d9c2ffa30a4f330cea3957c",
+      "upstream_paths": [
+        "skills/java-coding-standards/SKILL.md"
+      ]
+    },
+    "skills/jpa-patterns/SKILL.md": {
+      "sha256": "f7e088acd656d7847efc8e15fbacd2f38a570097e543e2e37e7a946e38e65be4",
+      "upstream_paths": [
+        "skills/jpa-patterns/SKILL.md"
+      ]
+    },
+    "skills/postgres-patterns/SKILL.md": {
+      "sha256": "013d770d2f443eda2854266c05929689089b948ac17ad4c5bbe6911ba59f67a0",
+      "upstream_paths": [
+        "skills/postgres-patterns/SKILL.md"
+      ]
+    },
+    "skills/python-patterns/SKILL.md": {
+      "sha256": "f86af34957267dd80a2191f1c24e77ea8c159094cb746eefb226980550e06180",
+      "upstream_paths": [
+        "skills/python-patterns/SKILL.md"
+      ]
+    },
+    "skills/python-testing/SKILL.md": {
+      "sha256": "07ed828328c04b07ce7c9d56101d0fbcfac1dd3a9eb6cb7d98be0c50883a0ce7",
+      "upstream_paths": [
+        "skills/python-testing/SKILL.md"
+      ]
+    },
+    "skills/regex-vs-llm-structured-text/SKILL.md": {
+      "sha256": "b2cedfc7e7e37d8a83875f3e2cec243b11bcb5e7aa7ab6794812d8ecf84e4277",
+      "upstream_paths": [
+        "skills/regex-vs-llm-structured-text/SKILL.md"
+      ]
+    },
+    "skills/search-first/SKILL.md": {
+      "sha256": "10c5529da3341ec29e7b78c4bdf5ddf31892eb41ec4341c3f6688726a72dfc52",
+      "upstream_paths": [
+        "skills/search-first/SKILL.md"
+      ]
+    },
+    "skills/security-review/SKILL.md": {
+      "sha256": "29c6f0b3c40d443dd526ca90813a901cbd7f2dc192ed47171ab1ebb1c62e8b46",
+      "upstream_paths": [
+        "skills/security-review/SKILL.md"
+      ]
+    },
+    "skills/springboot-patterns/SKILL.md": {
+      "sha256": "a382bf92dbb29ea762f4a1df15a778c16982c50594297dc61058b5f00f103851",
+      "upstream_paths": [
+        "skills/springboot-patterns/SKILL.md"
+      ]
+    },
+    "skills/springboot-security/SKILL.md": {
+      "sha256": "69b5be5214e48d986deb9993922d5f2e717f1344a929fc3ae0252e78e8cc38be",
+      "upstream_paths": [
+        "skills/springboot-security/SKILL.md"
+      ]
+    },
+    "skills/springboot-tdd/SKILL.md": {
+      "sha256": "8e88fe7813d066e7693cba533a1d184ed35bdeeff95dff50c26a3be2f5c5ba96",
+      "upstream_paths": [
+        "skills/springboot-tdd/SKILL.md"
+      ]
+    },
+    "skills/springboot-verification/SKILL.md": {
+      "sha256": "4327587ead6fded65960cb36a74b62a5948f472fd5ef6f67cb09bbe74b6a8ee3",
+      "upstream_paths": [
+        "skills/springboot-verification/SKILL.md"
+      ]
+    },
+    "skills/swift-actor-persistence/SKILL.md": {
+      "sha256": "3d7858309d43134ad06563769eb4c5462e602eaf130c5431f26fb9dd2dfd0f4a",
+      "upstream_paths": [
+        "skills/swift-actor-persistence/SKILL.md"
+      ]
+    },
+    "skills/swift-concurrency-6-2/SKILL.md": {
+      "sha256": "f722461538f5d887c82edfc57f773933d6264e784a6acd5c598d4ce761f66902",
+      "upstream_paths": [
+        "skills/swift-concurrency-6-2/SKILL.md"
+      ]
+    },
+    "skills/swift-protocol-di-testing/SKILL.md": {
+      "sha256": "c76bf0e0dc2a65a23f7bd67cb650c5ad38fcca8fb8ff670edd43f5199bcba54a",
+      "upstream_paths": [
+        "skills/swift-protocol-di-testing/SKILL.md"
+      ]
+    },
+    "skills/swiftui-patterns/SKILL.md": {
+      "sha256": "45d7212cbeac676a7f23b6fde4ee4edc6bf46400104d9b0c9dca5ca5ac766b80",
+      "upstream_paths": [
+        "skills/swiftui-patterns/SKILL.md"
+      ]
+    },
+    "skills/tdd-workflow/SKILL.md": {
+      "sha256": "f98ae11d2b66f7034560c414515d5380ffe55d8eff88194f272aad16b04eb67f",
+      "upstream_paths": [
+        "skills/tdd-workflow/SKILL.md"
+      ]
+    },
+    "skills/verification-loop/SKILL.md": {
+      "sha256": "85b9be1ef394731746e8461ed749299b728b11499a46897b656bdb4c8e22d04b",
+      "upstream_paths": [
+        "skills/verification-loop/SKILL.md"
+      ]
+    },
+    "upstream.json": {
+      "sha256": "5594634f142e3944de5cd472957274d21a62a5fcb7b5f336c14ffbe770b02056",
+      "upstream_paths": []
+    },
+    "workflows/build-fix.md": {
+      "sha256": "3a1b8c27bc39f2a922d563883c51303bf14a224e8147b78c446ee1419a3f0a93",
+      "upstream_paths": [
+        "commands/build-fix.md"
+      ]
+    },
+    "workflows/checkpoint.md": {
+      "sha256": "7c589b8b7f5b38753c8df6d855fc4e7e9b32fe44c066172ab7e35ce73ee3787e",
+      "upstream_paths": [
+        "commands/checkpoint.md"
+      ]
+    },
+    "workflows/code-review.md": {
+      "sha256": "62f13fd8c96c1508efcc50022579d5eff95dc2220a6c95719aa5f058468a1f9d",
+      "upstream_paths": [
+        "commands/code-review.md"
+      ]
+    },
+    "workflows/e2e.md": {
+      "sha256": "ed17b5a7813d9cfa7374808eb0332451fb5e0266a751acabc458a1b6d3109755",
+      "upstream_paths": [
+        "commands/e2e.md"
+      ]
+    },
+    "workflows/eval.md": {
+      "sha256": "7475fa7afdd9e7511f05771a22809a8a78ffc00816fc67acee169c0a7323e1c1",
+      "upstream_paths": [
+        "commands/eval.md"
+      ]
+    },
+    "workflows/go-build.md": {
+      "sha256": "14935638162237b3b1bb7cd21c9c7036e2c7eccbb3a7673a5bcb5a761e3d863e",
+      "upstream_paths": [
+        "commands/go-build.md"
+      ]
+    },
+    "workflows/go-review.md": {
+      "sha256": "7aa896a6419e6e23b15db9c133815f6c7417120c65eea9532a781082c1a03f6d",
+      "upstream_paths": [
+        "commands/go-review.md"
+      ]
+    },
+    "workflows/go-test.md": {
+      "sha256": "f02907616e295aafc3220bdd35576f826f1b4ded610a7b81ed3fccd1b454b2fd",
+      "upstream_paths": [
+        "commands/go-test.md"
+      ]
+    },
+    "workflows/learn-eval.md": {
+      "sha256": "c738f39b3202a83f4664f2f3f4676ee5324bfe33843a32464b3dce5744dd1339",
+      "upstream_paths": [
+        "commands/learn-eval.md"
+      ]
+    },
+    "workflows/learn.md": {
+      "sha256": "9942c04f0a88c9f2055dad3ba856f6d49504f076cc64c122e5871d011b8cfd0b",
+      "upstream_paths": [
+        "commands/learn.md"
+      ]
+    },
+    "workflows/orchestrate.md": {
+      "sha256": "35efc01fc72b20b77b95ee7ce8e79d077176c32820199f5756e3e76afc85bcb5",
+      "upstream_paths": [
+        "commands/orchestrate.md"
+      ]
+    },
+    "workflows/plan.md": {
+      "sha256": "cdcc3d750bfe4365629ae538edcc471869ce804e4f8cf3455d68a7361a8d463b",
+      "upstream_paths": [
+        "commands/plan.md"
+      ]
+    },
+    "workflows/python-review.md": {
+      "sha256": "a1ed97c90d84b7b834d46e2e6d27a8c6788bf1f13653496340d228915009d4ac",
+      "upstream_paths": [
+        "commands/python-review.md"
+      ]
+    },
+    "workflows/refactor-clean.md": {
+      "sha256": "9423e714d425afc8a9768aeee34e1a141d5670d5e6cd7b98f0f537cb6b8e1a20",
+      "upstream_paths": [
+        "commands/refactor-clean.md"
+      ]
+    },
+    "workflows/setup-pm.md": {
+      "sha256": "29f5ca34234147b17f0632ace7183f4a6a811c9094a0be54a034093ee3a6a9ca",
+      "upstream_paths": [
+        "commands/setup-pm.md"
+      ]
+    },
+    "workflows/skill-create.md": {
+      "sha256": "c2318a6e65ba2bbfe2c5b6298ea0a6b9c12b0b3be60eed382d2652e54d3524f8",
+      "upstream_paths": [
+        "commands/skill-create.md"
+      ]
+    },
+    "workflows/tdd.md": {
+      "sha256": "78778f7e72583f38e7dd1bae222bbe38d1d596e760068a9f982c7d76b40298b6",
+      "upstream_paths": [
+        "commands/tdd.md"
+      ]
+    },
+    "workflows/test-coverage.md": {
+      "sha256": "0758aa8cea7b2200805d6d0d150a225ced71f5543fa5853407cc88ad5d653cdf",
+      "upstream_paths": [
+        "commands/test-coverage.md"
+      ]
+    },
+    "workflows/update-codemaps.md": {
+      "sha256": "04b5c79da8ea2ff60981200d58456906e5f9a5fe9dae8816770f951e413e2038",
+      "upstream_paths": [
+        "commands/update-codemaps.md"
+      ]
+    },
+    "workflows/update-docs.md": {
+      "sha256": "06c7c102cf06d5f5eada8ebbce2b58f64365644ac6042a088efdc42f0ff77bd9",
+      "upstream_paths": [
+        "commands/update-docs.md"
+      ]
+    },
+    "workflows/verify.md": {
+      "sha256": "e0568d122efbb0ec10da0188e6e13e4f4689ea0a5efc1b1e533b558f66d436dc",
+      "upstream_paths": [
+        "commands/verify.md"
+      ]
+    }
+  },
+  "package_version": "1.7.0-codex.0",
+  "repository": "forever94yu/everything-codex-code",
+  "schema_version": 1
+}

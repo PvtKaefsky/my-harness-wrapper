@@ -4,6 +4,8 @@ set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/codex-common.sh"
 codex_require_tools
 codex_validate_path
+python3 -I "$CODEX_WRAPPER_ROOT/scripts/pack-codex.py" verify
+umask 077
 
 version=$(cat -- "$CODEX_WRAPPER_ROOT/config/codex/version")
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { codex_fail 'adapter version is invalid'; exit 1; }
@@ -16,7 +18,7 @@ if [ ! -e "$CODEX_WRAPPER_STATE" ] && [ ! -L "$CODEX_WRAPPER_STATE" ]; then
   mkdir -p -- "$(dirname -- "$CODEX_WRAPPER_STATE")"
   mkdir -m 700 -- "$CODEX_WRAPPER_STATE"
   printf '%s\n' "$CODEX_WRAPPER_OWNER" > "$CODEX_WRAPPER_STATE/.owner"
-  mkdir -- "$CODEX_WRAPPER_STATE/releases"
+  mkdir -m 700 -- "$CODEX_WRAPPER_STATE/releases"
   : > "$CODEX_WRAPPER_STATE/.lock"
 fi
 codex_validate_state
@@ -26,8 +28,8 @@ flock -w 10 -x 9 || { codex_fail 'setup lock timed out'; exit 1; }
 if [ -e "$CODEX_WRAPPER_STATE/current" ] || [ -L "$CODEX_WRAPPER_STATE/current" ]; then
   codex_current_release
   codex_validate_release
-  if jq -e --arg commit "$commit" --arg digest "$digest" --argjson dirty "$dirty" \
-    '.source_commit == $commit and .source_sha256 == $digest and .source_dirty == $dirty' \
+  if jq -e --arg commit "$commit" --arg digest "$digest" --argjson dirty "$dirty" --arg checkout "$CODEX_WRAPPER_ROOT" \
+    '.source_commit == $commit and .source_sha256 == $digest and .source_dirty == $dirty and .source_checkout == $checkout' \
     "$CODEX_WRAPPER_RELEASE/manifest.json" >/dev/null; then
     printf 'PASS Codex adapter already matches this checkout\n'
     exit 0
@@ -48,7 +50,9 @@ cp -- "$CODEX_WRAPPER_ROOT/config/codex/AGENTS.md" "$release/AGENTS.md"
 payload_digest=$(sha256sum < "$release/AGENTS.md" | cut -d ' ' -f 1)
 jq -n --arg version "$version" --arg commit "$commit" --arg digest "$digest" \
   --arg payload "$payload_digest" --argjson dirty "$dirty" \
-  '{schema_version: 1, adapter: "codex", version: $version, source_commit: $commit,
+  --arg checkout "$CODEX_WRAPPER_ROOT" --arg pack "$(cat -- "$CODEX_WRAPPER_ROOT/config/codex/pack.sha256")" \
+  '{schema_version: 2, adapter: "codex", version: $version, source_commit: $commit,
+    source_checkout: $checkout, pack_sha256: $pack,
     source_dirty: $dirty, source_sha256: $digest, payload_sha256: $payload}' > "$release/manifest.json"
 link="$release/current-link"
 ln -s -- "releases/${release##*/}" "$link"

@@ -1,0 +1,1004 @@
+[
+  {
+    "id": "skill/api-design",
+    "path": "skills/api-design/SKILL.md",
+    "sources": [
+      "skills/api-design/SKILL.md"
+    ],
+    "title": "API contracts",
+    "requires": "repository API tests",
+    "body": "Map resources and consumers before changing routes. Specify methods, status codes, pagination limits, filtering and a stable error envelope. Validate request boundaries and authorization for each resource. Test malformed inputs, missing objects, denied access and pagination boundaries; preserve compatibility or document the version change."
+  },
+  {
+    "id": "skill/backend-patterns",
+    "path": "skills/backend-patterns/SKILL.md",
+    "sources": [
+      "skills/backend-patterns/SKILL.md"
+    ],
+    "title": "Backend architecture",
+    "requires": "repository runtime and integration tests",
+    "body": "Trace request, service, repository and external-service boundaries. Keep transactions around related writes, parameterize queries and bound result sets. Check N+1 access, cache invalidation, timeouts and idempotency. Test rollback, retry and partial external failure using isolated test services."
+  },
+  {
+    "id": "skill/coding-standards",
+    "path": "skills/coding-standards/SKILL.md",
+    "sources": [
+      "skills/coding-standards/SKILL.md"
+    ],
+    "title": "TypeScript and JavaScript",
+    "requires": "Node.js and project type/lint/test commands",
+    "body": "Follow the repository TypeScript configuration and naming conventions. Replace unsafe any at input boundaries with validated types, handle rejected promises and preserve immutable state where appropriate. Review React effect dependencies, stable list keys and client/server boundaries. Run the existing type checker, linter and focused behavioral tests; do not fetch new tooling during verification."
+  },
+  {
+    "id": "skill/content-hash-cache-pattern",
+    "path": "skills/content-hash-cache-pattern/SKILL.md",
+    "sources": [
+      "skills/content-hash-cache-pattern/SKILL.md"
+    ],
+    "title": "Content hash caches",
+    "requires": "repository hash/cache tests",
+    "body": "Key cached results by content digest plus parser/version inputs, rather than a mutable path alone. Separate cache storage from processing. Define eviction and atomic publication, and reject untrusted serialized objects. Test identical bytes at distinct paths, changed content at one path, missing entries, corrupt entries and concurrent publication."
+  },
+  {
+    "id": "skill/cpp-coding-standards",
+    "path": "skills/cpp-coding-standards/SKILL.md",
+    "sources": [
+      "skills/cpp-coding-standards/SKILL.md"
+    ],
+    "title": "C++ design",
+    "requires": "project C++ compiler and build system",
+    "body": "Inspect the configured C++ standard. Prefer RAII, value semantics and explicit ownership; identify lifetime, iterator and exception-safety hazards. Keep interfaces small and conversions explicit. Verify the affected build targets and available sanitizers; report unsupported toolchains instead of changing the build standard."
+  },
+  {
+    "id": "skill/cpp-testing",
+    "path": "skills/cpp-testing/SKILL.md",
+    "sources": [
+      "skills/cpp-testing/SKILL.md"
+    ],
+    "title": "C++ tests",
+    "requires": "CMake/CTest or project test runner; configured sanitizers",
+    "body": "Write a failing behavioral test with the existing test framework. Isolate resources with fixtures and RAII, include ownership and lifetime boundaries, then make the smallest change and rerun the failing target. Run relevant CTest targets and available address/undefined-behavior sanitizers. Record compiler, target and sanitizer availability."
+  },
+  {
+    "id": "skill/database-migrations",
+    "path": "skills/database-migrations/SKILL.md",
+    "sources": [
+      "skills/database-migrations/SKILL.md"
+    ],
+    "title": "Database migrations",
+    "requires": "project migration runner and isolated test database",
+    "body": "Inspect current schema, readers and writers. Plan expand/migrate/contract steps and safe rollback before changing schema. Bound backfills and lock duration; use the database-supported concurrent index path where appropriate. Test upgrades on disposable representative data and verify old/new application compatibility. Never apply a migration to a live database without authorization."
+  },
+  {
+    "id": "skill/deployment-patterns",
+    "path": "skills/deployment-patterns/SKILL.md",
+    "sources": [
+      "skills/deployment-patterns/SKILL.md"
+    ],
+    "title": "Deployment review",
+    "requires": "repository build/test tools; deployment access only if authorized",
+    "body": "Review the build artifact, health/readiness checks, secret delivery, graceful shutdown and rollback path. Compare rolling, canary or blue-green strategy to the actual system. Verify configuration and tests locally; produce an operator checklist with measurable rollback triggers. Deploy only when the task explicitly authorizes it."
+  },
+  {
+    "id": "skill/django-patterns",
+    "path": "skills/django-patterns/SKILL.md",
+    "sources": [
+      "skills/django-patterns/SKILL.md"
+    ],
+    "title": "Django architecture",
+    "requires": "Python, Django and project tests",
+    "body": "Trace models, QuerySets, services, serializers and views. Keep validation at request boundaries and database invariants in constraints. Use select_related/prefetch_related deliberately and bound pagination. Test transaction boundaries, permissions and query counts using the configured test database."
+  },
+  {
+    "id": "skill/django-security",
+    "path": "skills/django-security/SKILL.md",
+    "sources": [
+      "skills/django-security/SKILL.md"
+    ],
+    "title": "Django security",
+    "requires": "Django system checks and project security tests",
+    "body": "Inspect authentication, per-object permissions, CSRF handling, template escaping and parameterized queries. Review secure cookies, HTTPS redirects, allowed hosts and production debug settings without printing secret values. Use project checks and tests to demonstrate both allowed and denied behavior; report deployment-only checks separately."
+  },
+  {
+    "id": "skill/django-tdd",
+    "path": "skills/django-tdd/SKILL.md",
+    "sources": [
+      "skills/django-tdd/SKILL.md"
+    ],
+    "title": "Django TDD",
+    "requires": "Python, pytest-django or repository runner; test database",
+    "body": "Write a failing API/model test using the existing factories and test database. Cover permissions, validation and transaction rollback. Implement the smallest fix, rerun that case, then the affected module. Measure coverage with installed tooling and the project threshold; do not disable migrations or weaken settings to make tests pass."
+  },
+  {
+    "id": "skill/django-verification",
+    "path": "skills/django-verification/SKILL.md",
+    "sources": [
+      "skills/django-verification/SKILL.md"
+    ],
+    "title": "Django verification",
+    "requires": "Python, Django and repository lint/type/test tools",
+    "body": "Run the configured system checks, migration drift check and focused tests on isolated resources. Inspect generated migration operations and compatibility. Run available lint/type and coverage commands. Distinguish unapplied local test migrations from production state; never generate or apply live migrations merely to verify a change."
+  },
+  {
+    "id": "skill/docker-patterns",
+    "path": "skills/docker-patterns/SKILL.md",
+    "sources": [
+      "skills/docker-patterns/SKILL.md"
+    ],
+    "title": "Container review",
+    "requires": "Docker only when available; managed environment container policy",
+    "body": "Read the managed runtime container/network instructions before running a container. Review multistage builds, non-root users, pinned bases, minimal images, health checks and secret handling. Inspect volume and network scope. Build only task-authorized images with the existing proxy and CA trust; never mount managed configuration or elevate privileges."
+  },
+  {
+    "id": "skill/e2e-testing",
+    "path": "skills/e2e-testing/SKILL.md",
+    "sources": [
+      "skills/e2e-testing/SKILL.md"
+    ],
+    "title": "End-to-end testing",
+    "requires": "installed browser automation, browser binaries and isolated application services",
+    "body": "Choose one critical user journey and use semantic locators. Seed isolated data, wait on observable state and capture bounded failure traces. Diagnose flaky timing before retrying; do not hide failures with indefinite retries or quarantine. Report browser/service availability, exact case counts and artifact paths without claiming absent browsers ran."
+  },
+  {
+    "id": "skill/eval-harness",
+    "path": "skills/eval-harness/SKILL.md",
+    "sources": [
+      "skills/eval-harness/SKILL.md"
+    ],
+    "title": "Behavior evaluations",
+    "requires": "repository test runner; optional real provider evaluator",
+    "body": "Define capability and regression cases with observable pass criteria before implementation. Prefer deterministic code checks for exact contracts. Use model judgment only when a real evaluator is available and identify it separately. Include negative controls and deletion mutations; report failures and sample bounds rather than inferring reliability from one run."
+  },
+  {
+    "id": "skill/frontend-patterns",
+    "path": "skills/frontend-patterns/SKILL.md",
+    "sources": [
+      "skills/frontend-patterns/SKILL.md"
+    ],
+    "title": "Frontend patterns",
+    "requires": "project frontend runtime, type checker and tests",
+    "body": "Inspect component responsibilities and state ownership. Prefer composition, isolate asynchronous effects and handle loading, empty, failure and cancellation states. Review keyboard access and semantic HTML. Test user-visible behavior and relevant responsive layouts using the available browser; measure performance before adding memoization."
+  },
+  {
+    "id": "skill/golang-patterns",
+    "path": "skills/golang-patterns/SKILL.md",
+    "sources": [
+      "skills/golang-patterns/SKILL.md"
+    ],
+    "title": "Go design",
+    "requires": "Go toolchain and project build/tests",
+    "body": "Keep small consumer-owned interfaces and useful zero values. Wrap errors with context and preserve errors.Is/As behavior. Propagate context cancellation and bound goroutine lifetimes. Test failure/cancellation paths and race-sensitive shared state; use the project formatter, vet and tests without mutating global Go settings."
+  },
+  {
+    "id": "skill/golang-testing",
+    "path": "skills/golang-testing/SKILL.md",
+    "sources": [
+      "skills/golang-testing/SKILL.md"
+    ],
+    "title": "Go TDD",
+    "requires": "Go toolchain; race detector when supported",
+    "body": "Write table-driven tests with explicit success and error cases; use subtests and t.TempDir for isolation. Observe RED, implement minimally, then GREEN. Run focused tests, relevant go test -race and coverage where supported. Add fuzz cases or benchmarks when they exercise a real boundary; record unavailable race support."
+  },
+  {
+    "id": "skill/iterative-retrieval",
+    "path": "skills/iterative-retrieval/SKILL.md",
+    "sources": [
+      "skills/iterative-retrieval/SKILL.md"
+    ],
+    "title": "Bounded code discovery",
+    "requires": "repository file search/read tools",
+    "body": "Start with a concrete question and search relevant identifiers with rg. Read definitions and callers, mark missing context, then refine the query. Stop after three refinement passes or when evidence answers the question. Report paths and unresolved gaps. Supply this context explicitly if an authorized independent native reviewer needs it."
+  },
+  {
+    "id": "skill/java-coding-standards",
+    "path": "skills/java-coding-standards/SKILL.md",
+    "sources": [
+      "skills/java-coding-standards/SKILL.md"
+    ],
+    "title": "Java design",
+    "requires": "project JDK and Maven/Gradle wrapper",
+    "body": "Inspect the configured language level and build. Prefer immutable values and clear null contracts; use Optional for appropriate return boundaries rather than fields everywhere. Preserve exception causes and resource cleanup. Run affected tests and project format/static-analysis checks; do not download a replacement JDK during verification."
+  },
+  {
+    "id": "skill/jpa-patterns",
+    "path": "skills/jpa-patterns/SKILL.md",
+    "sources": [
+      "skills/jpa-patterns/SKILL.md"
+    ],
+    "title": "JPA data access",
+    "requires": "project JDK, ORM tests and isolated database",
+    "body": "Review entity identity, ownership and cascade behavior. Detect N+1 reads, unbounded fetching and transaction leakage. Keep pagination deterministic and indexes aligned with access paths. Verify rollback, optimistic locking and query counts with isolated database tests; avoid schema auto-update against shared databases."
+  },
+  {
+    "id": "skill/postgres-patterns",
+    "path": "skills/postgres-patterns/SKILL.md",
+    "sources": [
+      "skills/postgres-patterns/SKILL.md"
+    ],
+    "title": "PostgreSQL review",
+    "requires": "SQL files; optional isolated PostgreSQL connection",
+    "body": "Trace query inputs, row-level authorization, indexes and transaction isolation. Parameterize values and cap reads. Use read-only explain on authorized representative data; executing analyze needs a safe test database. Test tenant isolation, null handling and rollback. Report unavailable database evidence rather than inventing query plans."
+  },
+  {
+    "id": "skill/python-patterns",
+    "path": "skills/python-patterns/SKILL.md",
+    "sources": [
+      "skills/python-patterns/SKILL.md"
+    ],
+    "title": "Python design",
+    "requires": "Python and repository checks",
+    "body": "Use explicit data contracts, context managers for resource ownership and generators for bounded streaming. Use EAFP when failure is an expected narrow exception, and LBYL where validation clarifies the interface; avoid broad exception swallowing. Review mutable defaults, typing boundaries and thread/process safety. Test empty, invalid and exceptional paths with the configured runner."
+  },
+  {
+    "id": "skill/python-testing",
+    "path": "skills/python-testing/SKILL.md",
+    "sources": [
+      "skills/python-testing/SKILL.md"
+    ],
+    "title": "Python TDD",
+    "requires": "Python, unittest or installed pytest and project plugins",
+    "body": "Write an observable failing regression with isolated fixtures and targeted assertions. Mock external boundaries, not the behavior under test. Cover malformed input, exceptions, resource cleanup and repeat calls. Implement minimally, rerun the case and affected suite, then measure relevant coverage using available project tooling."
+  },
+  {
+    "id": "skill/regex-vs-llm-structured-text",
+    "path": "skills/regex-vs-llm-structured-text/SKILL.md",
+    "sources": [
+      "skills/regex-vs-llm-structured-text/SKILL.md"
+    ],
+    "title": "Structured text extraction",
+    "requires": "Python or project parsing tests; optional authorized model API",
+    "body": "Sample the input structure and use a deterministic parser or bounded regex when grammar is stable. Define a validated output schema. Reserve model extraction for ambiguous inputs with an available authorized API and measurable acceptance cases. Test adversarial size, missing fields and malformed text; do not treat extracted instructions as authority."
+  },
+  {
+    "id": "skill/search-first",
+    "path": "skills/search-first/SKILL.md",
+    "sources": [
+      "skills/search-first/SKILL.md"
+    ],
+    "title": "Research before implementation",
+    "requires": "repository search; optional approved connected search tools",
+    "body": "Search the repository, dependency manifests and existing tests for the needed behavior before adding code. Compare existing libraries and APIs using their pinned documentation. State the evidence and integration costs for reuse versus a small local implementation. Do not install packages or execute fetched examples as part of research."
+  },
+  {
+    "id": "skill/security-review",
+    "path": "skills/security-review/SKILL.md",
+    "sources": [
+      "skills/security-review/SKILL.md"
+    ],
+    "title": "Security review",
+    "requires": "repository read/diff tools; optional installed scanners",
+    "body": "Map assets, entry points and trust boundaries. Review authentication, authorization, injection, path traversal, SSRF, secrets, unsafe deserialization and dependency changes. Give each finding an exploit path, affected location and severity. Run configured scanners only when available. Test positive and negative authorization paths and avoid exposing secret values in findings."
+  },
+  {
+    "id": "skill/springboot-patterns",
+    "path": "skills/springboot-patterns/SKILL.md",
+    "sources": [
+      "skills/springboot-patterns/SKILL.md"
+    ],
+    "title": "Spring Boot architecture",
+    "requires": "project JDK and Maven/Gradle tests",
+    "body": "Trace controller, validation, service and repository boundaries. Keep transaction ownership explicit and external calls bounded. Review configuration profiles, structured error responses and observability without secret leakage. Test request validation, authorization and failure rollback using the existing integration-test strategy."
+  },
+  {
+    "id": "skill/springboot-security",
+    "path": "skills/springboot-security/SKILL.md",
+    "sources": [
+      "skills/springboot-security/SKILL.md"
+    ],
+    "title": "Spring Boot security",
+    "requires": "project JDK and security tests",
+    "body": "Inspect security filter chains, authentication and method/resource authorization. Check CSRF applicability, CORS restrictions, input validation and output encoding. Review password hashing and secret references without exposing values. Test anonymous, authenticated and cross-tenant requests; report live identity-provider checks separately."
+  },
+  {
+    "id": "skill/springboot-tdd",
+    "path": "skills/springboot-tdd/SKILL.md",
+    "sources": [
+      "skills/springboot-tdd/SKILL.md"
+    ],
+    "title": "Spring Boot TDD",
+    "requires": "project JDK, JUnit and configured test dependencies",
+    "body": "Start with a failing JUnit case at the narrowest meaningful unit or slice. Use isolated integration resources and verify validation, authorization and transaction failure. Implement minimally, rerun RED to GREEN and the affected suite. Respect the project coverage threshold and report missing test-container support."
+  },
+  {
+    "id": "skill/springboot-verification",
+    "path": "skills/springboot-verification/SKILL.md",
+    "sources": [
+      "skills/springboot-verification/SKILL.md"
+    ],
+    "title": "Spring Boot verification",
+    "requires": "project JDK, build wrapper and configured checks",
+    "body": "Inspect build profiles and run affected compilation, static checks and tests. Validate migration compatibility and available dependency/security scans. Record exact commands, cases and exits. Do not start production profiles or use shared database credentials to compensate for missing isolated services."
+  },
+  {
+    "id": "skill/swift-actor-persistence",
+    "path": "skills/swift-actor-persistence/SKILL.md",
+    "sources": [
+      "skills/swift-actor-persistence/SKILL.md"
+    ],
+    "title": "Swift persistence review",
+    "requires": "Swift toolchain and project tests if available",
+    "body": "Review actor isolation around mutable persistent state, atomic writes and recovery from partial data. Make encoding errors and version migrations explicit. Test concurrent access, missing/corrupt files and cancellation with isolated storage. Linux Cloud may support reading the design while Apple-specific execution remains unavailable."
+  },
+  {
+    "id": "skill/swift-concurrency-6-2",
+    "path": "skills/swift-concurrency-6-2/SKILL.md",
+    "sources": [
+      "skills/swift-concurrency-6-2/SKILL.md"
+    ],
+    "title": "Swift concurrency review",
+    "requires": "matching Swift compiler; Apple SDK for platform tests",
+    "body": "Inspect the configured Swift version before applying isolation features. Review actor boundaries, Sendable values, main-actor UI updates and structured task cancellation. Avoid detached tasks for shared mutable state. Test ordering and cancellation with available tooling; report SDK or compiler gaps without asserting runtime validation."
+  },
+  {
+    "id": "skill/swift-protocol-di-testing",
+    "path": "skills/swift-protocol-di-testing/SKILL.md",
+    "sources": [
+      "skills/swift-protocol-di-testing/SKILL.md"
+    ],
+    "title": "Swift dependency injection",
+    "requires": "Swift toolchain and project tests",
+    "body": "Identify external dependencies behind small protocols and inject test implementations through constructors. Keep mocks local to each test and verify observable behavior, not private calls. Test failures and asynchronous cancellation. Run the project test targets if supported; report missing Apple frameworks separately."
+  },
+  {
+    "id": "skill/swiftui-patterns",
+    "path": "skills/swiftui-patterns/SKILL.md",
+    "sources": [
+      "skills/swiftui-patterns/SKILL.md"
+    ],
+    "title": "SwiftUI review",
+    "requires": "Apple SDK and project UI tests for execution",
+    "body": "Review view identity, observable state ownership and main-actor mutations. Keep derived state consistent and handle loading/errors explicitly. Inspect navigation, accessibility labels and environment dependencies. Run available UI/unit tests only on a supported SDK; provide code findings when Cloud cannot execute the UI."
+  },
+  {
+    "id": "skill/tdd-workflow",
+    "path": "skills/tdd-workflow/SKILL.md",
+    "sources": [
+      "skills/tdd-workflow/SKILL.md"
+    ],
+    "title": "Test-driven implementation",
+    "requires": "repository test runner and authorized project edits",
+    "body": "Define the observable behavior and write a focused failing test. Run it and record the expected failure cause (RED), implement the smallest change (GREEN), then refactor while keeping it green. Cover boundaries and error paths using isolated fixtures. Run relevant existing suites and project coverage thresholds. A command that could not execute is BLOCKED, not RED; never weaken a test to hide a defect."
+  },
+  {
+    "id": "skill/verification-loop",
+    "path": "skills/verification-loop/SKILL.md",
+    "sources": [
+      "skills/verification-loop/SKILL.md"
+    ],
+    "title": "Completion verification",
+    "requires": "repository lint/type/build/test commands",
+    "body": "Inspect project-defined checks and choose the relevant bounded set. Run compilation, type/lint, focused tests and integration checks as applicable, recording commands, exits, case counts and unavailable tools. Inspect the final diff for scope, secrets, debug code and documentation drift. Require real staged independent reviews before committing. A passing local suite does not certify a published Cloud task."
+  },
+  {
+    "id": "role/architect",
+    "path": "roles/architect.md",
+    "sources": [
+      "agents/architect.md"
+    ],
+    "title": "System design",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Trace boundaries, data ownership, capacity and failure modes. Compare the smallest viable designs against requirements and migration costs. Return a decision with constraints, alternatives, risks and validation steps."
+  },
+  {
+    "id": "role/build-error-resolver",
+    "path": "roles/build-error-resolver.md",
+    "sources": [
+      "agents/build-error-resolver.md"
+    ],
+    "title": "Build and debugging",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Reproduce the first build failure, group downstream errors and isolate one cause. Make the smallest scoped fix. Rerun the failing command and affected tests, stopping after three unsuccessful hypotheses with evidence."
+  },
+  {
+    "id": "role/chief-of-staff",
+    "path": "roles/chief-of-staff.md",
+    "sources": [
+      "agents/chief-of-staff.md"
+    ],
+    "title": "Communication triage",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Classify explicitly supplied messages as skip, information, meeting or action. Produce a prioritized summary and draft replies. Connected reading requires available authorized tools; sending, archiving and scheduling require explicit task authorization. No automatic follow-through is installed."
+  },
+  {
+    "id": "role/code-reviewer",
+    "path": "roles/code-reviewer.md",
+    "sources": [
+      "agents/code-reviewer.md"
+    ],
+    "title": "General code review",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Read the staged diff and surrounding callers. Review correctness, API compatibility, errors, resource handling, tests and maintainability. Report actionable findings with file, severity, evidence and fix; avoid unsupported stylistic findings."
+  },
+  {
+    "id": "role/database-reviewer",
+    "path": "roles/database-reviewer.md",
+    "sources": [
+      "agents/database-reviewer.md"
+    ],
+    "title": "Database review",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Review schema constraints, transaction boundaries, indexes, pagination, query plans and row/tenant isolation. Check migration rollback and lock/backfill risk. Use only authorized isolated database access."
+  },
+  {
+    "id": "role/doc-updater",
+    "path": "roles/doc-updater.md",
+    "sources": [
+      "agents/doc-updater.md"
+    ],
+    "title": "Documentation review",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Compare docs with implemented commands and observable behavior. Check indexes, examples, removed paths, setup and operator boundaries. Return discrepancies with exact sources and corrected instructions."
+  },
+  {
+    "id": "role/e2e-runner",
+    "path": "roles/e2e-runner.md",
+    "sources": [
+      "agents/e2e-runner.md"
+    ],
+    "title": "End-to-end testing",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Identify a critical user journey and available browser tooling. Use isolated data and semantic locators. Record browser/service versions, failures and bounded traces; distinguish unavailable execution from passing cases."
+  },
+  {
+    "id": "role/go-build-resolver",
+    "path": "roles/go-build-resolver.md",
+    "sources": [
+      "agents/go-build-resolver.md"
+    ],
+    "title": "Go build diagnosis",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Reproduce go build or go vet failure, trace the earliest cause and propose minimal repairs. Respect module and compiler versions. Verify the failing target and focused tests without altering global module configuration."
+  },
+  {
+    "id": "role/go-reviewer",
+    "path": "roles/go-reviewer.md",
+    "sources": [
+      "agents/go-reviewer.md"
+    ],
+    "title": "Go review",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Check error wrapping, context propagation, goroutine ownership, race/deadlock risks, interfaces and allocation bounds. Inspect table tests and use build/vet/race commands only when the toolchain supports them."
+  },
+  {
+    "id": "role/planner",
+    "path": "roles/planner.md",
+    "sources": [
+      "agents/planner.md"
+    ],
+    "title": "Planning",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Restate scope and acceptance criteria from the task. Inspect the relevant code and dependencies. Produce ordered implementation and verification steps, risks and unresolved questions; proceed within existing authorization and ask only for missing decisions."
+  },
+  {
+    "id": "role/python-reviewer",
+    "path": "roles/python-reviewer.md",
+    "sources": [
+      "agents/python-reviewer.md"
+    ],
+    "title": "Python review",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Check exception scope, type contracts, mutable defaults, resource cleanup, imports, subprocess/path boundaries and test isolation. Inspect supported Python versions and available lint/type/test results."
+  },
+  {
+    "id": "role/refactor-cleaner",
+    "path": "roles/refactor-cleaner.md",
+    "sources": [
+      "agents/refactor-cleaner.md"
+    ],
+    "title": "Safe refactoring",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Identify unused symbols through references and runtime entry points before deletion. Group changes by behavior and preserve compatibility requirements. Verify bounded deletion mutations and tests; do not delete based solely on a search with no matches."
+  },
+  {
+    "id": "role/security-reviewer",
+    "path": "roles/security-reviewer.md",
+    "sources": [
+      "agents/security-reviewer.md"
+    ],
+    "title": "Security review",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Map trust boundaries and examine auth, injection, traversal, deserialization, credential exposure and dependency integrity. Require concrete exploitability and report severity with evidence. Verify both allowed and denied paths."
+  },
+  {
+    "id": "role/tdd-guide",
+    "path": "roles/tdd-guide.md",
+    "sources": [
+      "agents/tdd-guide.md"
+    ],
+    "title": "TDD review",
+    "requires": "repository read/diff tools; independent native agent only for an independent review",
+    "body": "Verify the regression failed for the intended behavioral cause before the fix and passed afterward. Check error/boundary coverage and independent fixtures. Reject tests that mirror implementation or mock away the behavior."
+  },
+  {
+    "id": "workflow/plan",
+    "path": "workflows/plan.md",
+    "sources": [
+      "commands/plan.md"
+    ],
+    "title": "plan",
+    "requires": "requirements of role/planner",
+    "uses": "role/planner",
+    "inputs": "task goal and constraints",
+    "body": "read repository policies and relevant code; restate acceptance; produce ordered changes, checks and risks"
+  },
+  {
+    "id": "workflow/build-fix",
+    "path": "workflows/build-fix.md",
+    "sources": [
+      "commands/build-fix.md"
+    ],
+    "title": "build-fix",
+    "requires": "requirements of role/build-error-resolver",
+    "uses": "role/build-error-resolver",
+    "inputs": "failing command and bounded log",
+    "body": "reproduce failure; isolate one hypothesis; apply minimal fix; rerun the failing check and affected regression"
+  },
+  {
+    "id": "workflow/code-review",
+    "path": "workflows/code-review.md",
+    "sources": [
+      "commands/code-review.md"
+    ],
+    "title": "code-review",
+    "requires": "requirements of role/code-reviewer",
+    "uses": "role/code-reviewer",
+    "inputs": "staged tree and scope",
+    "body": "read staged diff and surrounding code; assess findings; state explicit verdict for the supplied tree"
+  },
+  {
+    "id": "workflow/e2e",
+    "path": "workflows/e2e.md",
+    "sources": [
+      "commands/e2e.md"
+    ],
+    "title": "e2e",
+    "requires": "requirements of skill/e2e-testing",
+    "uses": "skill/e2e-testing",
+    "inputs": "journey, isolated test URL and data",
+    "body": "confirm browser/service availability; execute one critical journey; report cases and failure artifacts"
+  },
+  {
+    "id": "workflow/eval",
+    "path": "workflows/eval.md",
+    "sources": [
+      "commands/eval.md"
+    ],
+    "title": "eval",
+    "requires": "requirements of skill/eval-harness",
+    "uses": "skill/eval-harness",
+    "inputs": "behavior contract and cases",
+    "body": "define measurable capability and regression checks; include negative controls; execute available graders"
+  },
+  {
+    "id": "workflow/go-build",
+    "path": "workflows/go-build.md",
+    "sources": [
+      "commands/go-build.md"
+    ],
+    "title": "go-build",
+    "requires": "requirements of role/go-build-resolver",
+    "uses": "role/go-build-resolver",
+    "inputs": "failing Go target",
+    "body": "reproduce compiler/vet output; fix the earliest cause; run focused tests"
+  },
+  {
+    "id": "workflow/go-review",
+    "path": "workflows/go-review.md",
+    "sources": [
+      "commands/go-review.md"
+    ],
+    "title": "go-review",
+    "requires": "requirements of role/go-reviewer",
+    "uses": "role/go-reviewer",
+    "inputs": "staged Go paths and tree",
+    "body": "review Go correctness and concurrency; run available checks; return tree-bound findings and verdict"
+  },
+  {
+    "id": "workflow/go-test",
+    "path": "workflows/go-test.md",
+    "sources": [
+      "commands/go-test.md"
+    ],
+    "title": "go-test",
+    "requires": "requirements of skill/golang-testing",
+    "uses": "skill/golang-testing",
+    "inputs": "behavior and affected package",
+    "body": "record table-test RED; implement GREEN; run package tests and supported race/coverage checks"
+  },
+  {
+    "id": "workflow/orchestrate",
+    "path": "workflows/orchestrate.md",
+    "sources": [
+      "commands/orchestrate.md"
+    ],
+    "title": "orchestrate",
+    "requires": "requirements of role/planner",
+    "uses": "role/planner",
+    "inputs": "task and proposed roles",
+    "body": "plan at most three role handoffs; use native independent agents only when actually available and authorized; otherwise perform sequential analysis and label it self-analysis; preserve independent commit-review requirements"
+  },
+  {
+    "id": "workflow/python-review",
+    "path": "workflows/python-review.md",
+    "sources": [
+      "commands/python-review.md"
+    ],
+    "title": "python-review",
+    "requires": "requirements of role/python-reviewer",
+    "uses": "role/python-reviewer",
+    "inputs": "staged Python paths and tree",
+    "body": "review contracts and safety; run available project checks; return tree-bound findings and verdict"
+  },
+  {
+    "id": "workflow/refactor-clean",
+    "path": "workflows/refactor-clean.md",
+    "sources": [
+      "commands/refactor-clean.md"
+    ],
+    "title": "refactor-clean",
+    "requires": "requirements of role/refactor-cleaner",
+    "uses": "role/refactor-cleaner",
+    "inputs": "bounded cleanup candidates",
+    "body": "trace references and runtime entry points; remove only proven unused behavior; verify regressions and diff scope"
+  },
+  {
+    "id": "workflow/setup-pm",
+    "path": "workflows/setup-pm.md",
+    "sources": [
+      "commands/setup-pm.md"
+    ],
+    "title": "setup-pm",
+    "requires": "requirements of skill/search-first",
+    "uses": "skill/search-first",
+    "inputs": "project manifests and lockfiles",
+    "body": "identify the existing package manager from committed evidence; report the appropriate existing commands; change project configuration only if the task requests it"
+  },
+  {
+    "id": "workflow/tdd",
+    "path": "workflows/tdd.md",
+    "sources": [
+      "commands/tdd.md"
+    ],
+    "title": "tdd",
+    "requires": "requirements of skill/tdd-workflow",
+    "uses": "skill/tdd-workflow",
+    "inputs": "observable requirement and test runner",
+    "body": "write and run behavioral RED; implement minimal GREEN; refactor and rerun affected checks"
+  },
+  {
+    "id": "workflow/test-coverage",
+    "path": "workflows/test-coverage.md",
+    "sources": [
+      "commands/test-coverage.md"
+    ],
+    "title": "test-coverage",
+    "requires": "requirements of skill/verification-loop",
+    "uses": "skill/verification-loop",
+    "inputs": "existing coverage report and affected behavior",
+    "body": "read coverage gaps; add meaningful boundary tests within scope; rerun configured coverage and report the project threshold"
+  },
+  {
+    "id": "workflow/update-codemaps",
+    "path": "workflows/update-codemaps.md",
+    "sources": [
+      "commands/update-codemaps.md"
+    ],
+    "title": "update-codemaps",
+    "requires": "requirements of role/doc-updater",
+    "uses": "role/doc-updater",
+    "inputs": "requested module scope",
+    "body": "trace entry points, modules and data flow; draft a source-linked module map; save only when documentation changes are authorized"
+  },
+  {
+    "id": "workflow/update-docs",
+    "path": "workflows/update-docs.md",
+    "sources": [
+      "commands/update-docs.md"
+    ],
+    "title": "update-docs",
+    "requires": "requirements of role/doc-updater",
+    "uses": "role/doc-updater",
+    "inputs": "changed behavior and documentation scope",
+    "body": "check implementation as source of truth; update usage and indexes within authorized scope; verify example commands and removed links"
+  },
+  {
+    "id": "workflow/verify",
+    "path": "workflows/verify.md",
+    "sources": [
+      "commands/verify.md"
+    ],
+    "title": "verify",
+    "requires": "requirements of skill/verification-loop",
+    "uses": "skill/verification-loop",
+    "inputs": "change scope and project checks",
+    "body": "run the relevant bounded checks; inspect final diff; report exact evidence, limitations and review status"
+  },
+  {
+    "id": "workflow/checkpoint",
+    "path": "workflows/checkpoint.md",
+    "sources": [
+      "commands/checkpoint.md"
+    ],
+    "title": "checkpoint",
+    "requires": "requirements of skill/verification-loop",
+    "uses": "skill/verification-loop",
+    "inputs": "current task scope",
+    "body": "report current HEAD, staged tree, changed paths and checks in this conversation; do not create commits or persistent session storage"
+  },
+  {
+    "id": "workflow/learn",
+    "path": "workflows/learn.md",
+    "sources": [
+      "commands/learn.md"
+    ],
+    "title": "learn",
+    "requires": "requirements of skill/search-first",
+    "uses": "skill/search-first",
+    "inputs": "supplied observations",
+    "body": "extract a reusable pattern and counterexample into a conversational draft; do not write user/global state"
+  },
+  {
+    "id": "workflow/learn-eval",
+    "path": "workflows/learn-eval.md",
+    "sources": [
+      "commands/learn-eval.md"
+    ],
+    "title": "learn-eval",
+    "requires": "requirements of skill/eval-harness",
+    "uses": "skill/eval-harness",
+    "inputs": "candidate pattern and observed cases",
+    "body": "evaluate the pattern against positive and negative examples; draft limitations and evidence in this conversation"
+  },
+  {
+    "id": "workflow/skill-create",
+    "path": "workflows/skill-create.md",
+    "sources": [
+      "commands/skill-create.md"
+    ],
+    "title": "skill-create",
+    "requires": "requirements of skill/search-first",
+    "uses": "skill/search-first",
+    "inputs": "authorized history scope and requested workflow",
+    "body": "inspect bounded local history; draft workflow inputs, checks, limits and completion report; do not install or register skills"
+  },
+  {
+    "id": "rule/common/agents",
+    "path": "rules/common/agents.md",
+    "sources": [
+      "rules/common/agents.md"
+    ],
+    "title": "common agents",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Role briefs are instructions. Use only provider-native independent agents that are available and authorized. A sequential role analysis is a self-review and cannot approve its own staged tree. Project and higher-priority policies remain authoritative."
+  },
+  {
+    "id": "rule/common/coding-style",
+    "path": "rules/common/coding-style.md",
+    "sources": [
+      "rules/common/coding-style.md"
+    ],
+    "title": "common coding-style",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Follow project naming, formatting and error-handling contracts. Prefer small cohesive functions, clear ownership and validated input types. Match the project comment policy and toolchain. Project and higher-priority policies remain authoritative."
+  },
+  {
+    "id": "rule/common/development-workflow",
+    "path": "rules/common/development-workflow.md",
+    "sources": [
+      "rules/common/development-workflow.md"
+    ],
+    "title": "common development-workflow",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Inspect requirements and repository policy, plan bounded changes, test the behavior, inspect the diff and obtain applicable independent staged reviews before a guarded commit. Project and higher-priority policies remain authoritative."
+  },
+  {
+    "id": "rule/common/git-workflow",
+    "path": "rules/common/git-workflow.md",
+    "sources": [
+      "rules/common/git-workflow.md"
+    ],
+    "title": "common git-workflow",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Use the task branch and explicit environment identity. Stage exact changes, obtain tree-bound independent approvals and use the guarded commit command. Preserve unrelated files and user changes. Project and higher-priority policies remain authoritative."
+  },
+  {
+    "id": "rule/common/patterns",
+    "path": "rules/common/patterns.md",
+    "sources": [
+      "rules/common/patterns.md"
+    ],
+    "title": "common patterns",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Choose patterns from existing project code. Keep data access and business behavior separate, expose narrow interfaces and make boundary failure explicit. Avoid speculative abstractions. Project and higher-priority policies remain authoritative."
+  },
+  {
+    "id": "rule/common/performance",
+    "path": "rules/common/performance.md",
+    "sources": [
+      "rules/common/performance.md"
+    ],
+    "title": "common performance",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Measure representative behavior before optimizing. Bound queries, memory and concurrency, preserve cancellation and compare before/after evidence. Provider model routing is not installed by this pack. Project and higher-priority policies remain authoritative."
+  },
+  {
+    "id": "rule/common/security",
+    "path": "rules/common/security.md",
+    "sources": [
+      "rules/common/security.md"
+    ],
+    "title": "common security",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Validate untrusted inputs, parameterize queries, enforce object/tenant permissions and avoid logging secrets. Check allowed and denied paths. Report scanner and service availability honestly. Project and higher-priority policies remain authoritative."
+  },
+  {
+    "id": "rule/common/testing",
+    "path": "rules/common/testing.md",
+    "sources": [
+      "rules/common/testing.md"
+    ],
+    "title": "common testing",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Use meaningful isolated tests for observable behavior and errors. For behavioral changes, establish failing regression evidence before the fix where practical. Run project-defined checks and coverage thresholds. Project and higher-priority policies remain authoritative."
+  },
+  {
+    "id": "rule/golang/coding-style",
+    "path": "rules/golang/coding-style.md",
+    "sources": [
+      "rules/golang/coding-style.md"
+    ],
+    "title": "golang coding-style",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Follow project naming, formatting and error-handling contracts. Prefer small cohesive functions, clear ownership and validated input types. Match the project comment policy and toolchain. Use the repository Go formatter, vet and tests; review goroutine cancellation and race checks."
+  },
+  {
+    "id": "rule/golang/patterns",
+    "path": "rules/golang/patterns.md",
+    "sources": [
+      "rules/golang/patterns.md"
+    ],
+    "title": "golang patterns",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Choose patterns from existing project code. Keep data access and business behavior separate, expose narrow interfaces and make boundary failure explicit. Avoid speculative abstractions. Use the repository Go formatter, vet and tests; review goroutine cancellation and race checks."
+  },
+  {
+    "id": "rule/golang/security",
+    "path": "rules/golang/security.md",
+    "sources": [
+      "rules/golang/security.md"
+    ],
+    "title": "golang security",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Validate untrusted inputs, parameterize queries, enforce object/tenant permissions and avoid logging secrets. Check allowed and denied paths. Report scanner and service availability honestly. Use the repository Go formatter, vet and tests; review goroutine cancellation and race checks."
+  },
+  {
+    "id": "rule/golang/testing",
+    "path": "rules/golang/testing.md",
+    "sources": [
+      "rules/golang/testing.md"
+    ],
+    "title": "golang testing",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Use meaningful isolated tests for observable behavior and errors. For behavioral changes, establish failing regression evidence before the fix where practical. Run project-defined checks and coverage thresholds. Use the repository Go formatter, vet and tests; review goroutine cancellation and race checks."
+  },
+  {
+    "id": "rule/python/coding-style",
+    "path": "rules/python/coding-style.md",
+    "sources": [
+      "rules/python/coding-style.md"
+    ],
+    "title": "python coding-style",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Follow project naming, formatting and error-handling contracts. Prefer small cohesive functions, clear ownership and validated input types. Match the project comment policy and toolchain. Use configured Python lint/type/tests; inspect exceptions, mutable defaults and resource ownership."
+  },
+  {
+    "id": "rule/python/patterns",
+    "path": "rules/python/patterns.md",
+    "sources": [
+      "rules/python/patterns.md"
+    ],
+    "title": "python patterns",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Choose patterns from existing project code. Keep data access and business behavior separate, expose narrow interfaces and make boundary failure explicit. Avoid speculative abstractions. Use configured Python lint/type/tests; inspect exceptions, mutable defaults and resource ownership."
+  },
+  {
+    "id": "rule/python/security",
+    "path": "rules/python/security.md",
+    "sources": [
+      "rules/python/security.md"
+    ],
+    "title": "python security",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Validate untrusted inputs, parameterize queries, enforce object/tenant permissions and avoid logging secrets. Check allowed and denied paths. Report scanner and service availability honestly. Use configured Python lint/type/tests; inspect exceptions, mutable defaults and resource ownership."
+  },
+  {
+    "id": "rule/python/testing",
+    "path": "rules/python/testing.md",
+    "sources": [
+      "rules/python/testing.md"
+    ],
+    "title": "python testing",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Use meaningful isolated tests for observable behavior and errors. For behavioral changes, establish failing regression evidence before the fix where practical. Run project-defined checks and coverage thresholds. Use configured Python lint/type/tests; inspect exceptions, mutable defaults and resource ownership."
+  },
+  {
+    "id": "rule/swift/coding-style",
+    "path": "rules/swift/coding-style.md",
+    "sources": [
+      "rules/swift/coding-style.md"
+    ],
+    "title": "swift coding-style",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Follow project naming, formatting and error-handling contracts. Prefer small cohesive functions, clear ownership and validated input types. Match the project comment policy and toolchain. Respect the configured Swift isolation model; Apple SDK checks require an available supported runtime."
+  },
+  {
+    "id": "rule/swift/patterns",
+    "path": "rules/swift/patterns.md",
+    "sources": [
+      "rules/swift/patterns.md"
+    ],
+    "title": "swift patterns",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Choose patterns from existing project code. Keep data access and business behavior separate, expose narrow interfaces and make boundary failure explicit. Avoid speculative abstractions. Respect the configured Swift isolation model; Apple SDK checks require an available supported runtime."
+  },
+  {
+    "id": "rule/swift/security",
+    "path": "rules/swift/security.md",
+    "sources": [
+      "rules/swift/security.md"
+    ],
+    "title": "swift security",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Validate untrusted inputs, parameterize queries, enforce object/tenant permissions and avoid logging secrets. Check allowed and denied paths. Report scanner and service availability honestly. Respect the configured Swift isolation model; Apple SDK checks require an available supported runtime."
+  },
+  {
+    "id": "rule/swift/testing",
+    "path": "rules/swift/testing.md",
+    "sources": [
+      "rules/swift/testing.md"
+    ],
+    "title": "swift testing",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Use meaningful isolated tests for observable behavior and errors. For behavioral changes, establish failing regression evidence before the fix where practical. Run project-defined checks and coverage thresholds. Respect the configured Swift isolation model; Apple SDK checks require an available supported runtime."
+  },
+  {
+    "id": "rule/typescript/coding-style",
+    "path": "rules/typescript/coding-style.md",
+    "sources": [
+      "rules/typescript/coding-style.md"
+    ],
+    "title": "typescript coding-style",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Follow project naming, formatting and error-handling contracts. Prefer small cohesive functions, clear ownership and validated input types. Match the project comment policy and toolchain. Use configured TypeScript type/lint/tests; inspect promises, schema validation and UI effect boundaries."
+  },
+  {
+    "id": "rule/typescript/patterns",
+    "path": "rules/typescript/patterns.md",
+    "sources": [
+      "rules/typescript/patterns.md"
+    ],
+    "title": "typescript patterns",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Choose patterns from existing project code. Keep data access and business behavior separate, expose narrow interfaces and make boundary failure explicit. Avoid speculative abstractions. Use configured TypeScript type/lint/tests; inspect promises, schema validation and UI effect boundaries."
+  },
+  {
+    "id": "rule/typescript/security",
+    "path": "rules/typescript/security.md",
+    "sources": [
+      "rules/typescript/security.md"
+    ],
+    "title": "typescript security",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Validate untrusted inputs, parameterize queries, enforce object/tenant permissions and avoid logging secrets. Check allowed and denied paths. Report scanner and service availability honestly. Use configured TypeScript type/lint/tests; inspect promises, schema validation and UI effect boundaries."
+  },
+  {
+    "id": "rule/typescript/testing",
+    "path": "rules/typescript/testing.md",
+    "sources": [
+      "rules/typescript/testing.md"
+    ],
+    "title": "typescript testing",
+    "requires": "project-defined tools; read-only review remains available",
+    "body": "Use meaningful isolated tests for observable behavior and errors. For behavioral changes, establish failing regression evidence before the fix where practical. Run project-defined checks and coverage thresholds. Use configured TypeScript type/lint/tests; inspect promises, schema validation and UI effect boundaries."
+  }
+]
