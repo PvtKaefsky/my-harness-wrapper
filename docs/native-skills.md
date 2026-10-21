@@ -142,7 +142,8 @@ Only account-database home lookup is injected to identify that scratch HOME; pro
 Additional unit cases simulate ownership, permission denial and interruption at syscall boundaries.
 The real user's HOME is never provisioned by these tests.
 Tests compare source file/Git bytes, HEAD and status, and dummy target bytes and metadata.
-The existing bootstrap may refresh source index inode/mtime without changing its bytes or staged state.
+The existing bootstrap may refresh source index inode/mtime and private mode without changing its bytes or staged state.
+Fixture Git commands start with a private umask so that source permission checks are stable under the runner's default umask.
 Tests also exercise deletion/restoration, conflicts, symlinks, opt-out, provenance, interrupted creation and fallback reads.
 Scratch filesystem success does not establish Cloud snapshot retention or provider indexing.
 The native suite is a separate required hosted step checked by the CI contract and its deletion regression.

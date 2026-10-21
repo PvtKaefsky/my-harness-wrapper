@@ -81,7 +81,7 @@ with patch('pwd.getpwuid',return_value=account):
         self.env['PATH'] = str(tools) + os.pathsep + os.environ['PATH']
 
     def cmd(self, *args, code=0, contains=None, env=None, timeout=120):
-        result = subprocess.run(args, cwd=self.root, env=env or self.env, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(args, cwd=self.root, env=env or self.env, capture_output=True, text=True, timeout=timeout, umask=0o077)
         output = result.stdout + result.stderr
         self.assertEqual(result.returncode, code, output[-7000:])
         if contains:
