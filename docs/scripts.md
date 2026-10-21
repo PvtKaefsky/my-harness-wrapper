@@ -18,6 +18,19 @@
 | `scripts/check-codex-commit-args.py` | Rejects tree/identity-changing commit arguments and checks explicit message attribution. |
 | `scripts/commit-codex.sh` | Explicit identity and independent review checks, then Git in the caller's repository. |
 
+## Hosted CI checks
+
+| Path | Interface and result |
+| --- | --- |
+| `.github/workflows/codex.yml` | Hosted push/PR job invoking the five suites, isolated full setup and CI contract tests. |
+| `scripts/check-hosted-ci.py` | `workflow PATH` validates the bounded workflow contract; `run RUN_JSON JOBS_JSON EXPECTED_SHA` checks supplied GitHub execution records. |
+| `scripts/tests/test_hosted_ci.py` | Eight local contract tests covering required commands, permissions, timeout, unmasked exit 37, stale checkout, inherited Git-context preservation, empty/skipped/failing steps and rejected non-CI claims. |
+
+The deletion test removes the Cloud pack invocation in a disposable workflow file.
+It requires exit 1 with `HOSTED_SUITE_COVERAGE_MISSING: Cloud pack suite`, restores the invocation, and requires exit 0.
+Fabricated hook/skill status strings cannot substitute for hosted execution records.
+These tests certify local validator behavior, not provider hook/skill execution or genuine hosted runs.
+
 ## Suites
 
 ```bash

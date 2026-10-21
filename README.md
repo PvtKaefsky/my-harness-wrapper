@@ -40,3 +40,7 @@ The pack installs no automatic hooks, native skill selectors or MCP servers.
 
 Use the verbatim Environment fields and fresh-task acceptance steps in [Codex delivery](docs/codex.md).
 A merged PR does not publish an Environment.
+
+GitHub Actions runs the wrapper suites and isolated full setup on pushes and pull requests.
+Use [the runbook](docs/runbook.md) to inspect actual hosted job steps and external billing blockers.
+Report each Cloud capability with its own [evidence state](docs/codex.md#capability-evidence).

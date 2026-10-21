@@ -102,6 +102,32 @@ A local source commit cannot distinguish a current remote base from a stale chec
 A dirty installation is reported and is not reproducible from its recorded commit alone.
 Local fixtures cannot distinguish fresh-task provider availability from unavailable registration.
 
+## Capability evidence
+
+Report each capability separately as `OBSERVED_PASS`, `OBSERVED_FAIL`, `BLOCKED`, `UNSUPPORTED` or `NOT_OBSERVED`.
+`OBSERVED_PASS` requires the capability's own executed evidence.
+`OBSERVED_FAIL` requires an executed check that fails that capability.
+`BLOCKED` names the external action or unavailable prerequisite preventing the check.
+`UNSUPPORTED` names a capability absent from this delivery contract.
+`NOT_OBSERVED` names a supported or possible behavior without current execution evidence.
+Every row records the evidence reference and the stronger claim still unproven.
+No comparison, inventory count or unrelated passing capability supplies a numerical grade or a substitute.
+
+| Capability | Evidence required for its own claim | Limit |
+| --- | --- | --- |
+| Local suites | Source SHA, command, exit and case count from actual suite logs | Local success does not establish hosted execution. |
+| Hosted CI | Workflow/run/job IDs, source identities, executed step names and conclusions from GitHub plus failing exit from logs where available | YAML tests, an empty step list, neutral or skipped conclusions do not pass hosted acceptance. |
+| Environment setup | Full setup exit, canonical isolated state path and delivery verification | A local setup does not publish an Environment or establish a fresh-task start skill. |
+| Live Cloud instruction use | Verified instruction ID/read reference and concrete task output | Installed Markdown and matching hashes do not establish conversational use. |
+| Native skills | Actual provider discovery/dispatch evidence | This pack registers no native selectors; file reads are not native discovery. |
+| Independent provider review | Native invocation/completion, reviewer identity, explicit approval and exact staged tree | Mock receipts and a passing JSON checker do not establish provider review. |
+| Automatic hooks | Actual registered/trusted event and its provider execution evidence | This pack provisions no automatic hooks; explicit commands are not hook events. |
+| Connected MCP tools | Current tool inventory and successful authorized invocation reference | Pack files do not register servers or prove other tools work. |
+
+A failure or blocker applies to its own capability.
+Other workstreams remain independently testable.
+Hosted operations and billing guidance are in [the runbook](runbook.md).
+
 ## Post-merge acceptance
 
 1. Review and merge the migration PR on `main`; issue #22 remains unchanged historical context.

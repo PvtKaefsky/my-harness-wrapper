@@ -28,6 +28,10 @@ Swift and container workflows support inspection even when SDK/container executi
 | Fork MCP servers | Unavailable through this delivery | Requires separate real provider registration and acceptance. |
 | Connected GitHub tools | Real provider tools, separate from the fork | Inventory and successful authorized invocation in the current task. |
 
+Hosted wrapper regression checks use the existing suites and isolated setup through GitHub Actions.
+Their execution is independent of pack delivery and provider capabilities.
+Use the per-capability statuses in [Codex delivery](codex.md) and the actual-run procedure in [the runbook](runbook.md).
+
 ## Hook outcomes
 
 Every upstream hook script is excluded from execution.
