@@ -1,0 +1,68 @@
+{
+  "name": "Codex wrapper checks",
+  "on": {
+    "push": {},
+    "pull_request": {}
+  },
+  "permissions": {
+    "contents": "read"
+  },
+  "jobs": {
+    "regression": {
+      "name": "Wrapper regression",
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 20,
+      "steps": [
+        {
+          "name": "Checkout exact source",
+          "uses": "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+          "with": {
+            "ref": "${{ github.sha }}",
+            "persist-credentials": false,
+            "set-safe-directory": false
+          }
+        },
+        {
+          "name": "Verify checkout identity",
+          "shell": "bash",
+          "run": "test \"$(git rev-parse HEAD)\" = \"$GITHUB_SHA\""
+        },
+        {
+          "name": "Codex delivery suite",
+          "shell": "bash",
+          "run": "bash scripts/test-codex.sh"
+        },
+        {
+          "name": "Git context suite",
+          "shell": "bash",
+          "run": "bash scripts/test-codex-git-context.sh"
+        },
+        {
+          "name": "Identity suite",
+          "shell": "bash",
+          "run": "bash scripts/test-codex-identity.sh"
+        },
+        {
+          "name": "Attribution suite",
+          "shell": "bash",
+          "run": "bash scripts/test-codex-attribution.sh"
+        },
+        {
+          "name": "Cloud pack suite",
+          "shell": "bash",
+          "run": "bash scripts/test-cloud-pack.sh"
+        },
+        {
+          "name": "Environment setup",
+          "shell": "bash",
+          "run": "scratch=$(mktemp -d /tmp/wrapper-ci.XXXXXX)\nscratch=$(cd -- \"$scratch\" && pwd -P)\nHARNESS_STATE_DIR=\"$scratch/state\" bash env/setup-codex.sh"
+        },
+        {
+          "name": "Hosted CI contract tests",
+          "shell": "bash",
+          "run": "python3 -I scripts/tests/test_hosted_ci.py"
+        }
+      ]
+    }
+  }
+}
