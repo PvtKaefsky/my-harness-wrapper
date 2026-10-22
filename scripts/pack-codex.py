@@ -127,7 +127,7 @@ def verify():
 
 def fingerprint():
     paths = [ROOT / "AGENTS.md", ROOT / "README.md"]
-    for name in ["config/codex", "env", "scripts", "docs"]:
+    for name in ["config/codex", "env", "scripts", "docs", ".agents"]:
         base = ROOT / name
         ordinary(base, True)
         for directory, folders, names in os.walk(base, followlinks=False):

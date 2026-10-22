@@ -41,7 +41,7 @@ class NativeSkills(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.root = self.base / 'wrapper'
         self.root.mkdir()
-        for name in ['config', 'scripts', 'env', 'docs', '.github']:
+        for name in ['config', 'scripts', 'env', 'docs', '.github', '.agents']:
             shutil.copytree(ROOT / name, self.root / name, ignore=shutil.ignore_patterns('__pycache__'))
         for name in ['AGENTS.md', 'README.md']:
             shutil.copy(ROOT / name, self.root / name)
@@ -109,7 +109,7 @@ with patch('pwd.getpwuid',return_value=account):
         self.cmd('git', '-C', str(target), 'status', '--porcelain=v1')
         before_target = snapshot(target)
         preservation = self.cmd('python3', '-I', str(self.root / 'scripts/check-native-preservation.py'), str(target))
-        before_source = {p: (record[:3], record[-1]) for p, record in snapshot(self.root).items()}
+        before_source = snapshot(self.root)
         head = self.cmd('git', 'rev-parse', 'HEAD')
         output = self.setup(timeout=240)
         self.assertIn('NATIVE_SKILL_LINK_VERIFIED', output)
@@ -117,10 +117,119 @@ with patch('pwd.getpwuid',return_value=account):
         self.assertEqual(self.link.resolve(), self.source.resolve())
         self.assertEqual(snapshot(target), before_target)
         self.assertEqual(self.cmd('python3', '-I', str(self.root / 'scripts/check-native-preservation.py'), str(target)), preservation)
-        self.assertEqual({p: (record[:3], record[-1]) for p, record in snapshot(self.root).items()}, before_source)
+        self.assertEqual(snapshot(self.root), before_source)
         self.assertEqual(self.cmd('git', 'rev-parse', 'HEAD'), head)
         self.assertEqual(self.cmd('git', 'status', '--porcelain=v1'), '')
-        print('REAL_SETUP exit=0 source bytes/HEAD/index/status and target bytes/metadata unchanged; LINK_PROVISIONED fixture only', flush=True)
+        print('REAL_SETUP exit=0 strict source bytes/metadata/HEAD/index/status and target bytes/metadata unchanged; LINK_PROVISIONED fixture only', flush=True)
+
+    def repository_source(self, **kwargs):
+        return self.cmd('python3', '-I', str(self.root / 'scripts/check-native-source.py'), **kwargs)
+
+    def test_repository_source_exact_real_path(self):
+        output = self.repository_source(contains='NATIVE_REPOSITORY_SOURCE_VERIFIED')
+        self.assertIn(str(self.root / '.agents/skills' / NAME), output)
+        self.assertNotIn('PROVIDER_DISCOVERED', output)
+        self.assertNotIn('PROVIDER_INVOKED', output)
+
+    def test_repository_source_deletion_and_mutation_red_green(self):
+        skill = self.root / '.agents/skills' / NAME / 'SKILL.md'
+        original = skill.read_bytes()
+        self.repository_source()
+        skill.unlink()
+        self.repository_source(code=1, contains='NATIVE_SKILL_SOURCE_MISSING:')
+        print('REPOSITORY DELETION RED exit=1 NATIVE_SKILL_SOURCE_MISSING', flush=True)
+        skill.write_bytes(original)
+        self.repository_source()
+        print('REPOSITORY DELETION GREEN exit=0', flush=True)
+        skill.write_bytes(original.replace(b'Use EAFP', b'use EAFP', 1))
+        self.repository_source(code=1, contains='NATIVE_REPOSITORY_BYTES_MODIFIED:')
+        print('REPOSITORY MUTATION RED exit=1 NATIVE_REPOSITORY_BYTES_MODIFIED', flush=True)
+        skill.write_bytes(original)
+        self.repository_source()
+        print('REPOSITORY MUTATION GREEN exit=0', flush=True)
+
+    def test_repository_all_bytes_match_audited_source(self):
+        package = self.root / '.agents/skills' / NAME
+        for name in ['SKILL.md', 'LICENSE', 'upstream.json']:
+            with self.subTest(name=name):
+                path = package / name
+                original = path.read_bytes()
+                path.write_bytes(original + b'\n')
+                self.repository_source(code=1, contains='NATIVE_REPOSITORY_BYTES_MODIFIED:')
+                path.write_bytes(original)
+        self.repository_source()
+
+    def test_repository_index_and_head_bytes_required(self):
+        path = '.agents/skills/' + NAME + '/SKILL.md'
+        self.cmd('git', 'rm', '--cached', path)
+        self.repository_source(code=1, contains='NATIVE_SKILL_SOURCE_UNTRACKED:')
+        self.cmd('git', 'add', path)
+        blob = self.cmd('git', 'hash-object', '-w', str(self.source / 'LICENSE')).strip()
+        self.cmd('git', 'update-index', '--cacheinfo', '100644,' + blob + ',' + path)
+        self.repository_source(code=1, contains='NATIVE_SKILL_SOURCE_UNTRACKED:')
+        self.cmd('git', 'reset', '-q', 'HEAD', '--', path)
+        self.repository_source()
+
+    def test_repository_unsafe_files_and_symlink_escapes(self):
+        package = self.root / '.agents/skills' / NAME
+        path = package / 'SKILL.md'
+        original = path.read_bytes()
+        path.chmod(0o755)
+        self.repository_source(code=1, contains='NATIVE_SKILL_SOURCE_UNSAFE:')
+        path.chmod(0o644)
+        path.unlink()
+        path.symlink_to(self.source / 'SKILL.md')
+        self.repository_source(code=1, contains='NATIVE_SKILL_SOURCE_UNSAFE:')
+        path.unlink()
+        path.write_bytes(original)
+        extra = package / 'run.sh'
+        extra.write_text('exit 0\n')
+        extra.chmod(0o755)
+        self.repository_source(code=1, contains='NATIVE_REPOSITORY_PACKAGE_INCOMPLETE')
+        extra.unlink()
+        package.rename(self.base / 'escaped')
+        package.symlink_to(self.base / 'escaped', target_is_directory=True)
+        self.repository_source(code=1, contains='NATIVE_SKILL_PATH_UNSAFE')
+
+    def test_repository_fingerprint_detects_deletion_and_mutation(self):
+        tool = str(self.root / 'scripts/pack-codex.py')
+        before = self.cmd('python3', '-I', tool, 'fingerprint')
+        self.cmd('bash', 'scripts/bootstrap-codex.sh')
+        self.cmd('bash', 'scripts/verify-codex.sh')
+        path = self.root / '.agents/skills' / NAME / 'SKILL.md'
+        original = path.read_bytes()
+        path.unlink()
+        self.assertNotEqual(before, self.cmd('python3', '-I', tool, 'fingerprint'))
+        self.cmd('bash', 'scripts/verify-codex.sh', code=1, contains='source revision or adapter files changed')
+        path.write_bytes(original)
+        self.assertEqual(before, self.cmd('python3', '-I', tool, 'fingerprint'))
+        self.cmd('bash', 'scripts/verify-codex.sh')
+        path.write_bytes(original.replace(b'Use EAFP', b'use EAFP', 1))
+        self.assertNotEqual(before, self.cmd('python3', '-I', tool, 'fingerprint'))
+        self.cmd('bash', 'scripts/verify-codex.sh', code=1, contains='source revision or adapter files changed')
+        path.write_bytes(original)
+        self.assertEqual(before, self.cmd('python3', '-I', tool, 'fingerprint'))
+        self.cmd('bash', 'scripts/verify-codex.sh')
+
+    def test_default_full_setup_strict_preservation_and_fallback(self):
+        target = self.base / 'target'
+        target.mkdir()
+        self.cmd('git', 'init', '-q', str(target))
+        (target / 'sentinel').write_text('preserve me\n')
+        self.cmd('git', '-C', str(target), 'add', 'sentinel')
+        before = snapshot(self.root), snapshot(target), snapshot(self.home)
+        env = dict(self.env)
+        env.pop('HARNESS_ENABLE_NATIVE_SKILLS')
+        output = self.setup(env=env, timeout=240)
+        self.assertNotIn('NATIVE_SKILL_LINK_VERIFIED', output)
+        self.repository_source(env=env)
+        read = subprocess.run(['python3', '-I', str(self.root / 'scripts/pack-codex.py'), 'read', 'skill/python-patterns'],
+                              cwd=target, env=env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(read.returncode, 0, read.stdout + read.stderr)
+        self.assertIn('WORKFLOW_INSTRUCTION_READ id=skill/python-patterns', read.stdout)
+        self.assertNotIn('PROVIDER_INVOKED', read.stdout)
+        self.assertEqual((snapshot(self.root), snapshot(target), snapshot(self.home)), before)
+        print('DEFAULT_REAL_SETUP exit=0; strict wrapper/target/HOME bytes and metadata unchanged; fallback read exit=0; native dispatch NOT_OBSERVED', flush=True)
 
     def test_idempotent_install_and_inspect(self):
         self.native()

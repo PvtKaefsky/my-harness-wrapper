@@ -8,7 +8,7 @@ trap 'rm -rf -- "$work"' EXIT
 mkdir -p -- "$work/source" "$work/private-home"
 export GIT_CONFIG_GLOBAL="$work/private-home/gitconfig"
 export GIT_CONFIG_NOSYSTEM=1
-cp -R -- "$root/config" "$root/scripts" "$root/env" "$root/docs" "$work/source/"
+cp -R -- "$root/.agents" "$root/config" "$root/scripts" "$root/env" "$root/docs" "$work/source/"
 cp -- "$root/AGENTS.md" "$root/README.md" "$work/source/"
 git -C "$work/source" init -q
 git -C "$work/source" -c user.name=Test -c user.email=test@example.invalid \

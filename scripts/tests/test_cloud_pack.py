@@ -21,7 +21,7 @@ class CloudPack(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.root = self.base / 'wrapper'
         self.root.mkdir()
-        for name in ['config', 'scripts', 'env', 'docs']:
+        for name in ['config', 'scripts', 'env', 'docs', '.agents']:
             shutil.copytree(ROOT / name, self.root / name, ignore=shutil.ignore_patterns('__pycache__'))
         for name in ['AGENTS.md', 'README.md']:
             shutil.copy(ROOT / name, self.root / name)

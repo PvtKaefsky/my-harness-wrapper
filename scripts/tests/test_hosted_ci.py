@@ -74,6 +74,15 @@ class HostedCI(unittest.TestCase):
         CI.check_workflow(workflow)
         print('DELETION NATIVE CI GREEN', flush=True)
 
+    def test_repository_source_deletion_red_green(self):
+        workflow = self.workflow()
+        steps = workflow['jobs']['regression']['steps']
+        workflow['jobs']['regression']['steps'] = [s for s in steps if s['name'] != 'Repository native source']
+        with self.assertRaisesRegex(ValueError, 'HOSTED_SUITE_COVERAGE_MISSING: Repository native source'):
+            CI.check_workflow(workflow)
+        workflow['jobs']['regression']['steps'] = steps
+        CI.check_workflow(workflow)
+
     def test_required_commands_preserve_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

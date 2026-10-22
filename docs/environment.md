@@ -16,8 +16,12 @@ Their actual invocation is separate from pack delivery.
 No fork-provided MCP, native skill dispatch or automatic shell-hook registration is established by this repository.
 The runtime's managed home and configuration remain provider-owned.
 Default setup writes no home or managed configuration and requests no elevated privileges.
-Operator-approved preparation may create only the user-scope `harness-python-patterns` discovery pointer under [the native delivery contract](native-skills.md).
-A denied or unsafe pointer stops native provisioning without a target-local or managed-configuration fallback.
+The operator-reported preparation cannot create `$HOME/.agents`: `OSError(30): Read-only file system`.
+The historical HOME provisioner remains disabled by default and inapplicable to that runtime.
+The [repository-scoped experiment](native-skills.md) versions `harness-python-patterns` under the wrapper's `.agents/skills/`.
+It requires the wrapper as the provider-selected working repository, with a separate attached target used read-only.
+A shell `cd` and sibling checkout presence do not establish that provider selection.
+User-global and target-rooted discovery remain unproven.
 
 Commit operations require the existing explicit author/committer environment identity.
 Forge assignment uses `HARNESS_ASSIGNEE` when present.

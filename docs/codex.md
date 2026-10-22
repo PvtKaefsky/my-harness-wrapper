@@ -34,7 +34,7 @@ Published and older releases are preserved, including interruption immediately a
 ```
 
 The delivery manifest records schema, adapter version, source checkout, source commit, source fingerprint, installation dirty flag, policy hash and pack-manifest hash.
-The source fingerprint covers root policy/README plus `config/codex`, `env`, `scripts` and `docs`, excluding Python bytecode caches.
+The source fingerprint covers root policy/README plus `.agents`, `config/codex`, `env`, `scripts` and `docs`, excluding Python bytecode caches.
 Inherited Git repository/index/object/config selectors are cleared for wrapper-source and fixture operations.
 Harness Python uses isolated mode (`-I`) to ignore inherited import selectors and adjacent shadow modules.
 The guarded commit command preserves the caller's repository context.
@@ -50,7 +50,7 @@ An attacker who replaces both trusted code and its anchors is outside this check
 ## Environment fields
 
 Attach `PvtKaefsky/my-harness-wrapper` at `/workspace/my-harness-wrapper` alongside task repositories.
-Use the reviewed migration branch only for an operator-controlled unmerged test; use `main` after merge.
+Use a reviewed branch for an operator-controlled unmerged test only if the Environment UI supports selecting it; otherwise a merge/publication decision is required.
 Set `install_script` verbatim:
 
 ```bash
@@ -82,8 +82,10 @@ The start skill is agent-facing instruction text, not a shell lifecycle hook.
 Its delivery and consumption require actual task evidence.
 Setup is offline and runs no upstream installer.
 Default setup writes no personal home, managed configuration, shared plugin cache or target-project files.
-The only HOME exception is the operator-approved preparation pointer described in [native skill delivery](native-skills.md).
-Normal tasks do not install or repair it; source/link verification never proves provider discovery.
+The operator-reported HOME preparation failed with `OSError(30): Read-only file system`; its disabled-by-default opt-in is inapplicable to this runtime.
+The separate checked-in `.agents/skills/harness-python-patterns` package is a [repository-scoped experiment](native-skills.md) requiring the wrapper as the actual provider-selected working repository.
+No HOME installation, Environment symlink or target-local package is part of that experiment.
+Native source checks and explicit reader output never prove provider discovery or dispatch.
 
 ## Readiness
 
@@ -121,7 +123,7 @@ No comparison, inventory count or unrelated passing capability supplies a numeri
 | Hosted CI | Workflow/run/job IDs, source identities, executed step names and conclusions from GitHub plus failing exit from logs where available | YAML tests, an empty step list, neutral or skipped conclusions do not pass hosted acceptance. |
 | Environment setup | Full setup exit, canonical isolated state path and delivery verification | A local setup does not publish an Environment or establish a fresh-task start skill. |
 | Live Cloud instruction use | Verified instruction ID/read reference and concrete task output | Installed Markdown and matching hashes do not establish conversational use. |
-| Native skills | Actual provider discovery/dispatch evidence | The pack registers no selectors; the separate opt-in native pointer requires fresh-task acceptance in `native-skills.md`. |
+| Native skills | Actual provider discovery/dispatch evidence | The pack registers no selectors; the separate repository-scoped package requires fresh-task acceptance in `native-skills.md`. |
 | Independent provider review | Native invocation/completion, reviewer identity, explicit approval and exact staged tree | Mock receipts and a passing JSON checker do not establish provider review. |
 | Automatic hooks | Actual registered/trusted event and its provider execution evidence | This pack provisions no automatic hooks; explicit commands are not hook events. |
 | Connected MCP tools | Current tool inventory and successful authorized invocation reference | Pack files do not register servers or prove other tools work. |
