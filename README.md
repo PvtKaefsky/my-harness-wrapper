@@ -12,8 +12,9 @@ The upstream MIT license, source paths, source hashes, exclusion inventory and d
 
 Default setup writes only wrapper-owned delivery state, normally `/workspace/.harness-wrapper`.
 It runs no upstream installer and writes no managed configuration, plugin-cache or target-repository files.
-Operator-approved Environment preparation may explicitly opt in to one user-scope discovery symlink for the tracked `harness-python-patterns` skill.
-See [native skill delivery](docs/native-skills.md) for source checks, safe provisioning, rollback and fresh-task acceptance.
+The checked-in `.agents/skills/harness-python-patterns` package supports a repository-scoped discovery experiment with this wrapper as the provider-selected working repository.
+See [native skill delivery](docs/native-skills.md) for source checks and operator-only fresh-task acceptance.
+The historical HOME opt-in remains disabled by default and cannot operate in the reported read-only managed preparation runtime.
 A missing wrapper checkout is a dependency failure.
 A matching checksum proves matching bytes, not agent use or provider acceptance.
 
@@ -35,6 +36,7 @@ The pack installs no automatic hooks, native skill selectors or MCP servers.
 | Path | Purpose |
 | --- | --- |
 | `AGENTS.md` | Wrapper development policy. |
+| `.agents/skills/` | Regular repository discovery package matching the audited wrapper source. |
 | `config/codex/` | Shared policy, version, manifest anchor, audited workflow pack and one native skill. |
 | `env/setup-codex.sh` | Complete offline checks and delivery setup. |
 | `scripts/` | Integrity, startup, explicit safety gates and isolated regression suites. |

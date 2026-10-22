@@ -12,7 +12,7 @@ version=$(cat -- "$CODEX_WRAPPER_ROOT/config/codex/version")
 commit=$(git -C "$CODEX_WRAPPER_ROOT" rev-parse --verify 'HEAD^{commit}')
 digest=$(codex_source_digest)
 dirty=false
-if [ -n "$(git -C "$CODEX_WRAPPER_ROOT" status --porcelain --untracked-files=normal)" ]; then dirty=true; fi
+if [ -n "$(git --no-optional-locks -C "$CODEX_WRAPPER_ROOT" status --porcelain --untracked-files=normal)" ]; then dirty=true; fi
 
 if [ ! -e "$CODEX_WRAPPER_STATE" ] && [ ! -L "$CODEX_WRAPPER_STATE" ]; then
   mkdir -p -- "$(dirname -- "$CODEX_WRAPPER_STATE")"

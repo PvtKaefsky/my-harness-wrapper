@@ -85,7 +85,7 @@ The `Wrapper regression` job has read-only contents permission and a twenty-minu
 Checkout is pinned, disables credential persistence and Git safe-directory changes, and selects `github.sha`.
 The identity step compares checked-out HEAD with `GITHUB_SHA` before testing.
 For pull requests this is GitHub's tested merge commit; record it separately from the PR branch SHA and the run API's `head_sha`.
-Each of the five existing suites, native skill suite and full `env/setup-codex.sh` has a named Bash step.
+Each of the five existing suites, native skill suite, real-path repository native source check and full `env/setup-codex.sh` has a named Bash step.
 Setup uses a fresh canonical `/tmp/wrapper-ci.XXXXXX/state` outside checkouts, homes and managed configuration.
 The runner retains scratch state until disposal.
 No upstream installer runs and no target repository is changed.
@@ -125,8 +125,13 @@ Only the account operator can correct GitHub Actions billing/spending problems.
 The pending action is to correct the reported account restriction and then rerun the wrapper checks at the reviewed revision.
 Do not hide the failed conclusion or replace it with local fixture results.
 
-## Native preparation boundary
+## Native repository acceptance boundary
 
-Use [native skill delivery](native-skills.md) for the operator-only HOME exception, offline inspection, rollback and fresh-task acceptance prompt.
+Use [native skill delivery](native-skills.md) for wrapper-working-root selection, offline source checks and the operator-only fresh-task acceptance prompt.
+The historical HOME preparation route failed with `OSError(30): Read-only file system` and is inapplicable to that managed runtime.
+Require actual wrapper repository selection; report `WRAPPER_WORKING_ROOT_UNAVAILABLE` when unsupported.
+An unmerged branch can be selected only if the UI supports it; otherwise the operator must decide merge/publication.
+Preserve both checkouts and require provider inventory and dispatch separately from source bytes and explicit reads.
+Inventory a target-rooted task separately; wrapper-rooted success does not establish global discovery.
 Neither local suites nor hosted CI certify provider-native discovery or invocation.
 Issue #30 remains open until independent runtime acceptance.

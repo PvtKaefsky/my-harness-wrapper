@@ -32,12 +32,13 @@ Hosted wrapper regression checks use the existing suites and isolated setup thro
 Their execution is independent of pack delivery and provider capabilities.
 Use the per-capability statuses in [Codex delivery](codex.md) and the actual-run procedure in [the runbook](runbook.md).
 
-## Optional native entry point
+## Repository-scoped native entry point
 
 The separate wrapper-owned `harness-python-patterns` source adds metadata to the exact reviewed Python body without changing this pack.
-Only operator-approved Environment preparation may link that source into the documented user-scope discovery location.
-Source/link verification and actual fresh-task provider discovery/invocation have separate gates in [native skill delivery](native-skills.md).
-The explicit pack reader remains the verified functional fallback when the link is absent or ignored.
+Its regular `.agents/skills/harness-python-patterns` copy requires the wrapper as the actual provider-selected working repository.
+The HOME opt-in is disabled by default and inapplicable to the reported read-only managed preparation runtime.
+Source verification and actual fresh-task provider discovery/invocation have separate gates in [native skill delivery](native-skills.md).
+The explicit pack reader remains the verified functional fallback when native discovery or dispatch is unavailable.
 The other 36 adapted skills remain explicit reads.
 
 ## Hook outcomes

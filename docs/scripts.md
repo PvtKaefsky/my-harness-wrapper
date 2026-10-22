@@ -8,6 +8,7 @@
 | `scripts/session-check-codex.sh` | Verifies and emits policy location plus the actual lazy catalog bytes. |
 | `scripts/codex-common.sh` | Git selector isolation, safe state paths, ownership, locking helpers and manifest checks. |
 | `scripts/pack-codex.py` | `verify`, `fingerprint`, or `read ID`; bounded pinned pack validation and explicit instruction reading. |
+| `scripts/check-native-source.py` | Read-only real-path repository package equality, safety and committed HEAD/index validation; no HOME access. |
 | `scripts/provision-native-skills.py` | Offline `source`/`inspect` checks and opt-in preparation-only `install`/`remove` for one user-scope pointer. |
 | `scripts/check-native-preservation.py` | Read-only target file/Git snapshot digest; no target Git commands or writes. |
 | `scripts/build-cloud-pack.py` | Offline maintainer projection build from an exact clean upstream checkout into an absent destination. |
@@ -24,9 +25,9 @@
 
 | Path | Interface and result |
 | --- | --- |
-| `.github/workflows/codex.yml` | Hosted push/PR job invoking the five existing suites, native skill suite, isolated full setup and CI contract tests. |
+| `.github/workflows/codex.yml` | Hosted push/PR job invoking the five existing suites, native skill suite, real-path repository source check, isolated full setup and CI contract tests. |
 | `scripts/check-hosted-ci.py` | `workflow PATH` validates the bounded workflow contract; `run RUN_JSON JOBS_JSON EXPECTED_SHA` checks supplied GitHub execution records. |
-| `scripts/tests/test_hosted_ci.py` | Nine local contract tests covering required commands, permissions, timeout, unmasked exit 37, stale checkout, inherited Git-context preservation, empty/skipped/failing steps and rejected non-CI claims. |
+| `scripts/tests/test_hosted_ci.py` | Local contract tests covering required commands, permissions, timeout, unmasked exit 37, stale checkout, inherited Git-context preservation, empty/skipped/failing steps and rejected non-CI claims. |
 
 The deletion test removes the Cloud pack invocation in a disposable workflow file.
 It requires exit 1 with `HOSTED_SUITE_COVERAGE_MISSING: Cloud pack suite`, restores the invocation, and requires exit 0.
@@ -59,6 +60,8 @@ Omitting catalog bytes triggers `WORKFLOW_CATALOG_NOT_CONSUMED` task acceptance 
 The test runner's exception supplies that named acceptance failure; the shell cannot prove conversational consumption.
 No suite writes personal configuration, managed runtime files or attached target repositories.
 
-The native suite covers committed source/provenance, safe scratch-HOME provisioning, source/pointer deletion, target preservation, interruption and explicit fallback reads.
-Its real setup case runs all five existing suites without stubs.
+The native suite covers exact repository-path bytes and committed index, deletion/mutation RED/GREEN, unsafe files, fingerprint changes, safe scratch-HOME provisioning, target preservation, interruption and explicit fallback reads.
+Its default and opt-in real setup cases run all five existing suites without stubs.
+Default setup and the fallback reader from a separate synthetic repository must preserve strict wrapper, target and scratch-HOME bytes and metadata.
+The retained HOME provisioner is disabled by default and inapplicable to the reported managed preparation runtime.
 See [native delivery](native-skills.md) for the account-lookup test boundary and provider acceptance limits.

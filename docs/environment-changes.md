@@ -28,7 +28,10 @@ ask. A rule with no such state says nothing about it.
 The Cloud-only shared policy is delivered through the published Environment start skill.
 Read-only workflow files do not register provider skills, hooks, reviewers or MCP.
 
-The narrow HOME exception in [native skill delivery](native-skills.md) is implemented for operator review.
+The historical narrow HOME exception in [native skill delivery](native-skills.md) is implemented for operator review.
 Only explicitly opted-in Environment preparation may provision its single user-scope discovery pointer.
 Normal tasks preserve the pointer and inspect it read-only.
 Unsafe or denied provisioning stops without a substitute installation location.
+
+The operator-reported managed preparation fails HOME creation with `OSError(30): Read-only file system`.
+That disabled-by-default route is inapplicable here; the wrapper-rooted repository experiment requires no environment-wide installation.
