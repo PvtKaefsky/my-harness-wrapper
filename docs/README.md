@@ -8,5 +8,5 @@
 | `environment.md` | Managed runtime boundaries, dependencies and the repository discovery and read-only HOME failure. |
 | `native-review.md` | Bounded staged role selection, native dispatch, provider receipts and independent approval acceptance. |
 | `runbook.md` | Explicit safety checkpoints, native review protocol entry point and guarded commits and hosted CI operation/blockers and the wrapper-rooted native acceptance boundary. |
-| `scripts.md` | Script interfaces, test suites and deletion regressions and hosted CI contract tests and native source integrity and isolated provisioning checks. |
+| `scripts.md` | Script interfaces, test suites and deletion regressions and hosted CI contract tests and native source integrity, isolated provisioning and quiescent scratch Git snapshots. |
 | `native-skills.md` | Repository-native byte contract, managed HOME failure, retained experiment and operator-only runtime acceptance. |

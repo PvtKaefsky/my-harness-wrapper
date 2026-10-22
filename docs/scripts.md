@@ -70,3 +70,8 @@ The review suite rejects absent/mismatched provider receipts, missing proof, dup
 Renamed/deleted source paths retain minimum role coverage.
 The provider-receipt deletion case removes consumption from a scratch copy of the real checker, requires `PROVIDER_RECEIPT_CONSUMPTION_OMITTED` acceptance RED, restores rejection of missing receipts and passes a synthetic valid guarded commit for GREEN.
 That GREEN verifies local gate behavior only, never genuine independent approval.
+
+Native fixtures disable automatic Git garbage collection and maintenance in their private scratch Git configuration before initializing repositories.
+This prevents background object pruning from racing strict byte/metadata snapshots on newer Git versions.
+The complete snapshots and preservation assertions remain unchanged.
+Attached repository and user Git configuration are not changed.
