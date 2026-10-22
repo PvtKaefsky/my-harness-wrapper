@@ -88,7 +88,9 @@ class CloudPack(unittest.TestCase):
 
     def synthetic_reviews(self):
         requirements = json.loads(self.run_cmd('python3', '-I', str(self.root / 'scripts/check-codex-review.py'), '--requirements'))
-        evidence = dict(tree=requirements['tree'], source_commit=requirements['source_commit'], provider='native-codex', implementer_id='fixture-author', reviews=[dict(reviewer_id='fixture-reviewer', tree=requirements['tree'], roles=requirements['required_roles'], verdict='APPROVED', findings=[], evidence='Synthetic fixture only; not actual provider approval.')])
+        evidence = dict(schema_version=2, required_roles=requirements['required_roles'], tree=requirements['tree'], source_commit=requirements['source_commit'], provider='native-codex', implementer_id='fixture-author', reviews=[dict(reviewer_id='fixture-reviewer', tree=requirements['tree'], roles=requirements['required_roles'], verdict='APPROVED', findings=[], evidence='Synthetic fixture only; not actual provider approval.')])
+        review = evidence['reviews'][0]
+        review['provider_receipt'] = dict(provider='native-codex', status='REVIEW_COMPLETED', reviewer_id=review['reviewer_id'], source_commit=evidence['source_commit'], tree=review['tree'], roles=review['roles'], verdict=review['verdict'], findings=review['findings'], dispatch_id='fixture-dispatch', completion_id='fixture-completion', transcript_ref='Synthetic fixture only; not a provider transcript')
         p = self.base / 'reviews.json'
         p.write_text(json.dumps(evidence))
         self.env['HARNESS_REVIEW_FILE'] = str(p)
@@ -324,6 +326,7 @@ class CloudPack(unittest.TestCase):
         p = self.synthetic_reviews()
         data = json.loads(p.read_text())
         data['reviews'][0]['roles'] = []
+        data['reviews'][0]['provider_receipt']['roles'] = []
         p.write_text(json.dumps(data))
         self.script('scripts/commit-codex.sh', '-m', 'test: roles', code=1, contains='INDEPENDENT_REVIEW_ROLES_MISSING')
 
@@ -359,6 +362,99 @@ class CloudPack(unittest.TestCase):
             self.script('scripts/commit-codex.sh', '-m', 'test: active hook', code=1, contains='COMMIT_HOOK_REVIEW_BOUNDARY')
             self.assertFalse(marker.exists())
             p.unlink()
+
+    def check_changed_review(self, edit, failure):
+        self.staged_fixture()
+        p = self.synthetic_reviews()
+        data = json.loads(p.read_text())
+        edit(data)
+        p.write_text(json.dumps(data))
+        self.script('scripts/commit-codex.sh', '-m', 'test: rejected receipt', code=1, contains=failure)
+
+    def test_absent_provider_receipt_blocks_commit(self):
+        self.check_changed_review(lambda d: d['reviews'][0].pop('provider_receipt'), 'INDEPENDENT_REVIEW_PROVIDER_RECEIPT_MISSING')
+
+    def test_absent_provider_completion_blocks_commit(self):
+        self.check_changed_review(lambda d: d['reviews'][0]['provider_receipt'].pop('completion_id'), 'INDEPENDENT_REVIEW_PROVIDER_PROOF_MISSING')
+
+    def test_blocked_provider_receipt_blocks_commit(self):
+        self.check_changed_review(lambda d: d['reviews'][0]['provider_receipt'].update(status='BLOCKED'), 'INDEPENDENT_REVIEW_PROVIDER_RECEIPT_MISMATCH')
+
+    def test_receipt_verdict_mismatch_blocks_commit(self):
+        self.check_changed_review(lambda d: d['reviews'][0]['provider_receipt'].update(verdict='NOT_APPROVED'), 'INDEPENDENT_REVIEW_PROVIDER_RECEIPT_MISMATCH')
+
+    def test_duplicate_reviewer_blocks_commit(self):
+        self.check_changed_review(lambda d: d['reviews'].append(d['reviews'][0]), 'INDEPENDENT_REVIEW_DUPLICATE_REVIEWER')
+
+    def test_duplicate_completion_blocks_commit(self):
+        def edit(d):
+            other = json.loads(json.dumps(d['reviews'][0]))
+            other['reviewer_id'] = 'second-fixture-reviewer'
+            other['provider_receipt']['reviewer_id'] = other['reviewer_id']
+            d['reviews'].append(other)
+        self.check_changed_review(edit, 'INDEPENDENT_REVIEW_DUPLICATE_PROVIDER_PROOF')
+
+    def test_unsupported_role_blocks_commit(self):
+        self.check_changed_review(lambda d: d['reviews'][0].update(roles=['invented-provider-agent']), 'INDEPENDENT_REVIEW_ROLE_UNSUPPORTED')
+
+    def test_project_role_cannot_remove_mechanical_coverage(self):
+        self.check_changed_review(lambda d: d.update(required_roles=['database']), 'INDEPENDENT_REVIEW_ROLES_MISSING: database')
+
+    def test_stale_head_blocks_commit(self):
+        self.staged_fixture()
+        self.synthetic_reviews()
+        self.run_cmd('git', '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-qm', 'test: changed head')
+        self.script('scripts/commit-codex.sh', '-m', 'test: stale head', code=1, contains='INDEPENDENT_REVIEW_STALE')
+
+    def test_empty_verdict_blocks_commit(self):
+        self.check_changed_review(lambda d: d['reviews'][0].update(verdict=''), 'INDEPENDENT_REVIEW_NOT_APPROVED')
+
+    def test_missing_identity_with_review_blocks_commit(self):
+        self.staged_fixture()
+        self.synthetic_reviews()
+        missing = dict(self.env)
+        missing.pop('GIT_AUTHOR_NAME')
+        self.script('scripts/commit-codex.sh', '-m', 'test: missing identity', env=missing, code=1, contains='GIT_AUTHOR_NAME')
+
+    def test_mismatched_identity_with_review_blocks_commit(self):
+        self.staged_fixture()
+        self.synthetic_reviews()
+        self.script('scripts/commit-codex.sh', '-m', 'test: mismatched identity', env=dict(self.env, GIT_COMMITTER_EMAIL='other@example.invalid'), code=1, contains='same environment identity')
+
+    def test_role_selection_includes_deleted_and_renamed_paths(self):
+        (self.root / 'old.py').write_text('pass\n')
+        self.run_cmd('git', 'add', '.')
+        self.run_cmd('git', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'test: old python')
+        self.run_cmd('git', 'mv', 'old.py', 'new.txt')
+        result = json.loads(self.run_cmd('python3', '-I', str(self.root / 'scripts/check-codex-review.py'), '--requirements'))
+        self.assertIn('python', result['required_roles'])
+        self.assertEqual(result['role_briefs']['shell'], 'role/code-reviewer')
+
+    def test_deletion_provider_receipt_consumption_red_green(self):
+        self.staged_fixture()
+        review_path = self.synthetic_reviews()
+        record = json.loads(review_path.read_text())
+        record['reviews'][0].pop('provider_receipt')
+        review_path.write_text(json.dumps(record))
+        checker = self.root / 'scripts/check-codex-review.py'
+        original = checker.read_text()
+        removed = original.replace('completion, dispatch = validate_provider_receipt(review, record)', "completion, dispatch = 'omitted-completion', 'omitted-dispatch'")
+        self.assertNotEqual(removed, original)
+        checker.write_text(removed)
+        before = self.run_cmd('git', 'rev-parse', 'HEAD').strip()
+        fixture_env = dict(self.env, GIT_CONFIG_COUNT='1', GIT_CONFIG_KEY_0='commit.gpgsign', GIT_CONFIG_VALUE_0='false')
+        def acceptance():
+            result = subprocess.run([BASH, str(self.root / 'scripts/commit-codex.sh'), '-m', 'test: receipt boundary'], cwd=self.root, env=fixture_env, text=True, capture_output=True)
+            if result.returncode != 1 or 'INDEPENDENT_REVIEW_PROVIDER_RECEIPT_MISSING' not in result.stderr:
+                raise AssertionError('PROVIDER_RECEIPT_CONSUMPTION_OMITTED')
+        with self.assertRaisesRegex(AssertionError, 'PROVIDER_RECEIPT_CONSUMPTION_OMITTED'):
+            acceptance()
+        self.run_cmd('git', 'reset', '--soft', before)
+        checker.write_text(original)
+        acceptance()
+        self.synthetic_reviews()
+        self.script('scripts/commit-codex.sh', '-m', 'test: restored receipt consumption', env=fixture_env, contains='GUARDED_COMMIT_PASSED')
+        print('DELETION provider receipt RED PROVIDER_RECEIPT_CONSUMPTION_OMITTED; restored GREEN missing-receipt exit=1, synthetic-valid guarded commit exit=0')
 
     def test_unknown_workflow(self):
         self.bootstrap()

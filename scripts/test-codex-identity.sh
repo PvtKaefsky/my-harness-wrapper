@@ -62,7 +62,10 @@ import json
 import subprocess
 import sys
 tree = subprocess.check_output(['git', 'write-tree'], text=True).strip()
-json.dump({'tree': tree, 'source_commit': '', 'provider': 'native-codex', 'implementer_id': 'fixture-author', 'reviews': [{'reviewer_id': 'fixture-reviewer', 'tree': tree, 'verdict': 'APPROVED', 'findings': [], 'roles': ['general'], 'evidence': 'Synthetic local identity-test fixture, not provider acceptance.'}]}, open(sys.argv[1], 'w'))
+record = {'schema_version': 2, 'required_roles': ['general'], 'tree': tree, 'source_commit': '', 'provider': 'native-codex', 'implementer_id': 'fixture-author', 'reviews': [{'reviewer_id': 'fixture-reviewer', 'tree': tree, 'verdict': 'APPROVED', 'findings': [], 'roles': ['general'], 'evidence': 'Synthetic local identity-test fixture, not provider acceptance.'}]}
+review = record['reviews'][0]
+review['provider_receipt'] = dict(provider='native-codex', status='REVIEW_COMPLETED', reviewer_id=review['reviewer_id'], source_commit='', tree=tree, roles=review['roles'], verdict=review['verdict'], findings=[], dispatch_id='fixture-dispatch', completion_id='fixture-completion', transcript_ref='Synthetic fixture only')
+json.dump(record, open(sys.argv[1], 'w'))
 PY
 expect_status 'valid identity permits the commit' 0 env GIT_CONFIG_COUNT=1 \
   GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false bash "$committer" -m 'test: guarded commit'
@@ -79,6 +82,7 @@ p = sys.argv[1]
 with open(p) as stream:
     record = json.load(stream)
 record['source_commit'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+record['reviews'][0]['provider_receipt']['source_commit'] = record['source_commit']
 with open(p, 'w') as stream:
     json.dump(record, stream)
 PY
