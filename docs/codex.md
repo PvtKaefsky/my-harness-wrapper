@@ -74,7 +74,7 @@ Use existing checkouts under /workspace; create a Git worktree only if the user 
 Work only in the repository relevant to the task; change the wrapper source only for a requested wrapper change.
 Do not install into user or managed configuration, change provider trust, or create discovery directories or symlinks in target repositories.
 Inventory actual native reviewers, skills, hooks and connected tools before relying on those capabilities; this pack registers none of them.
-Before committing, obtain applicable independent native reviews of the exact staged tree and use the guarded commit command with actual review evidence; if a required reviewer is unavailable, finish implementation and tests and leave changes uncommitted.
+Before committing, follow /workspace/my-harness-wrapper/docs/native-review.md: determine roles from staged paths and project rules, dispatch available independent native Codex agents with verified briefs and exact HEAD/tree, wait for actual completion and retain truthful provider receipts. Keep availability, dispatch, completion, approval and guarded commit statuses separate. Review has at most five rounds, two attempts per role per round and ten minutes per round; missing reviewers or completion evidence leaves changes uncommitted after independent implementation and tests. Use the guarded commit command with actual schema version 2 review evidence.
 At completion report the selected workflow, concrete output, checks, and separate observed/unavailable provider capabilities; a checksum is not runtime acceptance.
 ```
 
@@ -124,7 +124,7 @@ No comparison, inventory count or unrelated passing capability supplies a numeri
 | Environment setup | Full setup exit, canonical isolated state path and delivery verification | A local setup does not publish an Environment or establish a fresh-task start skill. |
 | Live Cloud instruction use | Verified instruction ID/read reference and concrete task output | Installed Markdown and matching hashes do not establish conversational use. |
 | Native skills | Actual provider discovery/dispatch evidence | The pack registers no selectors; the separate repository-scoped package requires fresh-task acceptance in `native-skills.md`. |
-| Independent provider review | Native invocation/completion, reviewer identity, explicit approval and exact staged tree | Mock receipts and a passing JSON checker do not establish provider review. |
+| Independent provider review | Native dispatch/completion references, reviewer identity, explicit verdict and exact source HEAD/staged tree under [the bounded protocol](native-review.md) | Mock receipts and a passing JSON checker do not establish provider review. |
 | Automatic hooks | Actual registered/trusted event and its provider execution evidence | This pack provisions no automatic hooks; explicit commands are not hook events. |
 | Connected MCP tools | Current tool inventory and successful authorized invocation reference | Pack files do not register servers or prove other tools work. |
 

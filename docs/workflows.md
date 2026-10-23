@@ -10,7 +10,9 @@ No source inventory count describes native Cloud-loaded components.
 `catalog.json` is the complete lazy inventory with exact relative paths, inputs, dependencies and source mappings.
 Use explicit requests such as “apply workflow tdd from the shared Codex pack”.
 Read `workflow/tdd` with `pack-codex.py read`; it also emits the linked skill.
-Roles can be passed to real native reviewers, but a role file is not a spawned agent.
+Roles are passed to actual native Codex reviewers through [the bounded dispatch and receipt protocol](native-review.md).
+The code-review workflow selects minimum and project-required roles from the staged tree and waits for actual provider completion.
+A role file is not a spawned agent; receipt consistency is not provider authentication.
 The communication-triage role accepts supplied messages and drafts only; connected access and sending require separate authorization.
 Swift and container workflows support inspection even when SDK/container execution is unavailable; their execution steps report the missing tools.
 

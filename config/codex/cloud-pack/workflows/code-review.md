@@ -10,7 +10,7 @@ Read `role/code-reviewer` using the verified pack reader before applying these s
 
 ## Procedure
 
-read staged diff and surrounding code; assess findings; state explicit verdict for the supplied tree
+Follow docs/native-review.md in the attached wrapper. Inspect the actual staged tree and applicable project rules; use --requirements as minimum coverage and declare extra domain roles. Read each relevant verified brief, inventory actual native Codex collaboration tools and select independent reviewers. Dispatch one batch where supported with exact source HEAD/tree, scope, risk, project rules and marked verbatim user hunks. Bound review to five rounds and two dispatch attempts per role per round; wait for actual provider completion within the ten-minute round deadline. Retain reviewer, dispatch and completion references and explicit tree-bound verdicts. Keep availability, dispatch, completion, approval and guarded commit statuses separate. Missing roles, receipts or approval leave changes uncommitted. After staged edits, obtain fresh approvals; use only actual provider evidence with commit-codex.sh.
 
 ## Completion report
 

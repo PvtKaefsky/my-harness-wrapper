@@ -8,4 +8,5 @@ bash "$root/scripts/check-codex-preflight.sh"
 command -v python3 >/dev/null || { printf 'FAIL dependency: python3 is unavailable\n' >&2; exit 1; }
 python3 -I "$root/scripts/check-codex-commit-args.py" "$@"
 python3 -I "$root/scripts/check-codex-review.py"
-exec git commit "$@"
+git commit "$@"
+printf 'GUARDED_COMMIT_PASSED commit=%s\n' "$(git rev-parse HEAD)"

@@ -15,11 +15,11 @@
 | `scripts/pack-projection.json` | Audited topic rewrites, dependencies and source mappings used by the build. |
 | `scripts/check-codex-hooks.sh` | Refuses active commit/index/reference hooks without disabling them. |
 | `scripts/check-codex-preflight.sh` | Bounded staged diff whitespace check before commit. |
-| `scripts/check-codex-review.py` | Validates real staged review evidence, or reports `--requirements`. |
+| `scripts/check-codex-review.py` | Checks schema version 2 tree-bound verdict/receipt consistency and declared project role coverage, or reports minimum `--requirements` and role brief mapping; cannot authenticate provider evidence. |
 | `scripts/check-codex-identity.sh` | Requires all four explicit identity variables and matching resolved Git roles. |
 | `scripts/check-codex-attribution.sh` | Checks a prepared body; exits 0 for clean text, 2 for matching attribution, 1 for unreadable input. |
 | `scripts/check-codex-commit-args.py` | Rejects tree/identity-changing commit arguments and checks explicit message attribution. |
-| `scripts/commit-codex.sh` | Explicit identity and independent review checks, then Git in the caller's repository. |
+| `scripts/commit-codex.sh` | Explicit identity and independent review checks, then Git in the caller's repository; prints `GUARDED_COMMIT_PASSED` only after Git succeeds. |
 
 ## Hosted CI checks
 
@@ -65,3 +65,13 @@ Its default and opt-in real setup cases run all five existing suites without stu
 Default setup and the fallback reader from a separate synthetic repository must preserve strict wrapper, target and scratch-HOME bytes and metadata.
 The retained HOME provisioner is disabled by default and inapplicable to the reported managed preparation runtime.
 See [native delivery](native-skills.md) for the account-lookup test boundary and provider acceptance limits.
+
+The review suite rejects absent/mismatched provider receipts, missing proof, duplicate identities/completions, self-review, stale HEAD/tree, unsupported roles, missing project coverage, empty/blocked verdicts, findings above LOW and invalid identity.
+Renamed/deleted source paths retain minimum role coverage.
+The provider-receipt deletion case removes consumption from a scratch copy of the real checker, requires `PROVIDER_RECEIPT_CONSUMPTION_OMITTED` acceptance RED, restores rejection of missing receipts and passes a synthetic valid guarded commit for GREEN.
+That GREEN verifies local gate behavior only, never genuine independent approval.
+
+Native fixtures disable automatic Git garbage collection and maintenance in their private scratch Git configuration before initializing repositories.
+This prevents background object pruning from racing strict byte/metadata snapshots on newer Git versions.
+The complete snapshots and preservation assertions remain unchanged.
+Attached repository and user Git configuration are not changed.

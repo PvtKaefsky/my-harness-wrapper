@@ -16,85 +16,85 @@
       "upstream_paths": []
     },
     "roles/architect.md": {
-      "sha256": "91d35dd29fab2fb247e4722eab33d834b728434e561360a0d0cf1d761966a3a8",
+      "sha256": "528ff3fa924be55427d15972c2dfb26b58fba96d3cba5caeba663651c9e50115",
       "upstream_paths": [
         "agents/architect.md"
       ]
     },
     "roles/build-error-resolver.md": {
-      "sha256": "dcade4ccfc73f1d6f293fe61b23bf10cd9adc085efb36c9f86b6b675e9d40940",
+      "sha256": "439b3435c378cf41a31b0550097eee8e5f2bd670c79fbb738eecc90107000607",
       "upstream_paths": [
         "agents/build-error-resolver.md"
       ]
     },
     "roles/chief-of-staff.md": {
-      "sha256": "bb89bc5dcf1284ac9c6104303793d299662606ae478ed8589ffb67d5ff11cc5c",
+      "sha256": "2916d2e89a94cd80b2452a8e4407d88d75587dc0bbc797eb9583b3be1942c44a",
       "upstream_paths": [
         "agents/chief-of-staff.md"
       ]
     },
     "roles/code-reviewer.md": {
-      "sha256": "3c21a5f1d3f18d341b9036916ee172f342e6b8da343aea4bdb2f26f698d7f92d",
+      "sha256": "b5b7c8993ea8788a5a41c364911740eea7569ab63f568b15bb386d78b1cfaf43",
       "upstream_paths": [
         "agents/code-reviewer.md"
       ]
     },
     "roles/database-reviewer.md": {
-      "sha256": "758973d9a6fc2afcf534f968f105c223674dba7d90cbc947a68f1ea0c1f2b2d0",
+      "sha256": "f6db6e1ac8941f366311b25371cbed1736ec309e78643bdff5668cd10daff5ef",
       "upstream_paths": [
         "agents/database-reviewer.md"
       ]
     },
     "roles/doc-updater.md": {
-      "sha256": "29f155a9b93baac3d14d3d763328ec818eb39ec0b59b5fbe56f04540145c7b87",
+      "sha256": "17d87508bd640482c67e7fb67854e3fbbc66fa3781ebaebb474cb17bf454fa9a",
       "upstream_paths": [
         "agents/doc-updater.md"
       ]
     },
     "roles/e2e-runner.md": {
-      "sha256": "a2a4505f08c1b9aede2519d6f195a18aa11bcfc1337a06653db2bdfb61b10dbe",
+      "sha256": "9b82f75f27a9dbaea8095a86dff75a4693bbccdda3a648131edaba84f8501c84",
       "upstream_paths": [
         "agents/e2e-runner.md"
       ]
     },
     "roles/go-build-resolver.md": {
-      "sha256": "501642f6c955425409df139fcf1a9730fb240970a4ba42114e97a99c067331da",
+      "sha256": "df26ebdee0b483157e88b25737c6be77d1e8ef4ad426b33ff82e87e60c0dbc1e",
       "upstream_paths": [
         "agents/go-build-resolver.md"
       ]
     },
     "roles/go-reviewer.md": {
-      "sha256": "255d540842b2c403224cca2c50d5c062615d317f6eff99a499e4ea950e86db5f",
+      "sha256": "bb685362d70fcb7d3099c0ba1ba098d985282ecc4b24cd3ced66e6b858875634",
       "upstream_paths": [
         "agents/go-reviewer.md"
       ]
     },
     "roles/planner.md": {
-      "sha256": "24201d277e093c9a3fd582c3306a3804336d6ef1090879cbce60e6ad914ede44",
+      "sha256": "1c1f4c58b08d080668e9fc967a89f40978b7e767a3d2e59be1bec3ec719c18cb",
       "upstream_paths": [
         "agents/planner.md"
       ]
     },
     "roles/python-reviewer.md": {
-      "sha256": "5be2d90c7d465f877960951bc4faae51ae6954b265cf49e48c7659a224689c50",
+      "sha256": "ca3ecaee00e0c4ad5a3619f221045e71b1e588c8383d2942c12d4ce7458b298f",
       "upstream_paths": [
         "agents/python-reviewer.md"
       ]
     },
     "roles/refactor-cleaner.md": {
-      "sha256": "c52a1b0d7b49ca4969570d201cf4ed6c917489bff60fab9e78de345c62e6f29a",
+      "sha256": "194b3e7b62ca909439bddeb17bcd1775728ebea5d97533bd295cc9a8afc84898",
       "upstream_paths": [
         "agents/refactor-cleaner.md"
       ]
     },
     "roles/security-reviewer.md": {
-      "sha256": "cdb501d8579bdde484f32e257ad4f0716a1ddfab3c80a14fd7891d0ac7beb066",
+      "sha256": "5e2116591bac5a5de722bf70a62268bbfefe5025b84219851a9c5619d0939672",
       "upstream_paths": [
         "agents/security-reviewer.md"
       ]
     },
     "roles/tdd-guide.md": {
-      "sha256": "cbc724f23bd8fca6238b408bdd80059121bc99bdca61d154359dc3680a2311e3",
+      "sha256": "c464eb8f375b0641e75fce68faec345062344f89ee22f4b291bfe4a86c753a1e",
       "upstream_paths": [
         "agents/tdd-guide.md"
       ]
@@ -482,7 +482,7 @@
       ]
     },
     "workflows/code-review.md": {
-      "sha256": "62f13fd8c96c1508efcc50022579d5eff95dc2220a6c95719aa5f058468a1f9d",
+      "sha256": "9fdb2ac4b5ddb3c1b440c3b25e7cd4f05633fefe0cc0b8904ac664d3b0165b07",
       "upstream_paths": [
         "commands/code-review.md"
       ]

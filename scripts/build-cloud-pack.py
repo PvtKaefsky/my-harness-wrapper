@@ -110,13 +110,13 @@ def main():
         text += "Requires: " + item["requires"] + ".\n\n"
         text += "Follow project-local AGENTS.md and higher-priority instructions. Use the existing task authorization. If a required tool or decision is absent, report BLOCKED for that step and continue independent authorized work.\n\n"
         if role:
-            text += "This role brief does not create an agent. For independent review, pass it to an available native Codex reviewer with the staged tree ID, scope and user-supplied verbatim hunks. A self-review cannot approve its own work.\n\n"
+            text += "This role brief does not create an agent. Follow docs/native-review.md in the attached wrapper for bounded role selection, native dispatch and provider receipts. For independent review, pass this verified brief to an available independent native Codex agent with source HEAD, exact staged tree, assigned roles, scope, risk, project rules and marked user-supplied verbatim hunks. Inspect immutable staged tree blobs; do not edit files or the index. A self-review cannot approve its own work.\n\n"
         if item.get("uses"):
             text += "Inputs: " + item["inputs"] + ".\nRead `" + item["uses"] + "` using the verified pack reader before applying these steps.\n\n"
         text += "## Procedure\n\n" + item["body"] + "\n\n"
         text += "## Completion report\n\nReport the input/scope, inspected paths, concrete output or findings, executed checks with exits and case counts, and unavailable dependencies. Separate local evidence from provider invocation."
         if role:
-            text += " A review must name the staged tree and give APPROVED or NOT_APPROVED, with severity and evidence for every finding. Findings above LOW or no explicit approval block committing."
+            text += " A review must name source HEAD, staged tree and assigned roles and give APPROVED or NOT_APPROVED, with severity and evidence for every finding. Return inspected paths and actual checks. The coordinator must retain the actual provider dispatch/completion references separately; never invent them. Findings above LOW, a blocked review or no explicit approval block committing."
         text += "\n\nAdapted from `" + "`, `".join(item["sources"]) + "` at upstream `" + PIN + "`; see `LICENSE` and `upstream.json`.\n"
         destination.write_text(text)
         entries.append({k: v for k, v in item.items() if k != "body"})

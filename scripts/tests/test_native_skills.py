@@ -57,6 +57,7 @@ class NativeSkills(unittest.TestCase):
                         GIT_AUTHOR_NAME='Fixture', GIT_AUTHOR_EMAIL='fixture@example.invalid',
                         GIT_COMMITTER_NAME='Fixture', GIT_COMMITTER_EMAIL='fixture@example.invalid', FIXTURE_PASSWD_HOME=str(self.home))
         self.env.pop('HARNESS_REVIEW_FILE', None)
+        Path(self.env['GIT_CONFIG_GLOBAL']).write_text('[gc]\n\tauto = 0\n[maintenance]\n\tauto = false\n')
         self.cmd('git', 'init', '-q')
         self.cmd('git', 'remote', 'add', 'origin', 'https://github.com/PvtKaefsky/my-harness-wrapper.git')
         self.cmd('git', 'add', '.')

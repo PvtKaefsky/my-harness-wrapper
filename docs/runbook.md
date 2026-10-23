@@ -23,36 +23,15 @@ Other applicable language/domain reviewers remain required by the shared policy 
 The current migration needs general, Python, shell and security review.
 Go, database and UI reviewers are inapplicable to this migration's implementation.
 
-Give reviewers the exact staged tree, relevant brief, task constraints and marked user-supplied verbatim hunks.
-Wait for actual provider completion.
-Record their real results in a private scratch JSON file and set `HARNESS_REVIEW_FILE` to its absolute path for the commit command:
-
-```json
-{
-  "tree": "STAGED_TREE_ID",
-  "source_commit": "CURRENT_HEAD",
-  "provider": "native-codex",
-  "implementer_id": "ACTUAL_IMPLEMENTER_ID",
-  "reviews": [
-    {
-      "reviewer_id": "ACTUAL_NATIVE_REVIEWER_ID",
-      "tree": "STAGED_TREE_ID",
-      "roles": ["general"],
-      "verdict": "APPROVED",
-      "findings": [],
-      "evidence": "Actual provider completion reference and verdict"
-    }
-  ]
-}
-```
-
-Include entries covering every required role.
-A reviewer ID must differ from the implementer ID.
-Findings above LOW, stale trees/HEAD, missing roles or missing explicit approval block committing.
-After editing staged bytes, obtain updated approvals for the new tree.
-The JSON checker validates declared evidence consistency; it cannot authenticate provider identities or prove that a supplied transcript is genuine.
-The agent must retain actual provider results and must not fabricate approvals.
-Synthetic review records in tests establish local gate behavior only.
+Use [the native review protocol](native-review.md) for role selection, bounded dispatch, provider completion receipts and schema version 2 evidence.
+The mechanical requirements are minimum coverage; add roles required by project rules and actual staged behavior.
+Shell review uses the verified general brief with explicit shell scope; no dedicated shell agent is registered.
+Capture the actual reviewer identity, dispatch reference, completion reference and explicit verdict for the exact source HEAD and staged tree.
+Set `HARNESS_REVIEW_FILE` to the absolute private scratch record path before the commit command.
+Missing receipts, duplicate/self-review, stale trees/HEAD, unsupported roles, missing coverage and findings above LOW block committing.
+After editing staged bytes, obtain fresh approvals within the five-round budget.
+The local JSON checks cannot cryptographically authenticate provider participation.
+Synthetic review records test gate behavior only.
 
 ## Commit and forge bodies
 
