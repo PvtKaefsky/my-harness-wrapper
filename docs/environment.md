@@ -15,11 +15,14 @@ The wrapper does not request full access, change trust or rewrite Git settings.
 Isolated imports never search target directories.
 Harness module loaders compile source directly and never execute timestamp caches or sourceless bytecode.
 
-Windows checks require the current owner and reject write grants to other principals.
+Windows checks require the current user or the active token's Administrators default owner and reject write grants to other principals.
+An Administrators owner is accepted only when it equals the current token's default owner; other users remain invalid owners.
 Directory deletion authority is treated as a write grant.
 Installation records existing trusted roots for state, profile and Codex home and checks the complete descendant chains on later operations.
 The profile is an explicit operator boundary; custom state/home roots anchor at their nearest existing parent on first installation.
 Ancestors outside those recorded roots remain operator trust assumptions.
 System, Administrators and Windows Owner Rights are trusted owner/system entries.
 Existing unsafe directories are preserved and reported; tests secure only newly created fixture roots.
+Disposable Windows fixtures assign the current token user as owner, including elevated runners.
 See [Microsoft SID definitions](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/understand-security-identifiers).
+Windows assigns new objects their [token's default owner](https://learn.microsoft.com/en-us/windows/win32/secauthz/owner-of-a-new-object).

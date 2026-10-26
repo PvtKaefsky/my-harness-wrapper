@@ -51,7 +51,23 @@ def owner_check(path: str | Path) -> None:
         if not advapi.GetTokenInformation(token, 1, buffer, size, ctypes.byref(size)):
             raise ValueError("STATE_OWNER_UNREADABLE")
         user = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_void_p))[0]
-        if not advapi.EqualSid(owner, user) or not acl:
+        trusted_owner = bool(advapi.EqualSid(owner, user))
+        if not trusted_owner:
+            owner_size = wintypes.DWORD()
+            advapi.GetTokenInformation(token, 4, None, 0, ctypes.byref(owner_size))
+            owner_buffer = ctypes.create_string_buffer(owner_size.value)
+            if not advapi.GetTokenInformation(token, 4, owner_buffer, owner_size, ctypes.byref(owner_size)):
+                raise ValueError("STATE_OWNER_UNREADABLE")
+            default_owner = ctypes.cast(owner_buffer, ctypes.POINTER(ctypes.c_void_p))[0]
+            default_sid = wintypes.LPWSTR()
+            if not advapi.ConvertSidToStringSidW(default_owner, ctypes.byref(default_sid)):
+                raise ValueError("STATE_OWNER_UNREADABLE")
+            try:
+                trusted_owner = (default_sid.value == "S-1-5-32-544"
+                                 and bool(advapi.EqualSid(owner, default_owner)))
+            finally:
+                kernel.LocalFree(default_sid)
+        if not trusted_owner or not acl:
             raise ValueError("STATE_OWNER_OR_PERMISSIONS_UNSAFE")
         info = (wintypes.DWORD * 3)()
         if not advapi.GetAclInformation(acl, info, ctypes.sizeof(info), 2):

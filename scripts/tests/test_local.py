@@ -22,32 +22,42 @@ def private_fixture(path: Path, allow_world_write: bool = False, inherit_only: b
     from ctypes import wintypes
     api = ctypes.WinDLL("advapi32", use_last_error=True)
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    owner, descriptor, restricted = ctypes.c_void_p(), ctypes.c_void_p(), ctypes.c_void_p()
+    restricted = ctypes.c_void_p()
+    token = wintypes.HANDLE()
     sid = wintypes.LPWSTR()
-    api.GetNamedSecurityInfoW.argtypes = [
-        wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p),
-        ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    api.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    api.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p,
+                                        wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
     api.ConvertSidToStringSidW.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.LPWSTR)]
     api.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [
         wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p]
     api.SetFileSecurityW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.c_void_p]
     kernel.LocalFree.argtypes = [ctypes.c_void_p]
     try:
-        if api.GetNamedSecurityInfoW(str(path), 1, 1, ctypes.byref(owner), None,
-                                    None, None, ctypes.byref(descriptor)):
-            raise OSError("Cannot inspect disposable fixture owner")
-        if not api.ConvertSidToStringSidW(owner, ctypes.byref(sid)):
+        if not api.OpenProcessToken(kernel.GetCurrentProcess(), 8, ctypes.byref(token)):
+            raise OSError("Cannot inspect disposable fixture user")
+        size = wintypes.DWORD()
+        api.GetTokenInformation(token, 1, None, 0, ctypes.byref(size))
+        buffer = ctypes.create_string_buffer(size.value)
+        if not api.GetTokenInformation(token, 1, buffer, size, ctypes.byref(size)):
+            raise OSError("Cannot resolve disposable fixture user")
+        user = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_void_p))[0]
+        if not api.ConvertSidToStringSidW(user, ctypes.byref(sid)):
             raise OSError("Cannot resolve disposable fixture owner")
-        sddl = "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" + sid.value + ")"
+        sddl = "O:" + sid.value + "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" + sid.value + ")"
         if allow_world_write:
             sddl += "(A;OICI" + ("IO" if inherit_only else "") + (";DC;;;WD)" if delete_child else ";FW;;;WD)")
         if not api.ConvertStringSecurityDescriptorToSecurityDescriptorW(
                 sddl, 1, ctypes.byref(restricted), None):
             raise OSError("Cannot create private fixture descriptor")
-        if not api.SetFileSecurityW(str(path), 0x80000004, restricted):
+        if not api.SetFileSecurityW(str(path), 0x80000005, restricted):
             raise OSError("Cannot secure disposable fixture")
     finally:
-        for value in [sid, descriptor, restricted]:
+        if token:
+            kernel.CloseHandle(token)
+        for value in [sid, restricted]:
             if value:
                 kernel.LocalFree(value)
 
@@ -702,6 +712,14 @@ class LocalHarnessTests(unittest.TestCase):
         self.install()
         private_fixture(directory, allow_world_write=True, delete_child=True)
         self.run_cli("doctor", expected=1)
+
+    @unittest.skipUnless(os.name == "nt", "Windows process token default owner")
+    def test_current_windows_token_default_owner_is_accepted(self) -> None:
+        import runpy
+        runpy.run_path(str(CLI))
+        directory = self.base / "default-process-owner"
+        directory.mkdir()
+        sys.modules["harness_local.storage"].owner_check(directory)
 
     @unittest.skipUnless(os.name == "nt", "Windows command expansion")
     def test_expansion_characters_rejected_before_install_writes(self) -> None:

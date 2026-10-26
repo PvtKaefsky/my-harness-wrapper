@@ -10,6 +10,7 @@
   "jobs": {
     "regression": {
       "strategy": {
+        "fail-fast": false,
         "matrix": {
           "os": [
             "windows-latest",
