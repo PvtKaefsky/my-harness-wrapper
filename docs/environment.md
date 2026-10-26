@@ -1,30 +1,25 @@
-# Managed Cloud environment
+# Native environment
 
-The supported runtime is managed Codex Cloud.
-The wrapper checkout convention is `/workspace/my-harness-wrapper`.
-The delivery-state convention is `/workspace/.harness-wrapper`.
-Other attached repositories remain independent task repositories.
-Setup never creates discovery directories or symlinks in those repositories.
+Native Windows desktop/CLI with PowerShell, Git and Python 3.12 is primary.
+The observed development CLI was 0.164.0-alpha.11.1; version alone proves no integration.
+Generated hooks use the actual Python executable.
+Codex's default Windows command-hook runner uses COMSPEC; generated registrations use its quoting rules.
+Every Windows argument is quoted; percent, exclamation, quote and newline characters in hook launch paths are rejected before installation writes.
+The hook runner is separate from the user's preferred PowerShell tool/terminal shell.
+Source, interactive user, Codex home, target Git context and wrapper state are distinct.
+A restricted account is not the interactive user's install destination.
+Normal tasks do not install or repair the harness.
 
-Setup requires Bash, Git, jq, Python 3.9 or newer and GNU/Linux utilities including `flock`, `realpath`, `sha256sum`, `cmp` and `mv -T`.
-Workflow execution also requires the project-specific tools named in its catalog entry.
-Unavailable compilers, browsers, services or connected tools are reported per workflow step.
-Read-only planning and code inspection need no external workflow service.
+Credentials, network and sandbox policy remain with Codex and the user.
+The wrapper does not request full access, change trust or rewrite Git settings.
+Isolated imports never search target directories.
+Harness module loaders compile source directly and never execute timestamp caches or sourceless bytecode.
 
-The current-task provider exposes native agent collaboration and connected GitHub tools.
-Their actual invocation is separate from pack delivery.
-No fork-provided MCP, native skill dispatch or automatic shell-hook registration is established by this repository.
-The runtime's managed home and configuration remain provider-owned.
-Default setup writes no home or managed configuration and requests no elevated privileges.
-The operator-reported preparation cannot create `$HOME/.agents`: `OSError(30): Read-only file system`.
-The historical HOME provisioner remains disabled by default and inapplicable to that runtime.
-The [repository-scoped experiment](native-skills.md) versions `harness-python-patterns` under the wrapper's `.agents/skills/`.
-It requires the wrapper as the provider-selected working repository, with a separate attached target used read-only.
-A shell `cd` and sibling checkout presence do not establish that provider selection.
-User-global and target-rooted discovery remain unproven.
-
-Commit operations require the existing explicit author/committer environment identity.
-Forge assignment uses `HARNESS_ASSIGNEE` when present.
-The wrapper does not modify personal Git identity or signing configuration.
-Network access and credentials follow the managed provider policy.
-Delivery setup is offline; maintenance fetches and forge actions use existing approved access.
+Windows checks require the current owner and reject write grants to other principals.
+Directory deletion authority is treated as a write grant.
+Installation records existing trusted roots for state, profile and Codex home and checks the complete descendant chains on later operations.
+The profile is an explicit operator boundary; custom state/home roots anchor at their nearest existing parent on first installation.
+Ancestors outside those recorded roots remain operator trust assumptions.
+System, Administrators and Windows Owner Rights are trusted owner/system entries.
+Existing unsafe directories are preserved and reported; tests secure only newly created fixture roots.
+See [Microsoft SID definitions](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/understand-security-identifiers).

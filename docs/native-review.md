@@ -9,7 +9,7 @@ Retain the actual provider messages separately and report that limitation with a
 ## Selection and bounds
 
 1. Read applicable project rules and inspect `git diff --cached --stat` and the complete staged diff, including deletions and surrounding callers.
-2. Run `check-codex-review.py --requirements` in the task repository and record its `source_commit` and `tree`.
+2. Run `codex-local.py review-requirements` in the task repository and record its `source_commit` and `tree`.
 An unborn repository uses an empty source commit and `git diff --cached` for inspection; wrapper development uses the checked live main.
 3. Add project-required language/domain roles to `required_roles`; the suffix/path mapping is a minimum, not exhaustive project analysis.
 4. Inventory current native collaboration tools and independent agent availability before dispatch.
@@ -24,7 +24,7 @@ An unborn repository uses an empty source commit and `git diff --cached` for ins
 | `security` | `role/security-reviewer` | Changes under `env/`, `scripts/` or `config/codex/`, plus project security rules. |
 | `go` | `role/go-reviewer` | Changed or deleted Go files. |
 | `database` | `role/database-reviewer` | Changed or deleted SQL files, migrations or project database rules. |
-| `architecture`, `build`, `docs`, `e2e`, `go-build`, `planning`, `refactor`, `tdd`, `communication` | Corresponding IDs emitted by `--requirements` | Project/task rules and actual staged scope. |
+| `architecture`, `build`, `docs`, `e2e`, `go-build`, `planning`, `refactor`, `tdd`, `communication` | The corresponding verified `role/*` brief from the catalog | Project/task rules and actual staged scope. |
 
 No dedicated shell or UI brief is shipped.
 Use the general brief with explicit domain scope when it covers the required expertise.
@@ -80,7 +80,7 @@ Do not invent a completion identifier; use the provider's task/completion messag
 | `REVIEW_DISPATCHED` | Provider accepted the exact packet and returned an invocation reference. | No completion or approval. |
 | `REVIEW_COMPLETED` | Actual terminal provider response with completion reference. | Verdict may be blocked or negative. |
 | `TREE_APPROVED` | Every required role explicitly approves the same HEAD/tree with no findings above LOW. | Local JSON consistency cannot authenticate participation or guarantee commit success. |
-| `GUARDED_COMMIT_PASSED` | Explicit `commit-codex.sh` returned zero after Git committed. | Hosted CI and fresh Environment acceptance remain separate. |
+| `GUARDED_COMMIT_PASSED` | Explicit `codex-local.py commit` returned zero after Git committed. | Hosted CI and fresh local-session acceptance remain separate. |
 
 Save actual completion references and explicit verdicts in a private scratch record.
 The `provider_receipt` is a structured transcription of actual provider evidence, not an authentication token.
@@ -133,6 +133,6 @@ A pre-run billing/policy failure is an operator blocker and cannot be waived by 
 Report source HEAD, reviewed tree, actual reviewer/task/completion IDs and verdicts, selected and unavailable roles, suite counts, isolated setup and guarded commit output.
 Report deletion RED/GREEN for receipt consumption separately from genuine provider approval.
 Synthetic records exercise rejection and acceptance branches in disposable repositories only.
-Current-task native staged reviews do not prove a new task uses the operator-published Environment.
-Record the publication/version and fresh-task evidence separately or report that acceptance pending.
-Automatic hooks remain `UNSUPPORTED` through this pack; explicit gates are not PreToolUse/PostToolUse registration.
+Current-task staged reviews do not prove fresh local-session discovery or hook invocation.
+Record fresh desktop and CLI evidence separately or report acceptance pending.
+Explicit Git guards do not establish automatic Codex callback execution.

@@ -1,5 +1,5 @@
 {
-  "name": "Codex wrapper checks",
+  "name": "Local Codex harness checks",
   "on": {
     "push": {},
     "pull_request": {}
@@ -9,68 +9,41 @@
   },
   "jobs": {
     "regression": {
-      "name": "Wrapper regression",
-      "runs-on": "ubuntu-24.04",
+      "strategy": {
+        "matrix": {
+          "os": [
+            "windows-latest",
+            "ubuntu-24.04"
+          ]
+        }
+      },
+      "runs-on": "${{ matrix.os }}",
       "timeout-minutes": 20,
       "steps": [
         {
-          "name": "Checkout exact source",
           "uses": "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
           "with": {
-            "ref": "${{ github.sha }}",
             "persist-credentials": false,
-            "set-safe-directory": false
+            "ref": "${{ github.sha }}"
           }
         },
         {
-          "name": "Verify checkout identity",
-          "shell": "bash",
-          "run": "test \"$(git rev-parse HEAD)\" = \"$GITHUB_SHA\""
+          "uses": "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1",
+          "with": {
+            "python-version": "3.12"
+          }
         },
         {
-          "name": "Codex delivery suite",
-          "shell": "bash",
-          "run": "bash scripts/test-codex.sh"
+          "name": "Verify exact source",
+          "run": "python -c \"import os, subprocess; assert subprocess.check_output(['git','rev-parse','HEAD']).decode().strip() == os.environ['GITHUB_SHA']\""
         },
         {
-          "name": "Git context suite",
-          "shell": "bash",
-          "run": "bash scripts/test-codex-git-context.sh"
+          "name": "Verify native pack",
+          "run": "python -X utf8 -I scripts/codex-local.py verify-source"
         },
         {
-          "name": "Identity suite",
-          "shell": "bash",
-          "run": "bash scripts/test-codex-identity.sh"
-        },
-        {
-          "name": "Attribution suite",
-          "shell": "bash",
-          "run": "bash scripts/test-codex-attribution.sh"
-        },
-        {
-          "name": "Cloud pack suite",
-          "shell": "bash",
-          "run": "bash scripts/test-cloud-pack.sh"
-        },
-        {
-          "name": "Native skill suite",
-          "shell": "bash",
-          "run": "python3 -I scripts/tests/test_native_skills.py"
-        },
-        {
-          "name": "Repository native source",
-          "shell": "bash",
-          "run": "python3 -I scripts/check-native-source.py"
-        },
-        {
-          "name": "Environment setup",
-          "shell": "bash",
-          "run": "scratch=$(mktemp -d /tmp/wrapper-ci.XXXXXX)\nscratch=$(cd -- \"$scratch\" && pwd -P)\nHARNESS_STATE_DIR=\"$scratch/state\" bash env/setup-codex.sh"
-        },
-        {
-          "name": "Hosted CI contract tests",
-          "shell": "bash",
-          "run": "python3 -I scripts/tests/test_hosted_ci.py"
+          "name": "Native regression tests",
+          "run": "python -X utf8 -I scripts/tests/test_local.py"
         }
       ]
     }
