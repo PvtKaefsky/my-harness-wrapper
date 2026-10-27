@@ -62,9 +62,17 @@ def trusted_chain(path: Path, boundary: Path, profile: Path | None = None) -> No
 def windows_command(command: list[str]) -> str:
     if any(any(character in argument for character in '%!\r\n"') for argument in command):
         raise ValueError("WINDOWS_HOOK_PATH_UNSUPPORTED")
-    return " ".join('"' + argument.rstrip("\\") + "\\" *
-                    (2 * (len(argument) - len(argument.rstrip("\\")))) + '"'
-                    for argument in command)
+    launcher = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    if not launcher.is_file() or not re.fullmatch(r"[A-Za-z]:\\[A-Za-z0-9_\\./-]+", str(launcher)):
+        raise ValueError("WINDOWS_HOOK_SHELL_UNAVAILABLE")
+    script = ("$ErrorActionPreference = 'Stop'; try { "
+              "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+              "$OutputEncoding = [Console]::OutputEncoding; & "
+              + " ".join("'" + argument.replace("'", "''") + "'" for argument in command)
+              + "; if ($null -eq $LASTEXITCODE) { exit 1 }; exit $LASTEXITCODE "
+              "} catch { [Console]::Error.WriteLine('FAIL WINDOWS_HOOK_LAUNCH: ' + $_.Exception.Message); exit 1 }")
+    payload = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    return str(launcher) + " -NoProfile -NonInteractive -EncodedCommand " + payload
 
 
 def registration_root(path: Path, profile: Path, home: Path) -> Path:

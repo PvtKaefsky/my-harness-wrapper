@@ -3,8 +3,10 @@
 Native Windows desktop/CLI with PowerShell, Git and Python 3.12 is primary.
 The observed development CLI was 0.164.0-alpha.11.1; version alone proves no integration.
 Generated hooks use the actual Python executable.
-Codex's default Windows command-hook runner uses COMSPEC; generated registrations use its quoting rules.
-Every Windows argument is quoted; percent, exclamation, quote and newline characters in hook launch paths are rejected before installation writes.
+Codex uses COMSPEC for default Windows hook execution and the supplied environment shell when present.
+Windows registrations use an absolute PowerShell launcher and encoded argument literals that work under CMD and PowerShell and preserve UTF-8 output.
+Interpreter launch errors return failure rather than a successful empty hook result.
+Percent, exclamation, quote and newline characters in hook launch paths are rejected before installation writes.
 The hook runner is separate from the user's preferred PowerShell tool/terminal shell.
 Source, interactive user, Codex home, target Git context and wrapper state are distinct.
 A restricted account is not the interactive user's install destination.

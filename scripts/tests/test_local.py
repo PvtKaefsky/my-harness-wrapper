@@ -648,10 +648,14 @@ class LocalHarnessTests(unittest.TestCase):
         command = data["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
         runner = subprocess.list2cmdline([os.environ["COMSPEC"], "/C"]) + ' "' + command + '"'
         event = json.dumps({"hook_event_name": "SessionStart", "source": "startup"})
-        result = subprocess.run(runner, input=event, cwd=self.target, capture_output=True,
-                                text=True, encoding="utf-8", errors="replace")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(json.loads(result.stdout)["hookSpecificOutput"]["hookEventName"], "SessionStart")
+        powershell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+        for invocation in [runner, [str(powershell), "-NoProfile", "-NonInteractive", "-Command", command]]:
+            result = subprocess.run(invocation, input=event, cwd=self.target, capture_output=True,
+                                    text=True, encoding="utf-8", errors="replace")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            output = json.loads(result.stdout)["hookSpecificOutput"]
+            self.assertEqual(output["hookEventName"], "SessionStart")
+            self.assertIn("Виктор user", output["additionalContext"])
 
     def test_interrupted_rollback_of_added_package_recovers_transition(self) -> None:
         self.install()
@@ -758,6 +762,20 @@ class LocalHarnessTests(unittest.TestCase):
         result = subprocess.run(runner, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(result.stdout.strip(), argument)
+
+    @unittest.skipUnless(os.name == "nt", "Windows interpreter launch failure")
+    def test_missing_windows_hook_interpreter_is_not_reported_as_success(self) -> None:
+        import runpy
+        runpy.run_path(str(CLI))
+        missing = self.base / "absent interpreter/python.exe"
+        command = sys.modules["harness_local.install"].windows_command([str(missing), "-I"])
+        powershell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+        runners = [subprocess.list2cmdline([os.environ["COMSPEC"], "/C"]) + ' "' + command + '"',
+                   [str(powershell), "-NoProfile", "-NonInteractive", "-Command", command]]
+        for runner in runners:
+            result = subprocess.run(runner, capture_output=True, text=True, encoding="utf-8")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("WINDOWS_HOOK_LAUNCH", result.stderr)
 
 if __name__ == "__main__":
     unittest.main()
