@@ -1,50 +1,42 @@
 # my-harness-wrapper
 
-This repository delivers shared workflows and working policy for managed Codex Cloud.
-The published Environment includes this checkout at `/workspace/my-harness-wrapper`.
-Its start skill runs a read-only integrity check and directs the agent to the delivered policy and a lazy workflow catalog.
-The selected workflow is read explicitly from the wrapper, including when the task concerns an unrelated attached repository.
+Shared working policy and ECC workflows for native local Codex on Windows.
+Python 3.12, native Git and a signed-in local Codex app or CLI are required.
+PowerShell is the normal Windows shell; Bash, WSL, jq and administrator access are not required.
 
-The Cloud pack is a curated derivative of `forever94yu/everything-codex-code` at `d468c521f1a76e7b05d446d805f6ad2afa8ed066`, package `1.7.0-codex.0`.
-It contains 37 skills, 14 role briefs, 21 explicit workflows and 24 rule files.
-These counts describe readable instructions, not registered provider components.
-The upstream MIT license, source paths, source hashes, exclusion inventory and derivative hashes accompany the pack.
-
-Default setup writes only wrapper-owned delivery state, normally `/workspace/.harness-wrapper`.
-It runs no upstream installer and writes no managed configuration, plugin-cache or target-repository files.
-The checked-in `.agents/skills/harness-python-patterns` package supports a repository-scoped discovery experiment with this wrapper as the provider-selected working repository.
-See [native skill delivery](docs/native-skills.md) for source checks and operator-only fresh-task acceptance.
-The historical HOME opt-in remains disabled by default and cannot operate in the reported read-only managed preparation runtime.
-A missing wrapper checkout is a dependency failure.
-A matching checksum proves matching bytes, not agent use or provider acceptance.
+The upstream pin is forever94yu/everything-codex-code at d468c521f1a76e7b05d446d805f6ad2afa8ed066.
+Full bodies are retained for 37 skills, 14 reviewers, 21 workflows and 24 rules.
+The wrapper adapts native wiring and preserves source hashes/licenses.
+It is a selected distribution, not the complete upstream plugin.
 
 ## Usage
 
-After the operator publishes the Environment, ask: “apply workflow plan from the shared Codex pack”.
-The agent reads verified instructions through:
+Inspect the installation before applying it:
 
-```bash
-python3 -I /workspace/my-harness-wrapper/scripts/pack-codex.py read workflow/plan
-```
+    py -3.12 -X utf8 -I scripts/codex-local.py install
+    py -3.12 -X utf8 -I scripts/codex-local.py install --apply
 
-Project-local `AGENTS.md` and higher-priority instructions remain authoritative.
-Independent native reviewers must actually run before commits; role files do not create reviewers.
-The pack installs no automatic hooks, native skill selectors or MCP servers.
+Open a fresh local chat and invoke harness-workflow-plan or a native skill.
+Trust new hook definitions through Codex before claiming automatic startup.
+Existing config.toml, authentication, models, permissions and Git settings are preserved.
+Target repositories need no harness files.
 
 ## Structure
 
 | Path | Purpose |
 | --- | --- |
-| `AGENTS.md` | Wrapper development policy. |
-| `.agents/skills/` | Regular repository discovery package matching the audited wrapper source. |
-| `config/codex/` | Shared policy, version, manifest anchor, audited workflow pack and one native skill. |
-| `env/setup-codex.sh` | Complete offline checks and delivery setup. |
-| `scripts/` | Integrity, startup, explicit safety gates and isolated regression suites. |
-| `docs/` | [Documentation index](docs/README.md). |
+| AGENTS.md | Wrapper development rules. |
+| config/codex/AGENTS.md | Shared working policy. |
+| config/codex/pack/ | Full-body pack and integrity manifest. |
+| config/codex/upstream/ | Exact selected source bytes and license. |
+| scripts/ | Native runtime, offline builder and tests. |
+| docs/ | [Documentation index](docs/README.md). |
 
-Use the verbatim Environment fields and fresh-task acceptance steps in [Codex delivery](docs/codex.md).
-A merged PR does not publish an Environment.
+## Verification
 
-GitHub Actions runs the wrapper suites and isolated full setup on pushes and pull requests.
-Use [the runbook](docs/runbook.md) to inspect actual hosted job steps and external billing blockers.
-Report each Cloud capability with its own [evidence state](docs/codex.md#capability-evidence).
+    py -3.12 -X utf8 -I scripts/codex-local.py verify-source
+    py -3.12 -X utf8 -I scripts/tests/test_local.py
+
+GitHub Actions checks Windows and portable Linux behavior separately.
+Fresh desktop/CLI acceptance and real-profile activation belong to the user.
+The old implementations remain on feat/codex-cloud-harness and feat/claude-harness.

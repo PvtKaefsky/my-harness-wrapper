@@ -1,0 +1,98 @@
+# Shared local workflow catalog
+
+- skill/api-design: API contracts
+- skill/backend-patterns: Backend architecture
+- skill/coding-standards: TypeScript and JavaScript
+- skill/content-hash-cache-pattern: Content hash caches
+- skill/cpp-coding-standards: C++ design
+- skill/cpp-testing: C++ tests
+- skill/database-migrations: Database migrations
+- skill/deployment-patterns: Deployment review
+- skill/django-patterns: Django architecture
+- skill/django-security: Django security
+- skill/django-tdd: Django TDD
+- skill/django-verification: Django verification
+- skill/docker-patterns: Container review
+- skill/e2e-testing: End-to-end testing
+- skill/eval-harness: Behavior evaluations
+- skill/frontend-patterns: Frontend patterns
+- skill/golang-patterns: Go design
+- skill/golang-testing: Go TDD
+- skill/iterative-retrieval: Bounded code discovery
+- skill/java-coding-standards: Java design
+- skill/jpa-patterns: JPA data access
+- skill/postgres-patterns: PostgreSQL review
+- skill/python-patterns: Python design
+- skill/python-testing: Python TDD
+- skill/regex-vs-llm-structured-text: Structured text extraction
+- skill/search-first: Research before implementation
+- skill/security-review: Security review
+- skill/springboot-patterns: Spring Boot architecture
+- skill/springboot-security: Spring Boot security
+- skill/springboot-tdd: Spring Boot TDD
+- skill/springboot-verification: Spring Boot verification
+- skill/swift-actor-persistence: Swift persistence review
+- skill/swift-concurrency-6-2: Swift concurrency review
+- skill/swift-protocol-di-testing: Swift dependency injection
+- skill/swiftui-patterns: SwiftUI review
+- skill/tdd-workflow: Test-driven implementation
+- skill/verification-loop: Completion verification
+- role/architect: System design
+- role/build-error-resolver: Build and debugging
+- role/chief-of-staff: Communication triage
+- role/code-reviewer: General code review
+- role/database-reviewer: Database review
+- role/doc-updater: Documentation review
+- role/e2e-runner: End-to-end testing
+- role/go-build-resolver: Go build diagnosis
+- role/go-reviewer: Go review
+- role/planner: Planning
+- role/python-reviewer: Python review
+- role/refactor-cleaner: Safe refactoring
+- role/security-reviewer: Security review
+- role/tdd-guide: TDD review
+- workflow/plan: plan
+- workflow/build-fix: build-fix
+- workflow/code-review: code-review
+- workflow/e2e: e2e
+- workflow/eval: eval
+- workflow/go-build: go-build
+- workflow/go-review: go-review
+- workflow/go-test: go-test
+- workflow/orchestrate: orchestrate
+- workflow/python-review: python-review
+- workflow/refactor-clean: refactor-clean
+- workflow/setup-pm: setup-pm
+- workflow/tdd: tdd
+- workflow/test-coverage: test-coverage
+- workflow/update-codemaps: update-codemaps
+- workflow/update-docs: update-docs
+- workflow/verify: verify
+- workflow/checkpoint: checkpoint
+- workflow/learn: learn
+- workflow/learn-eval: learn-eval
+- workflow/skill-create: skill-create
+- rule/common/agents: common agents
+- rule/common/coding-style: common coding-style
+- rule/common/development-workflow: common development-workflow
+- rule/common/git-workflow: common git-workflow
+- rule/common/patterns: common patterns
+- rule/common/performance: common performance
+- rule/common/security: common security
+- rule/common/testing: common testing
+- rule/golang/coding-style: golang coding-style
+- rule/golang/patterns: golang patterns
+- rule/golang/security: golang security
+- rule/golang/testing: golang testing
+- rule/python/coding-style: python coding-style
+- rule/python/patterns: python patterns
+- rule/python/security: python security
+- rule/python/testing: python testing
+- rule/swift/coding-style: swift coding-style
+- rule/swift/patterns: swift patterns
+- rule/swift/security: swift security
+- rule/swift/testing: swift testing
+- rule/typescript/coding-style: typescript coding-style
+- rule/typescript/patterns: typescript patterns
+- rule/typescript/security: typescript security
+- rule/typescript/testing: typescript testing

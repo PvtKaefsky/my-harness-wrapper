@@ -1,0 +1,911 @@
+{
+  "items": [
+    {
+      "id": "skill/api-design",
+      "path": "skills/api-design/SKILL.md",
+      "requires": "repository API tests",
+      "sources": [
+        "skills/api-design/SKILL.md"
+      ],
+      "title": "API contracts"
+    },
+    {
+      "id": "skill/backend-patterns",
+      "path": "skills/backend-patterns/SKILL.md",
+      "requires": "repository runtime and integration tests",
+      "sources": [
+        "skills/backend-patterns/SKILL.md"
+      ],
+      "title": "Backend architecture"
+    },
+    {
+      "id": "skill/coding-standards",
+      "path": "skills/coding-standards/SKILL.md",
+      "requires": "Node.js and project type/lint/test commands",
+      "sources": [
+        "skills/coding-standards/SKILL.md"
+      ],
+      "title": "TypeScript and JavaScript"
+    },
+    {
+      "id": "skill/content-hash-cache-pattern",
+      "path": "skills/content-hash-cache-pattern/SKILL.md",
+      "requires": "repository hash/cache tests",
+      "sources": [
+        "skills/content-hash-cache-pattern/SKILL.md"
+      ],
+      "title": "Content hash caches"
+    },
+    {
+      "id": "skill/cpp-coding-standards",
+      "path": "skills/cpp-coding-standards/SKILL.md",
+      "requires": "project C++ compiler and build system",
+      "sources": [
+        "skills/cpp-coding-standards/SKILL.md"
+      ],
+      "title": "C++ design"
+    },
+    {
+      "id": "skill/cpp-testing",
+      "path": "skills/cpp-testing/SKILL.md",
+      "requires": "CMake/CTest or project test runner; configured sanitizers",
+      "sources": [
+        "skills/cpp-testing/SKILL.md"
+      ],
+      "title": "C++ tests"
+    },
+    {
+      "id": "skill/database-migrations",
+      "path": "skills/database-migrations/SKILL.md",
+      "requires": "project migration runner and isolated test database",
+      "sources": [
+        "skills/database-migrations/SKILL.md"
+      ],
+      "title": "Database migrations"
+    },
+    {
+      "id": "skill/deployment-patterns",
+      "path": "skills/deployment-patterns/SKILL.md",
+      "requires": "repository build/test tools; deployment access only if authorized",
+      "sources": [
+        "skills/deployment-patterns/SKILL.md"
+      ],
+      "title": "Deployment review"
+    },
+    {
+      "id": "skill/django-patterns",
+      "path": "skills/django-patterns/SKILL.md",
+      "requires": "Python, Django and project tests",
+      "sources": [
+        "skills/django-patterns/SKILL.md"
+      ],
+      "title": "Django architecture"
+    },
+    {
+      "id": "skill/django-security",
+      "path": "skills/django-security/SKILL.md",
+      "requires": "Django system checks and project security tests",
+      "sources": [
+        "skills/django-security/SKILL.md"
+      ],
+      "title": "Django security"
+    },
+    {
+      "id": "skill/django-tdd",
+      "path": "skills/django-tdd/SKILL.md",
+      "requires": "Python, pytest-django or repository runner; test database",
+      "sources": [
+        "skills/django-tdd/SKILL.md"
+      ],
+      "title": "Django TDD"
+    },
+    {
+      "id": "skill/django-verification",
+      "path": "skills/django-verification/SKILL.md",
+      "requires": "Python, Django and repository lint/type/test tools",
+      "sources": [
+        "skills/django-verification/SKILL.md"
+      ],
+      "title": "Django verification"
+    },
+    {
+      "id": "skill/docker-patterns",
+      "path": "skills/docker-patterns/SKILL.md",
+      "requires": "Docker only when available; managed environment container policy",
+      "sources": [
+        "skills/docker-patterns/SKILL.md"
+      ],
+      "title": "Container review"
+    },
+    {
+      "id": "skill/e2e-testing",
+      "path": "skills/e2e-testing/SKILL.md",
+      "requires": "installed browser automation, browser binaries and isolated application services",
+      "sources": [
+        "skills/e2e-testing/SKILL.md"
+      ],
+      "title": "End-to-end testing"
+    },
+    {
+      "id": "skill/eval-harness",
+      "path": "skills/eval-harness/SKILL.md",
+      "requires": "repository test runner; optional real provider evaluator",
+      "sources": [
+        "skills/eval-harness/SKILL.md"
+      ],
+      "title": "Behavior evaluations"
+    },
+    {
+      "id": "skill/frontend-patterns",
+      "path": "skills/frontend-patterns/SKILL.md",
+      "requires": "project frontend runtime, type checker and tests",
+      "sources": [
+        "skills/frontend-patterns/SKILL.md"
+      ],
+      "title": "Frontend patterns"
+    },
+    {
+      "id": "skill/golang-patterns",
+      "path": "skills/golang-patterns/SKILL.md",
+      "requires": "Go toolchain and project build/tests",
+      "sources": [
+        "skills/golang-patterns/SKILL.md"
+      ],
+      "title": "Go design"
+    },
+    {
+      "id": "skill/golang-testing",
+      "path": "skills/golang-testing/SKILL.md",
+      "requires": "Go toolchain; race detector when supported",
+      "sources": [
+        "skills/golang-testing/SKILL.md"
+      ],
+      "title": "Go TDD"
+    },
+    {
+      "id": "skill/iterative-retrieval",
+      "path": "skills/iterative-retrieval/SKILL.md",
+      "requires": "repository file search/read tools",
+      "sources": [
+        "skills/iterative-retrieval/SKILL.md"
+      ],
+      "title": "Bounded code discovery"
+    },
+    {
+      "id": "skill/java-coding-standards",
+      "path": "skills/java-coding-standards/SKILL.md",
+      "requires": "project JDK and Maven/Gradle wrapper",
+      "sources": [
+        "skills/java-coding-standards/SKILL.md"
+      ],
+      "title": "Java design"
+    },
+    {
+      "id": "skill/jpa-patterns",
+      "path": "skills/jpa-patterns/SKILL.md",
+      "requires": "project JDK, ORM tests and isolated database",
+      "sources": [
+        "skills/jpa-patterns/SKILL.md"
+      ],
+      "title": "JPA data access"
+    },
+    {
+      "id": "skill/postgres-patterns",
+      "path": "skills/postgres-patterns/SKILL.md",
+      "requires": "SQL files; optional isolated PostgreSQL connection",
+      "sources": [
+        "skills/postgres-patterns/SKILL.md"
+      ],
+      "title": "PostgreSQL review"
+    },
+    {
+      "id": "skill/python-patterns",
+      "path": "skills/python-patterns/SKILL.md",
+      "requires": "Python and repository checks",
+      "sources": [
+        "skills/python-patterns/SKILL.md"
+      ],
+      "title": "Python design"
+    },
+    {
+      "id": "skill/python-testing",
+      "path": "skills/python-testing/SKILL.md",
+      "requires": "Python, unittest or installed pytest and project plugins",
+      "sources": [
+        "skills/python-testing/SKILL.md"
+      ],
+      "title": "Python TDD"
+    },
+    {
+      "id": "skill/regex-vs-llm-structured-text",
+      "path": "skills/regex-vs-llm-structured-text/SKILL.md",
+      "requires": "Python or project parsing tests; optional authorized model API",
+      "sources": [
+        "skills/regex-vs-llm-structured-text/SKILL.md"
+      ],
+      "title": "Structured text extraction"
+    },
+    {
+      "id": "skill/search-first",
+      "path": "skills/search-first/SKILL.md",
+      "requires": "repository search; optional approved connected search tools",
+      "sources": [
+        "skills/search-first/SKILL.md"
+      ],
+      "title": "Research before implementation"
+    },
+    {
+      "id": "skill/security-review",
+      "path": "skills/security-review/SKILL.md",
+      "requires": "repository read/diff tools; optional installed scanners",
+      "sources": [
+        "skills/security-review/SKILL.md"
+      ],
+      "title": "Security review"
+    },
+    {
+      "id": "skill/springboot-patterns",
+      "path": "skills/springboot-patterns/SKILL.md",
+      "requires": "project JDK and Maven/Gradle tests",
+      "sources": [
+        "skills/springboot-patterns/SKILL.md"
+      ],
+      "title": "Spring Boot architecture"
+    },
+    {
+      "id": "skill/springboot-security",
+      "path": "skills/springboot-security/SKILL.md",
+      "requires": "project JDK and security tests",
+      "sources": [
+        "skills/springboot-security/SKILL.md"
+      ],
+      "title": "Spring Boot security"
+    },
+    {
+      "id": "skill/springboot-tdd",
+      "path": "skills/springboot-tdd/SKILL.md",
+      "requires": "project JDK, JUnit and configured test dependencies",
+      "sources": [
+        "skills/springboot-tdd/SKILL.md"
+      ],
+      "title": "Spring Boot TDD"
+    },
+    {
+      "id": "skill/springboot-verification",
+      "path": "skills/springboot-verification/SKILL.md",
+      "requires": "project JDK, build wrapper and configured checks",
+      "sources": [
+        "skills/springboot-verification/SKILL.md"
+      ],
+      "title": "Spring Boot verification"
+    },
+    {
+      "id": "skill/swift-actor-persistence",
+      "path": "skills/swift-actor-persistence/SKILL.md",
+      "requires": "Swift toolchain and project tests if available",
+      "sources": [
+        "skills/swift-actor-persistence/SKILL.md"
+      ],
+      "title": "Swift persistence review"
+    },
+    {
+      "id": "skill/swift-concurrency-6-2",
+      "path": "skills/swift-concurrency-6-2/SKILL.md",
+      "requires": "matching Swift compiler; Apple SDK for platform tests",
+      "sources": [
+        "skills/swift-concurrency-6-2/SKILL.md"
+      ],
+      "title": "Swift concurrency review"
+    },
+    {
+      "id": "skill/swift-protocol-di-testing",
+      "path": "skills/swift-protocol-di-testing/SKILL.md",
+      "requires": "Swift toolchain and project tests",
+      "sources": [
+        "skills/swift-protocol-di-testing/SKILL.md"
+      ],
+      "title": "Swift dependency injection"
+    },
+    {
+      "id": "skill/swiftui-patterns",
+      "path": "skills/swiftui-patterns/SKILL.md",
+      "requires": "Apple SDK and project UI tests for execution",
+      "sources": [
+        "skills/swiftui-patterns/SKILL.md"
+      ],
+      "title": "SwiftUI review"
+    },
+    {
+      "id": "skill/tdd-workflow",
+      "path": "skills/tdd-workflow/SKILL.md",
+      "requires": "repository test runner and authorized project edits",
+      "sources": [
+        "skills/tdd-workflow/SKILL.md"
+      ],
+      "title": "Test-driven implementation"
+    },
+    {
+      "id": "skill/verification-loop",
+      "path": "skills/verification-loop/SKILL.md",
+      "requires": "repository lint/type/build/test commands",
+      "sources": [
+        "skills/verification-loop/SKILL.md"
+      ],
+      "title": "Completion verification"
+    },
+    {
+      "id": "role/architect",
+      "path": "roles/architect.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/architect.md"
+      ],
+      "title": "System design"
+    },
+    {
+      "id": "role/build-error-resolver",
+      "path": "roles/build-error-resolver.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/build-error-resolver.md"
+      ],
+      "title": "Build and debugging"
+    },
+    {
+      "id": "role/chief-of-staff",
+      "path": "roles/chief-of-staff.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/chief-of-staff.md"
+      ],
+      "title": "Communication triage"
+    },
+    {
+      "id": "role/code-reviewer",
+      "path": "roles/code-reviewer.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/code-reviewer.md"
+      ],
+      "title": "General code review"
+    },
+    {
+      "id": "role/database-reviewer",
+      "path": "roles/database-reviewer.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/database-reviewer.md"
+      ],
+      "title": "Database review"
+    },
+    {
+      "id": "role/doc-updater",
+      "path": "roles/doc-updater.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/doc-updater.md"
+      ],
+      "title": "Documentation review"
+    },
+    {
+      "id": "role/e2e-runner",
+      "path": "roles/e2e-runner.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/e2e-runner.md"
+      ],
+      "title": "End-to-end testing"
+    },
+    {
+      "id": "role/go-build-resolver",
+      "path": "roles/go-build-resolver.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/go-build-resolver.md"
+      ],
+      "title": "Go build diagnosis"
+    },
+    {
+      "id": "role/go-reviewer",
+      "path": "roles/go-reviewer.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/go-reviewer.md"
+      ],
+      "title": "Go review"
+    },
+    {
+      "id": "role/planner",
+      "path": "roles/planner.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/planner.md"
+      ],
+      "title": "Planning"
+    },
+    {
+      "id": "role/python-reviewer",
+      "path": "roles/python-reviewer.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/python-reviewer.md"
+      ],
+      "title": "Python review"
+    },
+    {
+      "id": "role/refactor-cleaner",
+      "path": "roles/refactor-cleaner.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/refactor-cleaner.md"
+      ],
+      "title": "Safe refactoring"
+    },
+    {
+      "id": "role/security-reviewer",
+      "path": "roles/security-reviewer.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/security-reviewer.md"
+      ],
+      "title": "Security review"
+    },
+    {
+      "id": "role/tdd-guide",
+      "path": "roles/tdd-guide.md",
+      "requires": "repository read/diff tools; independent native agent only for an independent review",
+      "sources": [
+        "agents/tdd-guide.md"
+      ],
+      "title": "TDD review"
+    },
+    {
+      "id": "workflow/plan",
+      "inputs": "task goal and constraints",
+      "path": "workflows/plan.md",
+      "requires": "requirements of role/planner",
+      "sources": [
+        "commands/plan.md"
+      ],
+      "title": "plan",
+      "uses": "role/planner"
+    },
+    {
+      "id": "workflow/build-fix",
+      "inputs": "failing command and bounded log",
+      "path": "workflows/build-fix.md",
+      "requires": "requirements of role/build-error-resolver",
+      "sources": [
+        "commands/build-fix.md"
+      ],
+      "title": "build-fix",
+      "uses": "role/build-error-resolver"
+    },
+    {
+      "id": "workflow/code-review",
+      "inputs": "staged tree and scope",
+      "path": "workflows/code-review.md",
+      "requires": "requirements of role/code-reviewer",
+      "sources": [
+        "commands/code-review.md"
+      ],
+      "title": "code-review",
+      "uses": "role/code-reviewer"
+    },
+    {
+      "id": "workflow/e2e",
+      "inputs": "journey, isolated test URL and data",
+      "path": "workflows/e2e.md",
+      "requires": "requirements of skill/e2e-testing",
+      "sources": [
+        "commands/e2e.md"
+      ],
+      "title": "e2e",
+      "uses": "skill/e2e-testing"
+    },
+    {
+      "id": "workflow/eval",
+      "inputs": "behavior contract and cases",
+      "path": "workflows/eval.md",
+      "requires": "requirements of skill/eval-harness",
+      "sources": [
+        "commands/eval.md"
+      ],
+      "title": "eval",
+      "uses": "skill/eval-harness"
+    },
+    {
+      "id": "workflow/go-build",
+      "inputs": "failing Go target",
+      "path": "workflows/go-build.md",
+      "requires": "requirements of role/go-build-resolver",
+      "sources": [
+        "commands/go-build.md"
+      ],
+      "title": "go-build",
+      "uses": "role/go-build-resolver"
+    },
+    {
+      "id": "workflow/go-review",
+      "inputs": "staged Go paths and tree",
+      "path": "workflows/go-review.md",
+      "requires": "requirements of role/go-reviewer",
+      "sources": [
+        "commands/go-review.md"
+      ],
+      "title": "go-review",
+      "uses": "role/go-reviewer"
+    },
+    {
+      "id": "workflow/go-test",
+      "inputs": "behavior and affected package",
+      "path": "workflows/go-test.md",
+      "requires": "requirements of skill/golang-testing",
+      "sources": [
+        "commands/go-test.md"
+      ],
+      "title": "go-test",
+      "uses": "skill/golang-testing"
+    },
+    {
+      "id": "workflow/orchestrate",
+      "inputs": "task and proposed roles",
+      "path": "workflows/orchestrate.md",
+      "requires": "requirements of role/planner",
+      "sources": [
+        "commands/orchestrate.md"
+      ],
+      "title": "orchestrate",
+      "uses": "role/planner"
+    },
+    {
+      "id": "workflow/python-review",
+      "inputs": "staged Python paths and tree",
+      "path": "workflows/python-review.md",
+      "requires": "requirements of role/python-reviewer",
+      "sources": [
+        "commands/python-review.md"
+      ],
+      "title": "python-review",
+      "uses": "role/python-reviewer"
+    },
+    {
+      "id": "workflow/refactor-clean",
+      "inputs": "bounded cleanup candidates",
+      "path": "workflows/refactor-clean.md",
+      "requires": "requirements of role/refactor-cleaner",
+      "sources": [
+        "commands/refactor-clean.md"
+      ],
+      "title": "refactor-clean",
+      "uses": "role/refactor-cleaner"
+    },
+    {
+      "id": "workflow/setup-pm",
+      "inputs": "project manifests and lockfiles",
+      "path": "workflows/setup-pm.md",
+      "requires": "requirements of skill/search-first",
+      "sources": [
+        "commands/setup-pm.md"
+      ],
+      "title": "setup-pm",
+      "uses": "skill/search-first"
+    },
+    {
+      "id": "workflow/tdd",
+      "inputs": "observable requirement and test runner",
+      "path": "workflows/tdd.md",
+      "requires": "requirements of skill/tdd-workflow",
+      "sources": [
+        "commands/tdd.md"
+      ],
+      "title": "tdd",
+      "uses": "skill/tdd-workflow"
+    },
+    {
+      "id": "workflow/test-coverage",
+      "inputs": "existing coverage report and affected behavior",
+      "path": "workflows/test-coverage.md",
+      "requires": "requirements of skill/verification-loop",
+      "sources": [
+        "commands/test-coverage.md"
+      ],
+      "title": "test-coverage",
+      "uses": "skill/verification-loop"
+    },
+    {
+      "id": "workflow/update-codemaps",
+      "inputs": "requested module scope",
+      "path": "workflows/update-codemaps.md",
+      "requires": "requirements of role/doc-updater",
+      "sources": [
+        "commands/update-codemaps.md"
+      ],
+      "title": "update-codemaps",
+      "uses": "role/doc-updater"
+    },
+    {
+      "id": "workflow/update-docs",
+      "inputs": "changed behavior and documentation scope",
+      "path": "workflows/update-docs.md",
+      "requires": "requirements of role/doc-updater",
+      "sources": [
+        "commands/update-docs.md"
+      ],
+      "title": "update-docs",
+      "uses": "role/doc-updater"
+    },
+    {
+      "id": "workflow/verify",
+      "inputs": "change scope and project checks",
+      "path": "workflows/verify.md",
+      "requires": "requirements of skill/verification-loop",
+      "sources": [
+        "commands/verify.md"
+      ],
+      "title": "verify",
+      "uses": "skill/verification-loop"
+    },
+    {
+      "id": "workflow/checkpoint",
+      "inputs": "current task scope",
+      "path": "workflows/checkpoint.md",
+      "requires": "requirements of skill/verification-loop",
+      "sources": [
+        "commands/checkpoint.md"
+      ],
+      "title": "checkpoint",
+      "uses": "skill/verification-loop"
+    },
+    {
+      "id": "workflow/learn",
+      "inputs": "supplied observations",
+      "path": "workflows/learn.md",
+      "requires": "requirements of skill/search-first",
+      "sources": [
+        "commands/learn.md"
+      ],
+      "title": "learn",
+      "uses": "skill/search-first"
+    },
+    {
+      "id": "workflow/learn-eval",
+      "inputs": "candidate pattern and observed cases",
+      "path": "workflows/learn-eval.md",
+      "requires": "requirements of skill/eval-harness",
+      "sources": [
+        "commands/learn-eval.md"
+      ],
+      "title": "learn-eval",
+      "uses": "skill/eval-harness"
+    },
+    {
+      "id": "workflow/skill-create",
+      "inputs": "authorized history scope and requested workflow",
+      "path": "workflows/skill-create.md",
+      "requires": "requirements of skill/search-first",
+      "sources": [
+        "commands/skill-create.md"
+      ],
+      "title": "skill-create",
+      "uses": "skill/search-first"
+    },
+    {
+      "id": "rule/common/agents",
+      "path": "rules/common/agents.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/common/agents.md"
+      ],
+      "title": "common agents"
+    },
+    {
+      "id": "rule/common/coding-style",
+      "path": "rules/common/coding-style.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/common/coding-style.md"
+      ],
+      "title": "common coding-style"
+    },
+    {
+      "id": "rule/common/development-workflow",
+      "path": "rules/common/development-workflow.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/common/development-workflow.md"
+      ],
+      "title": "common development-workflow"
+    },
+    {
+      "id": "rule/common/git-workflow",
+      "path": "rules/common/git-workflow.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/common/git-workflow.md"
+      ],
+      "title": "common git-workflow"
+    },
+    {
+      "id": "rule/common/patterns",
+      "path": "rules/common/patterns.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/common/patterns.md"
+      ],
+      "title": "common patterns"
+    },
+    {
+      "id": "rule/common/performance",
+      "path": "rules/common/performance.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/common/performance.md"
+      ],
+      "title": "common performance"
+    },
+    {
+      "id": "rule/common/security",
+      "path": "rules/common/security.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/common/security.md"
+      ],
+      "title": "common security"
+    },
+    {
+      "id": "rule/common/testing",
+      "path": "rules/common/testing.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/common/testing.md"
+      ],
+      "title": "common testing"
+    },
+    {
+      "id": "rule/golang/coding-style",
+      "path": "rules/golang/coding-style.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/golang/coding-style.md"
+      ],
+      "title": "golang coding-style"
+    },
+    {
+      "id": "rule/golang/patterns",
+      "path": "rules/golang/patterns.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/golang/patterns.md"
+      ],
+      "title": "golang patterns"
+    },
+    {
+      "id": "rule/golang/security",
+      "path": "rules/golang/security.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/golang/security.md"
+      ],
+      "title": "golang security"
+    },
+    {
+      "id": "rule/golang/testing",
+      "path": "rules/golang/testing.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/golang/testing.md"
+      ],
+      "title": "golang testing"
+    },
+    {
+      "id": "rule/python/coding-style",
+      "path": "rules/python/coding-style.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/python/coding-style.md"
+      ],
+      "title": "python coding-style"
+    },
+    {
+      "id": "rule/python/patterns",
+      "path": "rules/python/patterns.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/python/patterns.md"
+      ],
+      "title": "python patterns"
+    },
+    {
+      "id": "rule/python/security",
+      "path": "rules/python/security.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/python/security.md"
+      ],
+      "title": "python security"
+    },
+    {
+      "id": "rule/python/testing",
+      "path": "rules/python/testing.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/python/testing.md"
+      ],
+      "title": "python testing"
+    },
+    {
+      "id": "rule/swift/coding-style",
+      "path": "rules/swift/coding-style.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/swift/coding-style.md"
+      ],
+      "title": "swift coding-style"
+    },
+    {
+      "id": "rule/swift/patterns",
+      "path": "rules/swift/patterns.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/swift/patterns.md"
+      ],
+      "title": "swift patterns"
+    },
+    {
+      "id": "rule/swift/security",
+      "path": "rules/swift/security.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/swift/security.md"
+      ],
+      "title": "swift security"
+    },
+    {
+      "id": "rule/swift/testing",
+      "path": "rules/swift/testing.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/swift/testing.md"
+      ],
+      "title": "swift testing"
+    },
+    {
+      "id": "rule/typescript/coding-style",
+      "path": "rules/typescript/coding-style.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/typescript/coding-style.md"
+      ],
+      "title": "typescript coding-style"
+    },
+    {
+      "id": "rule/typescript/patterns",
+      "path": "rules/typescript/patterns.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/typescript/patterns.md"
+      ],
+      "title": "typescript patterns"
+    },
+    {
+      "id": "rule/typescript/security",
+      "path": "rules/typescript/security.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/typescript/security.md"
+      ],
+      "title": "typescript security"
+    },
+    {
+      "id": "rule/typescript/testing",
+      "path": "rules/typescript/testing.md",
+      "requires": "project-defined tools; read-only review remains available",
+      "sources": [
+        "rules/typescript/testing.md"
+      ],
+      "title": "typescript testing"
+    }
+  ],
+  "schema_version": 1
+}
