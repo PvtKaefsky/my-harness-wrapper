@@ -47,13 +47,13 @@ def existing_parent(path: Path) -> Path:
     return safe(path)
 
 
-def trusted_chain(path: Path, boundary: Path) -> None:
+def trusted_chain(path: Path, boundary: Path, profile: Path | None = None) -> None:
     path, boundary = safe(path), safe(boundary)
     if not path.is_relative_to(boundary) or not boundary.is_dir():
         raise ValueError("INSTALL_TRUST_BOUNDARY_INVALID")
     for directory in [path, *path.parents]:
         if directory.exists():
-            owner_check(directory)
+            owner_check(directory, allow_system_owner=(directory == profile))
         if directory == boundary:
             return
     raise ValueError("INSTALL_TRUST_BOUNDARY_INVALID")
@@ -88,7 +88,7 @@ def registration_check(path: Path, profile: Path, home: Path) -> None:
     while directory.is_relative_to(boundary):
         safe(directory)
         if directory.exists():
-            owner_check(directory)
+            owner_check(directory, allow_system_owner=(directory == profile))
         if directory == boundary:
             break
         directory = directory.parent
@@ -195,7 +195,7 @@ class Installation:
         if not isinstance(boundaries, dict) or set(boundaries) != set(roots):
             raise ValueError("INSTALL_TRUST_BOUNDARY_INVALID")
         for name, root in roots.items():
-            trusted_chain(root, Path(boundaries[name]))
+            trusted_chain(root, Path(boundaries[name]), profile=roots["profile"])
         for record in manifest["artifacts"]:
             path = safe(record["path"])
             profile = safe(manifest["profile"])
@@ -303,7 +303,7 @@ class Installation:
             "home": str(profile if home.is_relative_to(profile) and profile.exists()
                         else existing_parent(home.parent))}
         for name, destination in {"state": self.state, "profile": profile, "home": home}.items():
-            trusted_chain(destination, Path(boundaries[name]))
+            trusted_chain(destination, Path(boundaries[name]), profile=profile)
         if self.state.is_relative_to(profile / ".agents") or self.state.is_relative_to(home):
             raise ValueError("STATE_DISCOVERY_OVERLAP")
         if current_bytes(home / "AGENTS.override.md"):

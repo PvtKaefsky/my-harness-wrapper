@@ -721,6 +721,23 @@ class LocalHarnessTests(unittest.TestCase):
         directory.mkdir()
         sys.modules["harness_local.storage"].owner_check(directory)
 
+    @unittest.skipUnless(os.name == "nt", "Windows SYSTEM-owned profile")
+    def test_system_profile_owner_exception_is_limited_to_profile_ancestor(self) -> None:
+        import runpy
+        runpy.run_path(str(CLI))
+        storage = sys.modules["harness_local.storage"]
+        install = sys.modules["harness_local.install"]
+        profile = Path.home()
+        try:
+            storage.owner_check(profile)
+        except ValueError as error:
+            self.assertEqual(str(error), "STATE_OWNER_OR_PERMISSIONS_UNSAFE")
+        else:
+            self.skipTest("Profile already has the current user or active default owner")
+        install.trusted_chain(profile, profile, profile=profile)
+        with self.assertRaisesRegex(ValueError, "STATE_OWNER_OR_PERMISSIONS_UNSAFE"):
+            install.trusted_chain(profile, profile)
+
     @unittest.skipUnless(os.name == "nt", "Windows command expansion")
     def test_expansion_characters_rejected_before_install_writes(self) -> None:
         for name in ["state%HARNESS_EXPANSION%", "state!HARNESS_EXPANSION!"]:

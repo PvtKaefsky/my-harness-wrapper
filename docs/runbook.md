@@ -4,6 +4,7 @@
 
 Review the source, run install without --apply and inspect every destination/conflict.
 Use --profile/--codex-home only for deliberate alternate roots.
+If the default state parent is writable by another principal, choose --state under a new private directory beneath a safe profile ancestor; preserve existing directory permissions.
 The coding agent exercises disposable profiles only. Do not copy auth into fixtures.
 
     py -3.12 -X utf8 -I scripts/codex-local.py install

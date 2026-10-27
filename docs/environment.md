@@ -17,6 +17,7 @@ Harness module loaders compile source directly and never execute timestamp cache
 
 Windows checks require the current user or the active token's Administrators default owner and reject write grants to other principals.
 An Administrators owner is accepted only when it equals the current token's default owner; other users remain invalid owners.
+The explicitly selected Windows profile directory may be SYSTEM-owned; its ACL is still checked, and this exception does not apply to state, installed files or other ancestors.
 Directory deletion authority is treated as a write grant.
 Installation records existing trusted roots for state, profile and Codex home and checks the complete descendant chains on later operations.
 The profile is an explicit operator boundary; custom state/home roots anchor at their nearest existing parent on first installation.
