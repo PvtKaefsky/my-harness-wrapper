@@ -1,11 +1,13 @@
 #!/bin/bash
 set -uo pipefail
 exec > /home/user/bootstrap.log 2>&1
-export BOOTSTRAP_VERSION=0.1.14
+export BOOTSTRAP_VERSION=0.1.15
 echo "BOOTSTRAP_VERSION=$BOOTSTRAP_VERSION"
 
 HARNESS_DIR=/opt/my-harness-wrapper
+HARNESS_REF=feat/claude-harness
 echo "HARNESS_DIR -> $HARNESS_DIR"
+echo "HARNESS_REF -> $HARNESS_REF"
 if [ -z "${HARNESS_REPO_URL+set}" ]; then URL_STATE=unset
 elif [ -z "$HARNESS_REPO_URL" ]; then URL_STATE="set but empty"
 else URL_STATE=set; fi
@@ -21,8 +23,8 @@ if [ "$GIT_PATH" = none ]; then
   exit 0
 fi
 
-git clone --depth 1 "$HARNESS_REPO_URL" "$HARNESS_DIR"; rc=$?
-echo "git clone --depth 1 \$HARNESS_REPO_URL $HARNESS_DIR -> exit=$rc"
+git clone --depth 1 --branch "$HARNESS_REF" "$HARNESS_REPO_URL" "$HARNESS_DIR"; rc=$?
+echo "git clone --depth 1 --branch $HARNESS_REF \$HARNESS_REPO_URL $HARNESS_DIR -> exit=$rc"
 if [ "$rc" -ne 0 ]; then
   echo "bootstrap -> skipped, clone exit=$rc"
   exit 0

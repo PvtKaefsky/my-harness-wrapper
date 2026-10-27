@@ -806,16 +806,18 @@ It fetches the repository rather than reading an attached checkout. The clone
 URL comes from `HARNESS_REPO_URL` where that variable is set and non-empty, and
 from the script's own default, this repository's URL, where it is unset or
 empty. A value the environment supplies is never overwritten. The destination
-is the literal `/opt/my-harness-wrapper`.
+is the literal `/opt/my-harness-wrapper`. The cloned branch is the literal
+`feat/claude-harness`.
 
 | Line | What it reports |
 | --- | --- |
 | `BOOTSTRAP_VERSION=` | The version the pasted text carries. |
 | `HARNESS_DIR ->` | The clone destination. |
+| `HARNESS_REF ->` | The cloned branch. |
 | `HARNESS_REPO_URL -> <state>; clone URL from <environment\|default>` | The variable's state, and which of the two supplied the URL. Never the value itself. |
 | `command -v git ->` | Whether git is on `PATH`. |
 | `test -e <dir> -> yes/no` | Whether anything already occupies the destination. |
-| `git clone --depth 1 ... -> exit=N` | The clone's exit status. |
+| `git clone --depth 1 --branch ... -> exit=N` | The clone's exit status. |
 | `git -C <dir> log -1 ...` | The cloned commit and its date. |
 | `test -f <dir>/scripts/bootstrap.sh -> yes/no` | Whether the clone carries the delivery step. |
 | `bootstrap_exit=N` | `scripts/bootstrap.sh`'s exit status. |
