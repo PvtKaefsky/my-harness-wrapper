@@ -12,10 +12,10 @@ into a session's Claude config directory.
 1. The cloud environment runs the init script stored in its dialog. That text
    is a copy of `env/setup.sh`; the dialog holds the text, not a reference to
    this repository.
-2. The init script writes `/home/user/bootstrap.log` and clones this repository
-   `--depth 1` into `/opt/my-harness-wrapper`. The clone URL comes from
-   `HARNESS_REPO_URL`, or from the script's own default where that variable is
-   unset or empty.
+2. The init script writes `/home/user/bootstrap.log` and clones branch
+   `feat/claude-harness` of this repository `--depth 1` into
+   `/opt/my-harness-wrapper`. The clone URL comes from `HARNESS_REPO_URL`, or
+   from the script's own default where that variable is unset or empty.
 3. The init script runs `scripts/bootstrap.sh` from that clone. A failed clone
    skips that step and is named in the log.
 4. `scripts/bootstrap.sh` creates `/root/.claude`, symlinks `/home/user/.claude`
@@ -32,6 +32,9 @@ Every later session restores that snapshot and skips it, keeping the
 `/opt/my-harness-wrapper` clone that build made. A change under `config/`,
 `scripts/` or `env/` therefore reaches a session only after a rebuild. The only
 rebuild an operator controls is a change to the pasted init script text.
+
+The default branch `main` holds the Codex adapter, and this harness is branch
+`feat/claude-harness`.
 
 ## Structure
 
@@ -68,10 +71,10 @@ the same way. `docs/scripts.md` carries where the two loops diverge.
 Set the four identity variables and `HARNESS_ASSIGNEE` in the environment
 variables panel. A change under `config/`, `scripts/` or `env/` bumps the
 `export BOOTSTRAP_VERSION=` line of `env/setup.sh` in its last commit. After
-the merge to `main`, the file's contents are pasted into the environment dialog
-unchanged. A version number is never reused for different contents. Nothing
-needs attaching. The full order, and the facts that fix it, are in
-`docs/runbook.md`.
+the merge to `feat/claude-harness`, the file's contents are pasted into the
+environment dialog unchanged. A version number is never reused for different
+contents. Nothing needs attaching. The full order, and the facts that fix it,
+are in `docs/runbook.md`.
 
 ### Verify a session
 

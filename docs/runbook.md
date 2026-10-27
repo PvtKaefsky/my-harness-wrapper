@@ -7,27 +7,26 @@ A change sessions should receive is any change under `config/`, `scripts/` or
 
 1. Bump the `export BOOTSTRAP_VERSION=` line of `env/setup.sh` in the round's
    last commit.
-2. Merge the round to `main`.
-3. Paste the full contents of `env/setup.sh`, read from `main`, unchanged, into
-   the setup-script field of the cloud environment at claude.ai → Settings →
-   Environments.
+2. Merge the round to `feat/claude-harness`.
+3. Paste the full contents of `env/setup.sh`, read from `feat/claude-harness`,
+   unchanged, into the setup-script field of the cloud environment at
+   claude.ai → Settings → Environments.
 4. Start a session after the build and read `/home/user/bootstrap.log`.
 
 A version number is never reused for different contents.
 
-Merging a pull request closes the issues its description names with `Closes`.
-An issue still open after the merge means the base was not the default branch,
-or the line was lost from the description.
+Pull requests here target a non-default base, so `Closes` lines close nothing.
+Descriptions carry `Refs:` lines. Issues stay open until the user closes them.
 
 A mismatch between the manifest and the clone, the `FAIL
 manifest.bootstrap_version` line of `scripts/verify.sh`, means a paste is due.
 The comparison does not separate an older pasted copy from a newer one. A copy
-pasted from an unmerged branch is the newer case: after the merge `main` holds
-the same text, which does not rebuild, so the next bumped change, or a build
-another trigger starts, is what delivers it. A match does not mean no paste is
-due. A restored session's manifest and clone both come from its snapshot's
-build, so they match while `main` carries a later bumped change no paste has
-delivered.
+pasted from an unmerged branch is the newer case: after the merge
+`feat/claude-harness` holds the same text, which does not rebuild, so the next
+bumped change, or a build another trigger starts, is what delivers it. A match
+does not mean no paste is due. A restored session's manifest and clone both
+come from its snapshot's build, so they match while `feat/claude-harness`
+carries a later bumped change no paste has delivered.
 
 The environment variables panel carries the four identity variables
 `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
@@ -40,7 +39,7 @@ The facts that fix that order:
   paste.
 * Pasting identical text does not rebuild. Only the text the dialog holds is
   compared, so a bump to any other file changes nothing.
-* A rebuild clones the default branch as it stands at build time, so a paste
+* A rebuild clones `feat/claude-harness` as it stands at build time, so a paste
   made before the merge spends that version on the old tree.
 * A merged change outside `env/setup.sh` is in the clone of the next build
   without a paste. No operator action other than a paste triggers that build.
@@ -60,7 +59,8 @@ the user asked for.
 
 The init script assigns its own default clone URL where `HARNESS_REPO_URL` is
 unset or empty. To clone a different repository, edit that default URL in the
-pasted copy of `env/setup.sh`.
+pasted copy of `env/setup.sh`. The cloned branch is the `HARNESS_REF` line of
+that copy.
 
 ## The version line
 
