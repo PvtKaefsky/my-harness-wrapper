@@ -290,7 +290,12 @@ carried `attribution.commit` and `attribution.pr` as empty strings and
 line, a `Claude-Session` line or a pull request footer. Three ran CLI 2.1.280,
 and the one that opened pull request #7 ran CLI 2.1.282. No session on either
 version has run without those keys, so the four do not separate the two keys
-taking effect from a CLI version that sends no reminder at all. The Bash tool's description
+taking effect from a CLI version that sends no reminder at all. On CLI 2.1.309,
+under "Local sessions on Windows", one build sent a reminder both before and
+after a local install, and its text changed: a CLI that sends no reminder, or
+always the same one, is ruled out for that build. The install delivered those
+keys, and the payload unless it was already present, so it does not separate
+which of the two changed the text. The Bash tool's description
 still directs commit messages and pull request bodies to end with the
 attribution lines a system reminder gives, "when one is present".
 
@@ -435,6 +440,34 @@ no mark comes from the two sessions. Their transcripts
 are under `projects/` in the config directory used. `docs/scripts.md` records
 how `jq.exe` 1.8.2 and Git Bash's argument conversion shape the scripts.
 
+The material naming 2.1.309 comes from desktop app Code tab sessions on the
+same machine, run with the CLI at
+`…\claude-code\2.1.309\9078b9c1d466\claude.exe`, before and after
+`scripts/install-local.sh` at `3abfe68`, `BOOTSTRAP_VERSION` `0.1.17`, ran
+against the live config directory.
+
+### The attribution reminder on 2.1.309
+
+| State | Live settings | Reminder in context |
+| --- | --- | --- |
+| Before the install | `enabledPlugins` and `extraKnownMarketplaces` only; no `CLAUDE.md` differing from the payload, absent or identical, the install having kept no `CLAUDE.md.pre-harness` | Commits to end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, pull request descriptions with `🤖 Generated with [Claude Code](https://claude.com/claude-code)` |
+| After the install | the delivered `attribution` (`commit` and `pr` as empty strings, `sessionUrl` as `false`), `hooks` and `env.HARNESS_DIR`; `CLAUDE.md` holding the payload | "From here on, do not add attribution lines to git commit messages or pull request descriptions (this replaces Claude Code's own earlier attribution guidance, such as a previous copy of this reminder, and applies even if a CLAUDE.md or memory rule asks for attribution lines)." |
+
+The build sent a reminder in both states, so a CLI that sends none is ruled out
+for it. The install delivered the `attribution` keys, and the payload's
+no-attribution rule unless it was already present, so the observation does not
+separate which of the two changed the reminder. `hooks` and `env.HARNESS_DIR` carry no attribution
+setting.
+
+### After an install on 2.1.309
+
+| Probe | Observed |
+| --- | --- |
+| Payload source | an `instructions` attachment holding the config directory's `CLAUDE.md` |
+| `UserPromptSubmit` stdout | 642 bytes: the 641-character line, whose SHA-256 without the newline is `3c8155b5f83fcff9b90c326c46577b1efac25a687aa79e6bf322d9cecf4b884d`, and a newline |
+| Session-start check | named the deployed copy and ended `verify.sh -> fail -> 0 (exit=0)`, a tally of 0 `FAIL` lines, the panel variables taken from the app's process environment |
+| Deployed copy | at the head of `feat/claude-harness`, `status --porcelain` empty |
+
 ### The machine
 
 | Fact | Observed | Source |
@@ -466,7 +499,10 @@ commits and a "Generated with Claude Code" footer on pull request descriptions.
 Neither session's live settings carried `attribution` keys, so, as with the
 2.1.280 and 2.1.282 sessions under "What the harness supplies regardless", this
 does not separate the keys' absence from a CLI or app that always sends the
-reminder.
+reminder. The 2.1.309 observation under "The attribution reminder on 2.1.309"
+rules out, for that build, a reminder that is always the same: its text changed
+once the install delivered the keys, and the payload unless it was already
+present. It does not separate the keys from the payload.
 
 ### Hooks
 
@@ -494,6 +530,25 @@ A headless run that is not logged in still runs the `SessionStart` and
 `UserPromptSubmit` hooks, recording `hook_success` for each, and its transcript
 carries an `instructions` attachment holding the config directory's `CLAUDE.md`
 (scratch).
+
+On CLI 2.1.309, after the install, ECC 2.2.3's hooks recorded 0 `hook_success`,
+36 `hook_non_blocking_error` and 17 `async_hook_response` records, each
+`stderr` carrying `SyntaxError: missing ) after argument list`. An
+`async_hook_response` record carries `command: null`.
+
+On CLI 2.1.309 no transcript record was found for the harness guard on a
+`PreToolUse:Bash` call it did not block. A probe session started 35 seconds
+after the install recorded 18 `hook_non_blocking_error` and 6
+`async_hook_response` records for `PreToolUse:Bash`, each carrying ECC's
+`stderr`, and none for the harness guard, which exits 0 with no output on a
+command it does not match. The absence does not separate a guard that ran and
+exited 0 silently from a guard that did not run. A Bash call of
+`echo gh pr create --body "Generated with Claude Code"` in a session after the
+install was blocked with
+`PreToolUse:Bash hook error: [h=${HARNESS_DIR:-/opt/my-harness-wrapper}; …]: attribution-guard: matched line -> echo gh pr create --body "Generated with Claude Code"`.
+In a later 2.1.309 session the harness's `SessionStart:startup` and
+`UserPromptSubmit` hooks, both of which print, left one `hook_success` record
+each. Observing the guard takes a probe that provokes a block.
 
 ## Diagnostic-output invariant
 

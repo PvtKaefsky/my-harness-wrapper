@@ -73,18 +73,33 @@ are untested.
 | --- | --- |
 | Git Bash on Windows, bash elsewhere | The installer and every hook command run in it. Claude Code on Windows runs hook commands in Git Bash. |
 | Node | ECC's hook commands are `node -e` commands. |
-| `git` | `command -v git` resolves, and the clone URL is reachable. Without either the installer counts a failure and stops before writing `CLAUDE.md`. |
-| `jq` | `command -v jq` resolves in the shell the installer runs in. Without it the installer counts a failure, cannot merge the settings or write the manifest, and the attribution guard exits 0 without scanning. On Windows, `winget install jqlang.jq`, then restart the terminal and the app. |
+| `git` | `command -v git` resolves and `git --version` exits 0 in the shell the installer runs in; otherwise the installer refuses before any write. The clone URL is reachable; otherwise the installer counts a failure and stops before writing `CLAUDE.md`. |
+| `jq` | `command -v jq` resolves and `jq -n 1` prints `1` in the shell the installer runs in; otherwise the installer refuses before any write. Without it in the hook environment the attribution guard exits 0 without scanning. On Windows, `winget install jqlang.jq`, then restart the terminal and the app. |
+
+A refusal writes only the config directory, where it was absent, and the
+install log. It counts one failure per tool that failed.
 
 ### Install
 
-From any checkout of this repository, on any branch:
+From any checkout of this repository, on any branch, in Git Bash:
 
 ```
 bash scripts/install-local.sh
 ```
 
-It first clones branch `feat/claude-harness` `--depth 1` into the deployed
+In PowerShell, `bash scripts/install-local.sh` has run a bash that rejects
+carriage returns. It printed `set: pipefail\r: invalid option name` and
+`line 16: syntax error near unexpected token $'in\r'`, and stopped before line
+24, the script's first write, with nothing written. Which bash PowerShell
+resolved was not observed. Run it from Git Bash, or,
+where Git is in its default location, from PowerShell as:
+
+```
+& "C:\Program Files\Git\bin\bash.exe" scripts/install-local.sh
+```
+
+It first checks `jq` and `git` as the prerequisites table states, then clones
+branch `feat/claude-harness` `--depth 1` into the deployed
 copy, `my-harness-wrapper` in `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, from
 `HARNESS_REPO_URL` where it is set and non-empty and from the default URL in
 `env/setup.sh` otherwise, and marks the clone with the local config key
@@ -111,6 +126,15 @@ each run.
 Every line prints a predicate and its observed value. The exit status is the
 failure count, clamped to 255, and the last line is `fails -> N`. A session
 started after the run carries the harness.
+
+| Line | What it means | What to do |
+| --- | --- | --- |
+| `command -v jq -> none` | `jq` does not resolve on `PATH`. | Install `jq`, restart the terminal, re-run. |
+| `jq -n 1 -> exit=N value=[V]` | The `jq` that resolved ran; it passes where `V` is `1`. | Where `V` is not `1`, replace or remove the `jq` that `command -v jq` names. |
+| `command -v git -> none` | `git` does not resolve on `PATH`. | Install Git for Windows, or put `git` on `PATH`. |
+| `git --version -> exit=N value=[V]` | The `git` that resolved ran; it passes where `N` is 0. | Where `N` is not 0, replace the `git` that `command -v git` names. |
+| `prerequisites failing -> <tools>` | The tools that failed the two checks above, or `none`. | Act on each tool's line. |
+| `delivery -> stopped, not written: ...` | The run stopped before the deployed copy, `CLAUDE.md`, `settings.json`, the global git config, the plugins and the manifest. | Fix each failing tool, then re-run. |
 
 The plugin step finds the CLI on `PATH`, then at `CLAUDE_CODE_EXECPATH`, then
 as the highest-sorting `claude.exe` under
