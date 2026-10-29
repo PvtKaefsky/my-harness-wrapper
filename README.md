@@ -83,7 +83,7 @@ The default branch `main` holds the Codex adapter, and this harness is branch
 | `scripts/session-check.sh` | Reports what a session starts with. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
 | `scripts/attribution-guard.sh` | Blocks a pull request, issue, comment, review or review reply body carrying a Claude Code attribution line, and tells the session to resend a description the create call returns with one. Run by the `PreToolUse` and `PostToolUse` hooks `config/settings.json` registers. |
-| `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, one line per case. Run by hand only. |
+| `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, directly and through the `PreToolUse` hook the tree's `config/settings.json` registers, one line per case. Run by hand only. |
 | `README.md` | This file. |
 | `docs/` | Documentation. |
 
