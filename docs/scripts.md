@@ -146,8 +146,9 @@ the `/home/user/.claude` symlink.
 
 It never sets `-e`. Every step prints its predicate and observed value. Its
 output goes to the terminal and to `.my-harness-wrapper.install.log` in the
-config directory, which each run rewrites at mode 600, the log carrying prior
-hook commands. Every command that changes state, or
+config directory, which each run creates under `umask 077`, runs `chmod 600`
+on, then rewrites, the log carrying prior hook commands. `docs/runbook.md`
+carries the mode observed per platform. Every command that changes state, or
 produces a value the manifest carries, counts into `fails`. A failed write of
 the log counts too. The exit status is `fails`, clamped to 255.
 

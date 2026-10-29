@@ -122,8 +122,14 @@ replaces `CLAUDE.md` there whole, and replaces each `hooks.<event>` array that
 differing from the payload, copies it to `settings.json.pre-harness` or
 `CLAUDE.md.pre-harness` beside it; later runs leave that copy alone. The log
 also prints each replaced hook array's prior value. Its log is
-`.my-harness-wrapper.install.log` in that directory, mode 600, rewritten on
-each run.
+`.my-harness-wrapper.install.log` in that directory, rewritten on each run. The
+installer creates it under `umask 077` and runs `chmod 600` on it.
+
+| Platform | Mode of the log |
+| --- | --- |
+| Windows 11, NTFS, Git Bash | `-rw-r--r--` from `ls -l`, 644 from `stat -c %a`, after the installer's `chmod 600`. Git Bash derives these values from the file's ACL; they do not establish which accounts can read it. `Get-Acl` lists only inherited allow entries: full control for the owner, `SYSTEM` and `Administrators`, and read and execute for the machine's local `CodexSandboxUsers` group. |
+| Linux, macOS | not observed |
+
 Every line prints a predicate and its observed value. The exit status is the
 failure count, clamped to 255, and the last line is `fails -> N`. A session
 started after the run carries the harness.
