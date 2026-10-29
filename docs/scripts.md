@@ -153,13 +153,32 @@ before step 3 can rewrite it in a deployed copy the script runs from.
 | Step | What it does |
 | --- | --- |
 | 1 | Resolves the invoking checkout from the script's own location, with `CDPATH` cleared, and the config directory as `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, converted with `cygpath -u` where `cygpath` exists. A path that is not absolute stops the run with exit 1 and no log. |
-| 2 | Creates the config directory and prints `command -v jq`. An absent `jq` counts once here, and again in each step that runs it. |
+| 2 | Creates the config directory, then checks `jq` and `git`. A failing tool ends the run before step 3. |
 | 3 | Clones or refreshes the deployed copy, `my-harness-wrapper` in the config directory. A failure ends the run. |
 | 4 | Copies `config/CLAUDE.md` from the deployed copy to `CLAUDE.md` there, first printing `test -f` or `cmp -s` for the file it replaces, and keeping a differing one as `CLAUDE.md.pre-harness` where no such copy exists. |
 | 5 | Merges the deployed copy's `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the deployed copy. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
 | 6 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status. |
 | 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv`, then prints how many rows carried a `plugin_id`. |
 | 8 | Writes `.my-harness-wrapper.manifest.json` there. |
+
+### Step 2, the prerequisites
+
+| Tool | Present where |
+| --- | --- |
+| `jq` | `command -v jq` resolves it, and `jq -n 1` prints `1`, a trailing carriage return removed |
+| `git` | `command -v git` resolves it, and `git --version` exits 0 |
+
+Each check prints its predicate and value lines, then
+`prerequisites failing ->` names the tools that failed, or `none`. Each failing
+tool counts one failure. Where any fails, the step prints
+`delivery -> stopped, not written:` with the deployed copy, `CLAUDE.md`,
+`settings.json`, the global git config, the plugins and the manifest, and the
+run ends. By then the run has written only the config directory, where it was
+absent, and the install log.
+
+`jq.exe` 1.8.2 prints `1` followed by CRLF, so the carriage return is removed
+before the comparison. The `jq` check reads stdout only; its exit status is
+printed and not compared.
 
 ### Step 3, the deployed copy
 
@@ -193,7 +212,7 @@ value is compared, not the `url.<base>.insteadOf` rewrite `remote get-url`
 prints, so a rewrite in the user's git config does not fail the check. A clone
 URL given as a relative path is stored absolute and fails it.
 
-Where `git` is absent, a command fails, or the copy is not ready, the step
+Where a command fails, or the copy is not ready, the step
 counts one failure, prints `delivery -> stopped`, and the run ends before steps
 4 to 8. `CLAUDE.md`, `settings.json` and the manifest stay as they were. The
 deployed copy does not: a refresh that failed after its `fetch` may have moved

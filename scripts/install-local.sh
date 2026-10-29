@@ -151,13 +151,33 @@ main() {
   echo "test -d $CONFIG_DIR -> $([ -d "$CONFIG_DIR" ] && echo yes || echo no)"
   echo "log -> $LOG"
 
-  local JQ
+  local JQ GIT out failing=""
   JQ=$(command -v jq || echo none)
   echo "command -v jq -> $JQ"
-  [ "$JQ" != none ] || fails=$((fails + 1))
-
-  local GIT
+  if [ "$JQ" = none ]; then
+    failing="$failing jq"; fails=$((fails + 1))
+  else
+    out=$(jq -n 1 2>/dev/null); rc=$?
+    out=${out%$'\r'}
+    echo "jq -n 1 -> exit=$rc value=[$(first_line "$out")]"
+    [ "$out" = 1 ] || { failing="$failing jq"; fails=$((fails + 1)); }
+  fi
   GIT=$(command -v git || echo none)
+  echo "command -v git -> $GIT"
+  if [ "$GIT" = none ]; then
+    failing="$failing git"; fails=$((fails + 1))
+  else
+    out=$(git --version 2>&1); rc=$?
+    echo "git --version -> exit=$rc value=[$(first_line "$out")]"
+    [ "$rc" -eq 0 ] || { failing="$failing git"; fails=$((fails + 1)); }
+  fi
+  echo "prerequisites failing ->${failing:- none}"
+  if [ -n "$failing" ]; then
+    echo "delivery -> stopped, not written: $DEPLOY, $CONFIG_DIR/CLAUDE.md, $CONFIG_DIR/settings.json, the global git config, the plugins, $CONFIG_DIR/.my-harness-wrapper.manifest.json"
+    [ "$fails" -le 255 ] || fails=255
+    return "$fails"
+  fi
+
   if ! deploy; then
     echo "delivery -> stopped before $CONFIG_DIR/CLAUDE.md and $CONFIG_DIR/settings.json, the deployed copy step failed for $DEPLOY"
     [ "$fails" -le 255 ] || fails=255
