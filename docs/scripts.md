@@ -316,13 +316,21 @@ altered. The range is C0 plus DEL only, because `tr -c '[:print:]'` would mangle
 multi-byte UTF-8. Both `tr` calls run under `LC_ALL=C`, so those byte ranges
 mean what they say.
 
-Eight values pass through it. Three are git-derived: the contrast `user.email`,
-each `git var` ident, and each `*.gpgsign` read. Two come from `env/setup.sh`:
-the matched `export` lines, and an export value outside `[0-9A-Za-z._-]`. Two
-are the settings probes, one per side. One is the live `env.HARNESS_DIR`. A
-value inside that set needs no pass, holding no control byte by construction.
-Every other printed value goes out without passing through it, some git output
-among them. That is a known gap, not a finding that the others are safe.
+These values pass through it:
+
+| Source | Values |
+| --- | --- |
+| git | the contrast `user.email`, each `git var` ident and the pair it is compared against, each `*.gpgsign` read, the `status --porcelain` entries, git's first stderr line from that status, the top-level path, and the branch |
+| `env/setup.sh` | the matched `export` lines, and an export value outside `[0-9A-Za-z._-]` |
+| the settings files | the delivered key list, both settings probes, the carrying state, and the live `env.HARNESS_DIR` |
+| the hook commands | each guard check's stderr |
+| the CLI | the plugin id list |
+| the environment | `HARNESS_ASSIGNEE` |
+
+A version value inside `[0-9A-Za-z._-]` needs no pass, holding no control byte
+by construction. Every other printed value goes out without passing through it,
+some git output among them. That is a known gap, not a finding that the others
+are safe.
 
 ### Resolving the config directory
 
@@ -514,6 +522,49 @@ the plugin id list have every CR removed before they are split into lines.
 `settings_probe`, which supplies the displayed value, still emits one line per
 document, so for such a file the displayed value is each document's probe in
 turn. The state named beside it says how many documents were found.
+
+### The deployed copy's state
+
+Three probes run on the repository under test, after the `rev-parse --git-dir`
+probe and gated on it. Each runs `git` with `GIT_DIR`, `GIT_WORK_TREE`,
+`GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_COMMON_DIR` and
+`GIT_ALTERNATE_OBJECT_DIRECTORIES` removed from its environment.
+
+| Probe | Passes where | Fails on |
+| --- | --- | --- |
+| Top level | `rev-parse --show-toplevel` resolves, through `cygpath -u` where it exists and `readlink -f`, to the repository under test | a parent repository's top level; a non-zero exit |
+| `FAIL deployed copy branch` | `symbolic-ref -q HEAD` prints `refs/heads/feat/claude-harness` | another ref, a tag among them; a detached `HEAD`, exit 1; any other non-zero exit; a failed top-level probe |
+| `FAIL deployed copy changes` | `status --porcelain` exits 0 with no output and nothing on stderr, and `ls-files -v` lists no entry tagged `S` or lowercase | any status entry, modified, staged or untracked; any stderr output; a non-zero exit; a status that ran past 10 seconds; a marked index entry; a failed top-level probe |
+
+The branch probe runs before the status probe. The status command carries
+`--untracked-files=all`, `--ignore-submodules=none`, `-c core.fsmonitor=false`,
+`-c core.quotePath=true` and `--no-optional-locks`, so no git config setting
+hides an untracked file or a submodule, no configured monitor answers for the
+work tree, non-ASCII path bytes are C-quoted, and the index is not rewritten.
+It runs under `timeout 10` where `timeout` exists. A failing line prints the
+entry count and the first five entries, each cut to 120 bytes, joined by
+` | `, through `sanitize`. The branch, the top-level path and git's first stderr
+line are each cut to 120 bytes too.
+
+A sparse checkout marks entries skip-worktree, so it fails the changes check.
+A repository under test named by a Windows 8.3 short path fails the top-level
+probe, `readlink -f` not expanding short names; the line prints the long path.
+
+A cloud clone made by `env/setup.sh` and a deployed copy the installer cloned
+or refreshed pass all three.
+
+The checks cannot separate these states from a clean copy:
+
+| State | Why |
+| --- | --- |
+| A clean copy at another commit on the same branch | `status` compares against the copy's own `HEAD`; `FAIL manifest.commit` catches it |
+| A change confined to a file the copy's ignore rules match, including `.git/info/exclude` and the global excludes file | `status` omits ignored files |
+| A mode-only change where `core.fileMode` is `false`, its default on Windows | `status` does not compare modes |
+| A clean filter, `.git/info/attributes` entry or other setting in the copy's `.git` that rewrites what `status` compares | nothing reads the copy's `.git` configuration |
+| A change to `scripts/verify.sh` or `scripts/session-check.sh` in the copy that removes these checks | the `SessionStart` hook runs both from the copy they check |
+
+The checks report drift in the copy. They do not establish its integrity
+against a change made to defeat them.
 
 ### Git identity
 

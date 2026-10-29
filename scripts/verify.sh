@@ -2,9 +2,11 @@
 set -uo pipefail
 
 REPO=${HARNESS_DIR:-/opt/my-harness-wrapper}
+HARNESS_REF=feat/claude-harness
 HARNESS_MAIL="noreply@anthropic.com"
 run() { echo "\$ $*"; "$@" 2>&1; echo "exit=$?"; }
 sanitize() { printf '%s' "$1" | LC_ALL=C tr '\n' ' ' | LC_ALL=C tr '\000-\037\177' '?'; }
+cap() { printf '%s' "${1%%$'\n'*}" | LC_ALL=C cut -b 1-120; }
 settings_probe() {
   jq -S -c --arg k "$2" 'if type != "object" then {state: ("top level is " + type)}
     elif (has($k) | not) then {state: "key absent"}
@@ -413,6 +415,93 @@ fi
 
 git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1; REPO_RC=$?
 echo "git -C $REPO rev-parse --git-dir -> exit=$REPO_RC"
+RGIT=(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_OBJECT_DIRECTORY -u GIT_COMMON_DIR -u GIT_ALTERNATE_OBJECT_DIRECTORIES git)
+STATUS_TIMEOUT=10
+if command -v timeout >/dev/null 2>&1; then TO=(timeout "$STATUS_TIMEOUT"); else TO=(); fi
+COPY_TOP=no
+if [ "$REPO_RC" -ne 0 ]; then
+  COPY_SHOW="repo unreadable (git rev-parse exit=$REPO_RC)"
+else
+  TOP_RAW=$("${RGIT[@]}" -C "$REPO" rev-parse --show-toplevel 2>/dev/null); TOP_RC=$?
+  TOP_CMP=$TOP_RAW; REPO_TOP_CMP=$REPO
+  if [ "$CYGPATH" != none ]; then
+    TOP_CONV=$(cygpath -u "$TOP_RAW" 2>/dev/null) && [ -n "$TOP_CONV" ] && TOP_CMP=$TOP_CONV
+    REPO_TOP_CONV=$(cygpath -u "$REPO" 2>/dev/null) && [ -n "$REPO_TOP_CONV" ] && REPO_TOP_CMP=$REPO_TOP_CONV
+  fi
+  TOP_REAL=$([ -n "$TOP_RAW" ] && readlink -f "$TOP_CMP" 2>/dev/null)
+  REPO_TOP_REAL=$(readlink -f "$REPO_TOP_CMP" 2>/dev/null)
+  if [ "$TOP_RC" -ne 0 ] || [ -z "$TOP_REAL" ]; then
+    COPY_SHOW="unreadable (git exit=$TOP_RC)"
+  elif [ "$TOP_REAL" != "${REPO_TOP_REAL:-unresolved-repo}" ]; then
+    COPY_SHOW="no, the top level is [$(sanitize "$(cap "$TOP_RAW")")]"
+  else
+    COPY_SHOW=yes; COPY_TOP=yes
+  fi
+fi
+echo "git -C $REPO rev-parse --show-toplevel names $REPO -> $COPY_SHOW"
+BRANCH_OUT=""; BRANCH_RC=""
+if [ "$COPY_TOP" != yes ]; then
+  BRANCH_SHOW="not read, top level check $COPY_SHOW"
+else
+  BRANCH_OUT=$("${RGIT[@]}" -C "$REPO" symbolic-ref -q HEAD 2>/dev/null); BRANCH_RC=$?
+  if [ "$BRANCH_RC" -eq 1 ]; then
+    BRANCH_SHOW="detached HEAD (git exit=1)"
+  elif [ "$BRANCH_RC" -ne 0 ]; then
+    BRANCH_SHOW="unreadable (git exit=$BRANCH_RC)"
+  else
+    BRANCH_SHOW="[$(sanitize "$(cap "$BRANCH_OUT")")]"
+  fi
+fi
+echo "git -C $REPO symbolic-ref -q HEAD -> $BRANCH_SHOW"
+if [ "$COPY_TOP" != yes ] || [ "$BRANCH_RC" != 0 ] || [ "$BRANCH_OUT" != "refs/heads/$HARNESS_REF" ]; then
+  echo "FAIL deployed copy branch: expected [refs/heads/$HARNESS_REF] from git -C $REPO symbolic-ref -q HEAD, actual $BRANCH_SHOW"
+  fail=1
+fi
+STATUS_OK=no
+FLAG_SHOW="not read"
+if [ "$COPY_TOP" != yes ]; then
+  STATUS_SHOW="not read, top level check $COPY_SHOW"
+else
+  STATUS_ERRF=$(mktemp 2>/dev/null)
+  if [ -z "${STATUS_ERRF:-}" ]; then
+    STATUS_SHOW="not read, mktemp produced no file"
+  else
+    STATUS_OUT=$(${TO[@]+"${TO[@]}"} "${RGIT[@]}" -C "$REPO" -c core.fsmonitor=false -c core.quotePath=true --no-optional-locks status --porcelain --untracked-files=all --ignore-submodules=none 2>"$STATUS_ERRF"); STATUS_RC=$?
+    STATUS_ERR=$(cat "$STATUS_ERRF" 2>/dev/null)
+    rm -f "$STATUS_ERRF"
+    if [ "$STATUS_RC" -eq 124 ] && [ "${#TO[@]}" -gt 0 ]; then
+      STATUS_SHOW="timed out after ${STATUS_TIMEOUT}s (exit=124)"
+    elif [ "$STATUS_RC" -ne 0 ]; then
+      STATUS_SHOW="unreadable (git exit=$STATUS_RC) [$(sanitize "$(cap "$STATUS_ERR")")]"
+    elif [ -n "$STATUS_ERR" ]; then
+      STATUS_SHOW="unreadable, git wrote to stderr [$(sanitize "$(cap "$STATUS_ERR")")] (git exit=0)"
+    elif [ -z "$STATUS_OUT" ]; then
+      STATUS_SHOW="no entries (git exit=0)"; STATUS_OK=yes
+    else
+      STATUS_COUNT=$(printf '%s\n' "$STATUS_OUT" | grep -a -c '')
+      STATUS_FIRST=$(printf '%s\n' "$STATUS_OUT" | head -n 5 | LC_ALL=C cut -b 1-120 | {
+        IFS= read -r l; s=$l
+        while IFS= read -r l; do s="$s | $l"; done
+        printf '%s' "$s"
+      })
+      STATUS_SHOW="$STATUS_COUNT entries, the first up to 5 at up to 120 bytes each [$(sanitize "$STATUS_FIRST")] (git exit=0)"
+    fi
+  fi
+  FLAG_OUT=$("${RGIT[@]}" -C "$REPO" ls-files -v 2>/dev/null); FLAG_RC=$?
+  if [ "$FLAG_RC" -ne 0 ]; then
+    FLAG_SHOW="unreadable (git exit=$FLAG_RC)"; STATUS_OK=no
+  else
+    FLAG_COUNT=$(printf '%s\n' "$FLAG_OUT" | LC_ALL=C grep -a -c -E '^([a-z]|S) ')
+    FLAG_SHOW=$FLAG_COUNT
+    [ "$FLAG_COUNT" = 0 ] || STATUS_OK=no
+  fi
+fi
+echo "git -C $REPO status --porcelain --untracked-files=all --ignore-submodules=none -> $STATUS_SHOW"
+echo "git -C $REPO ls-files -v, entries marked skip-worktree or assume-unchanged -> $FLAG_SHOW"
+if [ "$STATUS_OK" != yes ]; then
+  echo "FAIL deployed copy changes: expected no entries from git -C $REPO status --porcelain --untracked-files=all --ignore-submodules=none and no entry marked skip-worktree or assume-unchanged, actual status $STATUS_SHOW, marked $FLAG_SHOW"
+  fail=1
+fi
 CFG_MAIL=$(git -C "$REPO" config --get user.email 2>/dev/null); CFG_RC=$?
 if [ "$REPO_RC" -ne 0 ]; then
   CFG_SHOW="repo unreadable (git rev-parse exit=$REPO_RC); any value here would come from global scope"
