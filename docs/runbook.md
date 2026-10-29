@@ -73,20 +73,36 @@ are untested.
 | --- | --- |
 | Git Bash on Windows, bash elsewhere | The installer and every hook command run in it. Claude Code on Windows runs hook commands in Git Bash. |
 | Node | ECC's hook commands are `node -e` commands. |
+| `git` | `command -v git` resolves, and the clone URL is reachable. Without either the installer counts a failure and stops before writing `CLAUDE.md`. |
 | `jq` | `command -v jq` resolves in the shell the installer runs in. Without it the installer counts a failure, cannot merge the settings or write the manifest, and the attribution guard exits 0 without scanning. On Windows, `winget install jqlang.jq`, then restart the terminal and the app. |
 
 ### Install
 
-From the checkout, on `feat/claude-harness`:
+From any checkout of this repository, on any branch:
 
 ```
 bash scripts/install-local.sh
 ```
 
-It writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the global git config and the
-plugin install directories, and nothing else. It replaces `CLAUDE.md` there
-whole, and replaces each `hooks.<event>` array that `config/settings.json`
-names. The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
+It first clones branch `feat/claude-harness` `--depth 1` into the deployed
+copy, `my-harness-wrapper` in `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, from
+`HARNESS_REPO_URL` where it is set and non-empty and from the default URL in
+`env/setup.sh` otherwise, and marks the clone with the local config key
+`harness.installer=install-local`. Where a marked deployed copy
+exists, it brings it to the branch's remote head instead and removes every
+change and untracked file in it. It refuses a deployed copy path that is a
+symlink, a linked worktree, or a repository it did not mark; move such a path
+aside to install. A failed clone or refresh, or a deployed copy not at that head
+and clean afterwards, prints `delivery -> stopped` and ends the run before
+`CLAUDE.md` or `settings.json` is written. A refresh that failed after its
+fetch can leave the deployed copy moved. Every later step reads the deployed
+copy, not the invoking checkout. Use a credential helper rather than a token in
+`HARNESS_REPO_URL`: the URL is stored in the deployed copy's `.git/config`.
+
+It writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, the
+global git config and the plugin install directories, and nothing else. It
+replaces `CLAUDE.md` there whole, and replaces each `hooks.<event>` array that
+`config/settings.json` names. The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
 differing from the payload, copies it to `settings.json.pre-harness` or
 `CLAUDE.md.pre-harness` beside it; later runs leave that copy alone. The log
 also prints each replaced hook array's prior value. Its log is
@@ -105,21 +121,18 @@ commands to run instead, and each counts as a failure.
 ### Update
 
 ```
-git pull
 bash scripts/install-local.sh
 ```
 
-The hook commands run the scripts in the checkout, so a pull changes them at
-once. The payload and the settings change only when the installer runs again;
-until then `scripts/verify.sh` reports `FAIL manifest.commit`, and
-`FAIL payload` or `FAIL settings.<key>` where those files changed. The checkout
-stays on `feat/claude-harness`, since a branch switch changes the scripts every
-local session runs.
+Run from any checkout, on any branch. The hook commands run the scripts in the
+deployed copy, so a merge to `feat/claude-harness` reaches local sessions only
+when the installer runs again. A branch switch, a pull or an edit in a checkout
+changes no session.
 
 ### Verify
 
 ```
-HARNESS_DIR="$PWD" bash scripts/verify.sh
+d="${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper"; HARNESS_DIR="$d" bash "$d/scripts/verify.sh"
 ```
 
 A local session's hook processes carry `HARNESS_DIR` from `settings.json`, so
@@ -160,7 +173,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `cygpath -u <dir> -> exit=N value=...` | Printed only where `cygpath` exists, as in Git Bash. The resolved config directory converted to the `/c/...` form; a Windows hook process receives `CLAUDE_CONFIG_DIR` as `C:/...`. A non-zero exit or empty value keeps the unconverted path. | Nothing, unless `FAIL live config dir path` follows it. |
 | `claude CLI -> none from none` | No CLI was found on `PATH`, at `CLAUDE_CODE_EXECPATH`, or under `$LOCALAPPDATA/Claude-Data`. The plugin list then reads exit 127. | Act on the `FAIL live config dir agreement: ... could not tell` line it produces. |
 | `jq -r .env.HARNESS_DIR <settings> -> ... value=absent` | The live `settings.json` carries no `env.HARNESS_DIR`, so the two guard checks run the hook commands with `HARNESS_DIR` unset, as a cloud session does. | Expected in the cloud. Locally, re-run `scripts/install-local.sh`. |
-| `FAIL hook harness dir` | The live `env.HARNESS_DIR` and the repository under test resolve to different directories, so the hooks run another tree's scripts. | Run `scripts/verify.sh` with `HARNESS_DIR` naming the checkout the installer ran from, or re-run `scripts/install-local.sh` from the checkout in use. |
+| `FAIL hook harness dir` | The live `env.HARNESS_DIR` and the repository under test resolve to different directories, so the hooks run another tree's scripts. | Run `scripts/verify.sh` with `HARNESS_DIR` naming the deployed copy, `${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper`, or re-run `scripts/install-local.sh`. A value naming a working checkout is an install older than the deployed copy. |
 | `FAIL manifest: ... actual absent` | No bootstrap has run in the resolved config directory. | Read `/home/user/bootstrap.log`. The setup script was never pasted, the snapshot predates it, or the CLI reads a directory bootstrap never wrote. Locally, run `scripts/install-local.sh`. |
 | `FAIL manifest.commit`, both sides a commit | Bootstrap ran against an older commit than the repository now holds. | Expected while the snapshot is frozen. Where the delta touches `config/`, `scripts/` or `env/`, a paste is due. |
 | `FAIL manifest.commit: ... actual unresolved-manifest` | The manifest carries no readable `commit` field. | Re-run bootstrap. The manifest was hand-edited or its write failed. |
@@ -213,7 +226,7 @@ beside the first prompt. It exits 0 in every case.
 In a cloud session it names whether this session built the snapshot or restored
 one, and each repository under `/home/user` with its branch and short HEAD. In
 a local session, one whose manifest carries `local_checkout`, it names that
-checkout, the installer's log and the log's mtime instead. In both it names
+deployed copy, the installer's log and the log's mtime instead. In both it names
 `verify.sh`'s
 result: every `FAIL` and `NOTE` line, or the `fail -> N` tally where there are
 none, or, where it printed neither, its output lines prefixed `verify.sh |` up

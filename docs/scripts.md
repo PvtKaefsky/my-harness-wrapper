@@ -135,9 +135,10 @@ cannot read is already counted by the `rev-parse` above it.
 
 ## scripts/install-local.sh
 
-Delivers `config/` into a local Claude config directory. Run by the user from a
-checkout, in Git Bash on Windows and bash elsewhere. It carries bootstrap's
-steps with the same semantics, minus the `/home/user/.claude` symlink.
+Delivers `config/` into a local Claude config directory from a deployed copy of
+`feat/claude-harness`. Run by the user from any checkout, in Git Bash on Windows
+and bash elsewhere. It carries bootstrap's steps with the same semantics, minus
+the `/home/user/.claude` symlink.
 
 It never sets `-e`. Every step prints its predicate and observed value. Its
 output goes to the terminal and to `.my-harness-wrapper.install.log` in the
@@ -146,17 +147,71 @@ hook commands. Every command that changes state, or
 produces a value the manifest carries, counts into `fails`. A failed write of
 the log counts too. The exit status is `fails`, clamped to 255.
 
+The run's last block is one brace group, so bash has parsed the whole file
+before step 3 can rewrite it in a deployed copy the script runs from.
+
 | Step | What it does |
 | --- | --- |
-| 1 | Resolves the checkout from the script's own location, with `CDPATH` cleared, and the config directory as `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, converted with `cygpath -u` where `cygpath` exists. A path that is not absolute stops the run with exit 1 and no log. |
+| 1 | Resolves the invoking checkout from the script's own location, with `CDPATH` cleared, and the config directory as `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, converted with `cygpath -u` where `cygpath` exists. A path that is not absolute stops the run with exit 1 and no log. |
 | 2 | Creates the config directory and prints `command -v jq`. An absent `jq` counts once here, and again in each step that runs it. |
-| 3 | Copies `config/CLAUDE.md` to `CLAUDE.md` there, first printing `test -f` or `cmp -s` for the file it replaces, and keeping a differing one as `CLAUDE.md.pre-harness` where no such copy exists. |
-| 4 | Merges `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the checkout. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
-| 5 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status. |
-| 6 | Installs each plugin named in `config/plugins.tsv`, then prints how many rows carried a `plugin_id`. |
-| 7 | Writes `.my-harness-wrapper.manifest.json` there. |
+| 3 | Clones or refreshes the deployed copy, `my-harness-wrapper` in the config directory. A failure ends the run. |
+| 4 | Copies `config/CLAUDE.md` from the deployed copy to `CLAUDE.md` there, first printing `test -f` or `cmp -s` for the file it replaces, and keeping a differing one as `CLAUDE.md.pre-harness` where no such copy exists. |
+| 5 | Merges the deployed copy's `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the deployed copy. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
+| 6 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status. |
+| 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv`, then prints how many rows carried a `plugin_id`. |
+| 8 | Writes `.my-harness-wrapper.manifest.json` there. |
 
-### Step 4, the settings file
+### Step 3, the deployed copy
+
+The branch is `feat/claude-harness`. The clone URL is `HARNESS_REPO_URL` where
+it is set and non-empty, and the default URL `env/setup.sh` carries otherwise.
+The `HARNESS_REPO_URL ->` line names which, as the init script's does. A URL
+beginning with `-` is refused. The step unsets `GIT_DIR`, `GIT_WORK_TREE`,
+`GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_COMMON_DIR` and
+`GIT_ALTERNATE_OBJECT_DIRECTORIES` first, so `git -C` acts on the deployed copy,
+and prints which of them were set.
+
+| State of the deployed copy | What runs |
+| --- | --- |
+| Absent | `git clone -q -c harness.installer=install-local --depth 1 --branch feat/claude-harness`, which writes the marker into the clone's local config in the same step |
+| A directory, not a symlink, holding a `.git` directory, at the top level of its work tree, with `harness.installer` set to `install-local` in its local config | `remote set-url origin`, `fetch -q --depth 1` of the branch into `refs/remotes/origin/feat/claude-harness`, `checkout -f -B feat/claude-harness` at that ref, and `clean -ffdx` |
+| Anything else: a symlink, a linked worktree, a plain directory, a directory inside another work tree, or a clone the installer did not make | Nothing; counted as a failure |
+
+The installer owns the copy it marked: a refresh discards every change and
+untracked file in it. The refresh prints `HEAD` before it runs.
+
+After either path the step prints the copy's `HEAD`, its remote ref, its branch,
+whether its local `remote.origin.url` equals the clone URL, its
+`status --porcelain` entry count, the
+count of index entries marked skip-worktree or assume-unchanged, whether
+`config/CLAUDE.md`, `config/settings.json`, `config/plugins.tsv` and
+`env/setup.sh` are tracked, and `log -1`. A failed read prints the first line of
+git's error. The copy is ready where `HEAD` equals the remote ref, the branch is
+`feat/claude-harness`, `remote.origin.url` equals the clone URL, the status has
+no entries, no index entry is marked, and the four files are tracked. The stored
+value is compared, not the `url.<base>.insteadOf` rewrite `remote get-url`
+prints, so a rewrite in the user's git config does not fail the check. A clone
+URL given as a relative path is stored absolute and fails it.
+
+Where `git` is absent, a command fails, or the copy is not ready, the step
+counts one failure, prints `delivery -> stopped`, and the run ends before steps
+4 to 8. `CLAUDE.md`, `settings.json` and the manifest stay as they were. The
+deployed copy does not: a refresh that failed after its `fetch` may have moved
+it, and the hooks of the previous install run its scripts from then on.
+
+During a refresh, `checkout -f` and `clean` rewrite the deployed copy in place.
+A hook firing in a running session in that window can find a script absent, and
+its command then exits 0 without running it.
+
+The clone URL is stored in the copy's `.git/config`, and git's own messages,
+which reach the log, can carry it. A URL carrying a token keeps it there; a
+credential helper keeps it out.
+
+Steps 4 to 8 read only the deployed copy, apart from step 8's `user.email`,
+which is read in the invoking checkout as before. The invoking checkout is
+printed on the `SRC ->` line.
+
+### Step 5, the settings file
 
 The merge is `jq -s '.[0] * .[1] * {env: {HARNESS_DIR: $h}}'`, the live file
 first. A key the live file holds and the delivered file does not is kept; a key
@@ -187,9 +242,10 @@ accepts.
 `env.HARNESS_DIR` is the only key the installer writes that
 `config/settings.json` does not carry. The CLI sets each `env` key in the
 environment of every hook and tool process, so the hook commands resolve the
-scripts in the checkout. The line after the merge prints the value read back.
+scripts in the deployed copy. The line after the merge prints the value read
+back.
 
-### Step 6, the plugins
+### Step 7, the plugins
 
 The CLI is taken from the first of three sources that yields one: `command -v
 claude`, `CLAUDE_CODE_EXECPATH` where it names a file, and the highest-sorting
@@ -199,11 +255,11 @@ processes it starts. The desktop app keeps its bundled CLI under
 `$LOCALAPPDATA` and puts none on `PATH`. Where no source yields one, each
 plugin's line names the two commands to run instead and counts one failure.
 
-### Step 7, the manifest
+### Step 8, the manifest
 
-The fields are bootstrap's, plus `local_checkout`, the checkout's path.
+The fields are bootstrap's, plus `local_checkout`, the deployed copy's path.
 `bootstrap_version` is read from the `export BOOTSTRAP_VERSION=` line of
-`env/setup.sh` in the checkout, with the shapes `scripts/verify.sh` rejects
+`env/setup.sh` in the deployed copy, with the shapes `scripts/verify.sh` rejects
 counted as a failure and written empty. `config_dir` is the converted path from
 step 1. `scripts/session-check.sh` takes the local branch on a non-empty
 `local_checkout`.
@@ -214,12 +270,12 @@ The `PreToolUse`, `PostToolUse` and `SessionStart` commands in
 `config/settings.json` set `h=${HARNESS_DIR:-/opt/my-harness-wrapper}` and run
 the script under `$h`. A cloud session's hook processes carry no `HARNESS_DIR`,
 so `h` is the cloud clone. A local install's `settings.json` carries
-`env.HARNESS_DIR`, so `h` is the checkout. The committed file is one text for
-both targets.
+`env.HARNESS_DIR`, so `h` is the deployed copy. The committed file is one text
+for both targets.
 
 The commands use only POSIX parameter expansion, `[ -f ]` and double quotes,
-which the Linux hook shell and Git Bash both run. A checkout path carrying a
-space or non-ASCII characters is passed whole, `$h` being quoted. Each command
+which the Linux hook shell and Git Bash both run. A deployed copy path carrying
+a space or non-ASCII characters is passed whole, `$h` being quoted. Each command
 prints nothing and exits 0 where the script is absent from `$h`, except the
 `SessionStart` command, which prints `test -f $h/scripts/session-check.sh -> no`.
 
@@ -316,7 +372,7 @@ either way is a value manufactured by a failure.
 Plugin state is read from `claude plugin list --json`, not from the command's
 human-readable output, which a wording, format or localisation change moves.
 
-The CLI is found the way `scripts/install-local.sh`'s step 6 finds it, and the
+The CLI is found the way `scripts/install-local.sh`'s step 7 finds it, and the
 `claude CLI ->` line names it and its source. Where none is found, the list is
 not run and its exit reads 127, which gives `CLI_PLUGINS=unknown`.
 
