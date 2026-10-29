@@ -81,10 +81,21 @@ install log. It counts one failure per tool that failed.
 
 ### Install
 
-From any checkout of this repository, on any branch:
+From any checkout of this repository, on any branch, in Git Bash:
 
 ```
 bash scripts/install-local.sh
+```
+
+In PowerShell, `bash scripts/install-local.sh` has run a bash that rejects
+carriage returns. It printed `set: pipefail\r: invalid option name` and
+`line 16: syntax error near unexpected token $'in\r'`, and stopped before line
+24, the script's first write, with nothing written. Which bash PowerShell
+resolved was not observed. Run it from Git Bash, or,
+where Git is in its default location, from PowerShell as:
+
+```
+& "C:\Program Files\Git\bin\bash.exe" scripts/install-local.sh
 ```
 
 It first checks `jq` and `git` as the prerequisites table states, then clones
