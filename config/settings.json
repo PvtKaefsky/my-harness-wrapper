@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f /opt/my-harness-wrapper/scripts/attribution-guard.sh ]; then bash /opt/my-harness-wrapper/scripts/attribution-guard.sh; fi",
+            "command": "h=${HARNESS_DIR:-/opt/my-harness-wrapper}; if [ -f \"$h/scripts/attribution-guard.sh\" ]; then bash \"$h/scripts/attribution-guard.sh\"; fi",
             "timeout": 10
           }
         ]
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f /opt/my-harness-wrapper/scripts/attribution-guard.sh ]; then bash /opt/my-harness-wrapper/scripts/attribution-guard.sh; fi",
+            "command": "h=${HARNESS_DIR:-/opt/my-harness-wrapper}; if [ -f \"$h/scripts/attribution-guard.sh\" ]; then bash \"$h/scripts/attribution-guard.sh\"; fi",
             "timeout": 10
           }
         ]
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f /opt/my-harness-wrapper/scripts/session-check.sh ]; then bash /opt/my-harness-wrapper/scripts/session-check.sh; else echo 'test -f /opt/my-harness-wrapper/scripts/session-check.sh -> no'; fi",
+            "command": "h=${HARNESS_DIR:-/opt/my-harness-wrapper}; if [ -f \"$h/scripts/session-check.sh\" ]; then bash \"$h/scripts/session-check.sh\"; else echo \"test -f $h/scripts/session-check.sh -> no\"; fi",
             "timeout": 30
           }
         ]

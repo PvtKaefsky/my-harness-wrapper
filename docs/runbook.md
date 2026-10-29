@@ -62,6 +62,69 @@ unset or empty. To clone a different repository, edit that default URL in the
 pasted copy of `env/setup.sh`. The cloned branch is the `HARNESS_REF` line of
 that copy.
 
+## Installing locally
+
+The local install is verified on Windows 11 in Git Bash only. macOS and Linux
+are untested.
+
+### Prerequisites
+
+| Tool | Requirement |
+| --- | --- |
+| Git Bash on Windows, bash elsewhere | The installer and every hook command run in it. Claude Code on Windows runs hook commands in Git Bash. |
+| Node | ECC's hook commands are `node -e` commands. |
+| `jq` | `command -v jq` resolves in the shell the installer runs in. Without it the installer counts a failure, cannot merge the settings or write the manifest, and the attribution guard exits 0 without scanning. On Windows, `winget install jqlang.jq`, then restart the terminal and the app. |
+
+### Install
+
+From the checkout, on `feat/claude-harness`:
+
+```
+bash scripts/install-local.sh
+```
+
+It writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the global git config and the
+plugin install directories, and nothing else. It replaces `CLAUDE.md` there
+whole, and replaces each `hooks.<event>` array that `config/settings.json`
+names. The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
+differing from the payload, copies it to `settings.json.pre-harness` or
+`CLAUDE.md.pre-harness` beside it; later runs leave that copy alone. The log
+also prints each replaced hook array's prior value. Its log is
+`.my-harness-wrapper.install.log` in that directory, mode 600, rewritten on
+each run.
+Every line prints a predicate and its observed value. The exit status is the
+failure count, clamped to 255, and the last line is `fails -> N`. A session
+started after the run carries the harness.
+
+The plugin step finds the CLI on `PATH`, then at `CLAUDE_CODE_EXECPATH`, then
+as the highest-sorting `claude.exe` under
+`$LOCALAPPDATA/Claude-Data/claude_*/claude-code/*/*/`. The `claude CLI ->` line
+names the one used. Where none is found, each plugin's line names the two
+commands to run instead, and each counts as a failure.
+
+### Update
+
+```
+git pull
+bash scripts/install-local.sh
+```
+
+The hook commands run the scripts in the checkout, so a pull changes them at
+once. The payload and the settings change only when the installer runs again;
+until then `scripts/verify.sh` reports `FAIL manifest.commit`, and
+`FAIL payload` or `FAIL settings.<key>` where those files changed. The checkout
+stays on `feat/claude-harness`, since a branch switch changes the scripts every
+local session runs.
+
+### Verify
+
+```
+HARNESS_DIR="$PWD" bash scripts/verify.sh
+```
+
+A local session's hook processes carry `HARNESS_DIR` from `settings.json`, so
+the session-start check needs no setting.
+
 ## The version line
 
 `scripts/verify.sh` reads the expected version from the same
@@ -82,7 +145,8 @@ bash /opt/my-harness-wrapper/scripts/verify.sh
 ```
 
 It prints `id`, `$HOME`, `CLAUDE_CONFIG_DIR`, the resolved config directory, the
-CLI version, the installed plugins and the manifest, then runs the checks below.
+CLI it found and its version, the installed plugins and the manifest, then runs
+the checks below.
 The exit status is 1 where any check failed and 0 otherwise; a check that exits
 early also exits 1. It is not a count. A `NOTE` line can appear alongside exit 0
 and does not set the exit status.
@@ -93,7 +157,11 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | Line | What it means | What to do |
 | --- | --- | --- |
 | `FAIL live config dir path` | The resolved config directory is not an absolute path. `CLAUDE_CONFIG_DIR` holds an empty or relative value, or it is unset and `HOME` is relative. The `CLAUDE_CONFIG_DIR ->` line above separates `unset`, `set but empty` and a value. | Unset it, or set an absolute path. |
-| `FAIL manifest: ... actual absent` | No bootstrap has run in the resolved config directory. | Read `/home/user/bootstrap.log`. The setup script was never pasted, the snapshot predates it, or the CLI reads a directory bootstrap never wrote. |
+| `cygpath -u <dir> -> exit=N value=...` | Printed only where `cygpath` exists, as in Git Bash. The resolved config directory converted to the `/c/...` form; a Windows hook process receives `CLAUDE_CONFIG_DIR` as `C:/...`. A non-zero exit or empty value keeps the unconverted path. | Nothing, unless `FAIL live config dir path` follows it. |
+| `claude CLI -> none from none` | No CLI was found on `PATH`, at `CLAUDE_CODE_EXECPATH`, or under `$LOCALAPPDATA/Claude-Data`. The plugin list then reads exit 127. | Act on the `FAIL live config dir agreement: ... could not tell` line it produces. |
+| `jq -r .env.HARNESS_DIR <settings> -> ... value=absent` | The live `settings.json` carries no `env.HARNESS_DIR`, so the two guard checks run the hook commands with `HARNESS_DIR` unset, as a cloud session does. | Expected in the cloud. Locally, re-run `scripts/install-local.sh`. |
+| `FAIL hook harness dir` | The live `env.HARNESS_DIR` and the repository under test resolve to different directories, so the hooks run another tree's scripts. | Run `scripts/verify.sh` with `HARNESS_DIR` naming the checkout the installer ran from, or re-run `scripts/install-local.sh` from the checkout in use. |
+| `FAIL manifest: ... actual absent` | No bootstrap has run in the resolved config directory. | Read `/home/user/bootstrap.log`. The setup script was never pasted, the snapshot predates it, or the CLI reads a directory bootstrap never wrote. Locally, run `scripts/install-local.sh`. |
 | `FAIL manifest.commit`, both sides a commit | Bootstrap ran against an older commit than the repository now holds. | Expected while the snapshot is frozen. Where the delta touches `config/`, `scripts/` or `env/`, a paste is due. |
 | `FAIL manifest.commit: ... actual unresolved-manifest` | The manifest carries no readable `commit` field. | Re-run bootstrap. The manifest was hand-edited or its write failed. |
 | `FAIL manifest.commit: expected unresolved-repo` | `git -C <repo> rev-parse --short HEAD` produced nothing, so the repository being checked is absent or is not a git repository. | Read the path in the line. The deployed copy is missing, or `HARNESS_DIR` names something else. The two sides carry different defaults, so two unknowns never compare equal and pass. |
@@ -115,7 +183,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL settings....: actual no expectation could be read` | That key could not be read from `config/settings.json`. | Fix the tree. This is a repository fault, not a session fault. |
 | `FAIL settings....: ..., <state>` | The state ends the line and names the cause: `does not carry`, `absent from the live file`, `absent from the delivered file`, `live top level is ...`, `delivered top level is ...`, `live file holds N JSON documents`, `delivered file holds N JSON documents`, or `not determined` where `jq` could not run. | Read the state. A document count other than one, or a non-object top level, is a corrupt file rather than a delivery that did not happen. |
 | `FAIL settings....: expected ... present in ...` | `config/settings.json` does not carry that key, or its top level is not an object. The `actual` value names which. | Fix the tree. This is a repository fault, not a session fault. |
-| `FAIL PreToolUse attribution guard` | The first live `PreToolUse` command naming `attribution-guard.sh` did not exit 2 on a `gh pr create` body carrying the Claude Code footer. The state ends the line: `exit=N` for a command that ran, `exit=2 without <marker>` for one that exited 2 without the guard's own stderr marker, `no PreToolUse command in <path> references attribution-guard.sh (jq exit=N)`, or `sample input not built (jq exit=N)`. | Read the state. `no PreToolUse command` reads the same for a live `settings.json` that registers no command naming the guard and for one `jq` could not read; the `(jq exit=N)` suffix separates them, `0` for the first and non-zero for the second. On either, the snapshot predates the hook: re-paste `env/setup.sh` and rebuild. `exit=0` means the hook is registered and the guard is not at the path it names. `exit=2 without <marker>` means the registered command is broken shell, `bash -c` exiting 2 on a syntax error. |
+| `FAIL PreToolUse attribution guard` | The first live `PreToolUse` command naming `attribution-guard.sh` did not exit 2 on a `gh pr create` body carrying the Claude Code footer. The state ends the line: `exit=N` for a command that ran, `exit=2 without <marker>` for one that exited 2 without the guard's own stderr marker, `no PreToolUse command in <path> references attribution-guard.sh (jq exit=N)`, or `sample input not built (jq exit=N)`. | Read the state. `no PreToolUse command` reads the same for a live `settings.json` that registers no command naming the guard and for one `jq` could not read; the `(jq exit=N)` suffix separates them, `0` for the first and non-zero for the second. On either, the snapshot predates the hook: re-paste `env/setup.sh` and rebuild. `exit=0` means the hook is registered and the guard is not at the path it names: in a local install, read the `jq -r .env.HARNESS_DIR` line above, since an absent value sends the command to `/opt/my-harness-wrapper`. `exit=2 without <marker>` means the registered command is broken shell, `bash -c` exiting 2 on a syntax error. |
 | `FAIL PostToolUse attribution guard` | The first live `PostToolUse` command naming `attribution-guard.sh` did not exit 2 on a `mcp__github__create_pull_request` response whose `body` carries the Claude Code footer. The state ends the line in the same four forms as `FAIL PreToolUse attribution guard`, the marker being `attribution-guard: matched line in the response body ->`. The guard prints that marker only on a footer match, so exit 2 from its size cap or from a response with no `body` fails the check. | Read the state as for `FAIL PreToolUse attribution guard`. `exit=0` also means the guard at the path the command names predates its `PostToolUse` path: re-paste `env/setup.sh` and rebuild. |
 | `FAIL config/plugins.tsv` | No file at that path under the repository being checked. | Read the `test -f` line above it. The deployed copy is absent, incomplete, or `HARNESS_DIR` names another tree. |
 | `FAIL plugin: ... among the installed ids` | A plugin named in `config/plugins.tsv` is not among the ids `claude plugin list --json` reports. | Read the `claude plugin install ... -> exit=` line in `/home/user/bootstrap.log`, then re-run the install by hand for the current error. |
@@ -142,14 +210,18 @@ bash /opt/my-harness-wrapper/scripts/session-check.sh
 The `SessionStart` hook runs it at every session start, and its output arrives
 beside the first prompt. It exits 0 in every case.
 
-It names whether this session built the snapshot or restored one, each
-repository under `/home/user` with its branch and short HEAD, and `verify.sh`'s
+In a cloud session it names whether this session built the snapshot or restored
+one, and each repository under `/home/user` with its branch and short HEAD. In
+a local session, one whose manifest carries `local_checkout`, it names that
+checkout, the installer's log and the log's mtime instead. In both it names
+`verify.sh`'s
 result: every `FAIL` and `NOTE` line, or the `fail -> N` tally where there are
 none, or, where it printed neither, its output lines prefixed `verify.sh |` up
 to `SESSION_CHECK_OUT_LINE_CAP` of them. A `FAIL` line is decoded by the table
 above.
 
-`/home/user/session-check.log` holds every run's output, appended.
+`/home/user/session-check.log` holds every run's output, appended. Locally the
+file is `session-check.log` in the config directory.
 
 `config/CLAUDE.md` requires a session whose check reports a `FAIL` to name it in
 its first reply.
@@ -157,7 +229,9 @@ its first reply.
 ## Before every commit
 
 Hand-run `scripts/bootstrap.sh`, `scripts/verify.sh` and
-`scripts/session-check.sh` before committing a change to them. Run
+`scripts/session-check.sh` before committing a change to them. Hand-run
+`scripts/install-local.sh` against a copy of the config directory, with
+`CLAUDE_CONFIG_DIR` naming the copy, never against the live one. Run
 `scripts/test-attribution-guard.sh` before committing a change to
 `scripts/attribution-guard.sh` or to the test script itself; it exits 0 only
 where every case passes. `bash -n` is not

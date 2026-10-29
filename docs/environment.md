@@ -413,14 +413,87 @@ home. Nothing in this repository can write the account copy, so
 `config/CLAUDE.md` carries no copy of them.
 
 The preferences reach every cloud session checked, single- and multi-repository
-alike. Whether they reach a local CLI session is unchecked, so a session outside
-claude.ai may run without them.
+alike. No `<user_preferences>` block reached either of the two local desktop
+Code sessions under "Local sessions on Windows" below. That does not separate
+preferences never reaching a local desktop session from the signed-in account
+holding none. A CLI session started outside the desktop app is unchecked.
 
 A payload in context implies something wrote `/root/.claude/CLAUDE.md`. It does
 not distinguish the init script's bootstrap run from any other writer of that
 file, a hand-run of `scripts/bootstrap.sh` among them. Its absence does not
 imply bootstrap did not run, the file being read at session start rather than
 on demand.
+
+## Local sessions on Windows
+
+Observed on one Windows 11 machine. Two sessions of the desktop app's Code tab,
+run locally with CLI 2.1.308 at `f4ddba1` before any local install, supply the
+rows marked "session". The rows marked "scratch" come from headless
+`claude -p` runs of the same CLI against a copy of the config directory, before
+and after `scripts/install-local.sh` ran against that copy. Material carrying
+no mark comes from the two sessions. Their transcripts
+are under `projects/` in the config directory used. `docs/scripts.md` records
+how `jq.exe` 1.8.2 and Git Bash's argument conversion shape the scripts.
+
+### The machine
+
+| Fact | Observed | Source |
+| --- | --- | --- |
+| Home path | `/c/Users/<name>` in Git Bash, the name carrying a space and non-ASCII characters | session |
+| `claude` on `PATH` | absent | session |
+| The CLI | `%LOCALAPPDATA%\Claude-Data\claude_<id>\claude-code\<version>\<hash>\claude.exe`; `CLAUDE_CODE_EXECPATH` names it in the session's tool and hook processes | session, scratch |
+| `python3` | the Microsoft Store stub | session |
+| Node | v24.14.0, on `PATH` | session |
+| `jq` | absent | session |
+| The four `GIT_*` variables and `HARNESS_ASSIGNEE` | set in the session's tool and hook processes | session, scratch |
+| `core.autocrlf` | `true`, from Git for Windows' system config, so a checkout's working files carry CRLF | session |
+| CRLF scripts | Git Bash runs them, and its `grep` strips the CR from each line it reads | session |
+| `.credentials.json` in the config directory | absent; a headless run against a copy of that directory reports `Not logged in` | scratch |
+
+### The config directory before an install
+
+| Probe | Observed |
+| --- | --- |
+| `test -f "${CLAUDE_CONFIG_DIR-$HOME/.claude}/CLAUDE.md"` | no |
+| `settings.json` keys | `enabledPlugins` and `extraKnownMarketplaces` only; no `attribution`, no `hooks` |
+| `.my-harness-wrapper.manifest.json` | absent |
+| `ecc@ecc` | 2.2.3, installed and enabled at user scope |
+| `<user_preferences>` block in context | none |
+| Session-start check output in context | none |
+
+A system reminder in those sessions asked for a `Co-Authored-By` trailer on
+commits and a "Generated with Claude Code" footer on pull request descriptions.
+Neither session's live settings carried `attribution` keys, so, as with the
+2.1.280 and 2.1.282 sessions under "What the harness supplies regardless", this
+does not separate the keys' absence from a CLI or app that always sends the
+reminder.
+
+### Hooks
+
+In these runs of CLI 2.1.308, each hook run was recorded as a transcript
+attachment whose `type` was `hook_success` or `hook_non_blocking_error`, carrying `hookName`, `command`,
+`stdout`, `stderr` and `exitCode`.
+
+In both sessions every hook record was `hook_non_blocking_error`, across
+`SessionStart:startup`, `UserPromptSubmit`, `PreToolUse:<tool>`,
+`PostToolUse:<tool>` and `Stop`. Every one came from ECC 2.2.3, all 27 of whose
+hook commands are `node -e` commands, and every `stderr` reads
+`[eval]:1 ... SyntaxError: missing ) after argument list`. The command text in
+the plugin's `hooks/hooks.json` carries `.replace(/\\\\/g,'/')`, four
+backslashes; the source line the `stderr` quotes carries `.replace(/\/g,'/')`,
+one. In those sessions no ECC 2.2.3 hook ran to completion.
+
+A hook command runs in Git Bash 5.2.37, with `$0` reading `/usr/bin/bash`
+(scratch). Four backslashes inside double quotes in a hook command reach the
+program bash runs as one; bash run directly in Git Bash gives two. A key under
+`env` in `settings.json` is set in the hook process's environment (scratch).
+`CLAUDE_CONFIG_DIR`, set to a `/c/...` path when the CLI is started from Git
+Bash, reaches a hook in the `C:/...` form (scratch).
+
+A headless run that is not logged in still runs the `SessionStart` and
+`UserPromptSubmit` hooks, recording `hook_success` for each, and its transcript
+carries an `instructions` attachment holding the config directory's `CLAUDE.md`
+(scratch).
 
 ## Diagnostic-output invariant
 
@@ -431,6 +504,8 @@ that records observations records the sandbox.
 
 ## Unresolved
 
+* Which layer between the Windows CLI and Git Bash removes one pair of
+  backslashes from a hook command.
 * Which component rewrites `/root/.gitconfig`, and what triggers it.
 * What triggers a rebuild. A session's check reported
   `log mtime >= boot time -> yes, this session built the snapshot`. That line

@@ -2,8 +2,16 @@
 set -uo pipefail
 
 REPO=${HARNESS_DIR:-/opt/my-harness-wrapper}
+CONFIG_DIR="${CLAUDE_CONFIG_DIR-${HOME:-}/.claude}"
+if command -v cygpath >/dev/null 2>&1 && [ -n "$CONFIG_DIR" ]; then
+  CONFIG_CONV=$(cygpath -u "$CONFIG_DIR" 2>/dev/null) && [ -n "$CONFIG_CONV" ] && CONFIG_DIR=$CONFIG_CONV
+fi
+MANIFEST="$CONFIG_DIR/.my-harness-wrapper.manifest.json"
+LOCAL_CHECKOUT=$(jq -r 'if type == "object" then (.local_checkout // empty | strings) else empty end' "$MANIFEST" 2>/dev/null)
+LOCAL_CHECKOUT=${LOCAL_CHECKOUT%$'\r'}
+INSTALL_LOG="$CONFIG_DIR/.my-harness-wrapper.install.log"
 BOOTLOG=/home/user/bootstrap.log
-LOG=/home/user/session-check.log
+if [ -n "$LOCAL_CHECKOUT" ]; then LOG="$CONFIG_DIR/session-check.log"; else LOG=/home/user/session-check.log; fi
 VERIFY_TIMEOUT=${SESSION_CHECK_VERIFY_TIMEOUT:-20}
 VERIFY_KILL_AFTER=${SESSION_CHECK_VERIFY_KILL_AFTER:-5}
 OUT_LINE_CAP=${SESSION_CHECK_OUT_LINE_CAP:-40}
@@ -18,45 +26,55 @@ NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null); NOW_RC=$?
 emit "session-check -> exit=$NOW_RC value=${NOW:-empty}"
 emit "append to $LOG -> $LOG_STATE"
 
-BOOT_RAW=$(uptime -s 2>/dev/null); BOOT_RC=$?
-emit "uptime -s -> exit=$BOOT_RC value=${BOOT_RAW:-empty}"
-emit "test -f $BOOTLOG -> $([ -f "$BOOTLOG" ] && echo yes || echo no)"
-if [ ! -f "$BOOTLOG" ]; then
-  emit "snapshot state -> undetermined, $BOOTLOG absent"
+if [ -n "$LOCAL_CHECKOUT" ]; then
+  emit "jq -r .local_checkout $MANIFEST -> $(printf '%s' "$LOCAL_CHECKOUT" | LC_ALL=C tr '\000-\037\177' '?')"
+  emit "test -f $INSTALL_LOG -> $([ -f "$INSTALL_LOG" ] && echo yes || echo no)"
+  if [ -f "$INSTALL_LOG" ]; then
+    emit "stat -c %y $INSTALL_LOG -> $(stat -c %y "$INSTALL_LOG" 2>/dev/null || echo unreadable)"
+    INSTALL_LAST=$(tail -n 1 "$INSTALL_LOG" 2>/dev/null)
+    emit "tail -n 1 $INSTALL_LOG -> $(printf '%s' "$INSTALL_LAST" | LC_ALL=C tr '\000-\037\177' '?')"
+  fi
 else
-  LOG_EPOCH=$(stat -c %Y "$BOOTLOG" 2>/dev/null)
-  LOG_SHOW=$(stat -c %y "$BOOTLOG" 2>/dev/null)
-  BOOT_EPOCH=$([ "$BOOT_RC" -eq 0 ] && [ -n "${BOOT_RAW:-}" ] && date -d "$BOOT_RAW" +%s 2>/dev/null)
-  emit "stat -c %y $BOOTLOG -> ${LOG_SHOW:-unreadable}"
-  LOG_OK=no
-  BOOT_OK=no
-  case "${LOG_EPOCH:-}" in ''|*[!0-9]*) ;; *) LOG_OK=yes ;; esac
-  case "${BOOT_EPOCH:-}" in ''|*[!0-9]*) ;; *) BOOT_OK=yes ;; esac
-  if [ "$LOG_OK" = yes ] && [ "$BOOT_OK" = yes ]; then
-    if [ "$LOG_EPOCH" -ge "$BOOT_EPOCH" ]; then
-      emit "log mtime >= boot time -> yes, this session built the snapshot"
+  BOOT_RAW=$(uptime -s 2>/dev/null); BOOT_RC=$?
+  emit "uptime -s -> exit=$BOOT_RC value=${BOOT_RAW:-empty}"
+  emit "test -f $BOOTLOG -> $([ -f "$BOOTLOG" ] && echo yes || echo no)"
+  if [ ! -f "$BOOTLOG" ]; then
+    emit "snapshot state -> undetermined, $BOOTLOG absent"
+  else
+    LOG_EPOCH=$(stat -c %Y "$BOOTLOG" 2>/dev/null)
+    LOG_SHOW=$(stat -c %y "$BOOTLOG" 2>/dev/null)
+    BOOT_EPOCH=$([ "$BOOT_RC" -eq 0 ] && [ -n "${BOOT_RAW:-}" ] && date -d "$BOOT_RAW" +%s 2>/dev/null)
+    emit "stat -c %y $BOOTLOG -> ${LOG_SHOW:-unreadable}"
+    LOG_OK=no
+    BOOT_OK=no
+    case "${LOG_EPOCH:-}" in ''|*[!0-9]*) ;; *) LOG_OK=yes ;; esac
+    case "${BOOT_EPOCH:-}" in ''|*[!0-9]*) ;; *) BOOT_OK=yes ;; esac
+    if [ "$LOG_OK" = yes ] && [ "$BOOT_OK" = yes ]; then
+      if [ "$LOG_EPOCH" -ge "$BOOT_EPOCH" ]; then
+        emit "log mtime >= boot time -> yes, this session built the snapshot"
+      else
+        emit "log mtime >= boot time -> no, this session restored the snapshot"
+      fi
     else
-      emit "log mtime >= boot time -> no, this session restored the snapshot"
+      emit "snapshot state -> undetermined, log epoch [${LOG_EPOCH:-empty}] boot epoch [${BOOT_EPOCH:-empty}]"
     fi
-  else
-    emit "snapshot state -> undetermined, log epoch [${LOG_EPOCH:-empty}] boot epoch [${BOOT_EPOCH:-empty}]"
   fi
-fi
 
-FOUND=0
-for d in /home/user/*/; do
-  [ -d "$d" ] || continue
-  FOUND=$((FOUND + 1))
-  if git -C "$d" rev-parse --git-dir >/dev/null 2>&1; then
-    BR=$(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null); BR_RC=$?
-    SHA=$(git -C "$d" rev-parse --short HEAD 2>/dev/null); SHA_RC=$?
-    emit "git -C $d rev-parse --abbrev-ref HEAD, --short HEAD -> exit=$BR_RC,$SHA_RC branch=${BR:-empty} head=${SHA:-empty}"
-  else
-    git -C "$d" rev-parse --git-dir >/dev/null 2>&1; GD_RC=$?
-    emit "git -C $d rev-parse --git-dir -> exit=$GD_RC"
-  fi
-done
-[ "$FOUND" -gt 0 ] || emit "ls -d /home/user/*/ -> none"
+  FOUND=0
+  for d in /home/user/*/; do
+    [ -d "$d" ] || continue
+    FOUND=$((FOUND + 1))
+    if git -C "$d" rev-parse --git-dir >/dev/null 2>&1; then
+      BR=$(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null); BR_RC=$?
+      SHA=$(git -C "$d" rev-parse --short HEAD 2>/dev/null); SHA_RC=$?
+      emit "git -C $d rev-parse --abbrev-ref HEAD, --short HEAD -> exit=$BR_RC,$SHA_RC branch=${BR:-empty} head=${SHA:-empty}"
+    else
+      git -C "$d" rev-parse --git-dir >/dev/null 2>&1; GD_RC=$?
+      emit "git -C $d rev-parse --git-dir -> exit=$GD_RC"
+    fi
+  done
+  [ "$FOUND" -gt 0 ] || emit "ls -d /home/user/*/ -> none"
+fi
 
 VERIFY="$REPO/scripts/verify.sh"
 emit "test -f $VERIFY -> $([ -f "$VERIFY" ] && echo yes || echo no)"

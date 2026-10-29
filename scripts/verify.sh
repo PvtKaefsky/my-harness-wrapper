@@ -11,7 +11,11 @@ settings_probe() {
     else {state: "present", value: .[$k]} end' "$1" 2>/dev/null
 }
 settings_carries() {
-  jq -n -r --arg k "$3" --slurpfile live "$1" --slurpfile want "$2" '
+  local live_docs want_docs
+  live_docs=$(jq -c -s . "$1" 2>/dev/null) || return 2
+  want_docs=$(jq -c -s . "$2" 2>/dev/null) || return 2
+  printf '%s\n%s\n' "$live_docs" "$want_docs" | jq -n -r --arg k "$3" '
+    input as $live | input as $want |
     if ($live | length) != 1 then "live file holds " + ($live | length | tostring) + " JSON documents"
     elif ($want | length) != 1 then "delivered file holds " + ($want | length | tostring) + " JSON documents"
     else $live[0] as $L | $want[0] as $W
@@ -22,6 +26,26 @@ settings_carries() {
         elif ((({($k): $L[$k]}) * ({($k): $W[$k]}))[$k]) == $L[$k] then "carries"
         else "does not carry" end
     end' 2>/dev/null
+}
+resolve_cli() {
+  local found base cand
+  found=$(command -v claude 2>/dev/null)
+  if [ -n "$found" ]; then CLI=$found; CLI_FROM=PATH; return; fi
+  if [ -n "${CLAUDE_CODE_EXECPATH:-}" ] && [ -f "$CLAUDE_CODE_EXECPATH" ]; then
+    CLI=$CLAUDE_CODE_EXECPATH; CLI_FROM=CLAUDE_CODE_EXECPATH; return
+  fi
+  if [ -n "${LOCALAPPDATA:-}" ] && [ "$CYGPATH" != none ]; then
+    base=$(cygpath -u "$LOCALAPPDATA" 2>/dev/null)
+    found=$(for cand in "$base"/Claude-Data/claude_*/claude-code/*/*/claude.exe; do
+      [ -f "$cand" ] && printf '%s\n' "$cand"
+    done | sort -V | tail -n 1)
+    if [ -n "$found" ]; then CLI=$found; CLI_FROM="the highest-sorting desktop app CLI under LOCALAPPDATA"; return; fi
+  fi
+  CLI=""; CLI_FROM=none
+}
+hook_run() {
+  if [ -n "$HOOK_HARNESS_DIR" ]; then HARNESS_DIR=$HOOK_HARNESS_DIR bash -c "$1"
+  else env -u HARNESS_DIR bash -c "$1"; fi
 }
 
 run id
@@ -34,6 +58,12 @@ else CCD_SHOW="$CLAUDE_CONFIG_DIR"; fi
 echo "CLAUDE_CONFIG_DIR -> $CCD_SHOW"
 LIVE_DIR="${CLAUDE_CONFIG_DIR-${HOME:-/root}/.claude}"
 echo "\${CLAUDE_CONFIG_DIR-\$HOME/.claude} -> ${LIVE_DIR:-empty}"
+CYGPATH=$(command -v cygpath || echo none)
+if [ "$CYGPATH" != none ] && [ -n "$LIVE_DIR" ]; then
+  LIVE_CONV=$(cygpath -u "$LIVE_DIR" 2>/dev/null); LIVE_CONV_RC=$?
+  echo "cygpath -u $LIVE_DIR -> exit=$LIVE_CONV_RC value=${LIVE_CONV:-empty}"
+  [ "$LIVE_CONV_RC" -ne 0 ] || [ -z "$LIVE_CONV" ] || LIVE_DIR=$LIVE_CONV
+fi
 case "${LIVE_DIR:-}" in
   /*) ;;
   *) echo "FAIL live config dir path: expected an absolute path, actual ${LIVE_DIR:-empty}"; exit 1 ;;
@@ -41,12 +71,20 @@ esac
 LIVE_REAL=$(readlink -f "$LIVE_DIR" 2>/dev/null)
 echo "readlink -f $LIVE_DIR -> ${LIVE_REAL:-unresolved}"
 
-run claude --version
-
-echo "\$ claude plugin list --json"
-PLUGIN_JSON=$(claude plugin list --json 2>/dev/null); PLUGIN_RC=$?
+resolve_cli
+echo "command -v claude -> $(command -v claude || echo none)"
+echo "CLAUDE_CODE_EXECPATH -> ${CLAUDE_CODE_EXECPATH:-unset or empty}"
+echo "claude CLI -> ${CLI:-none} from $CLI_FROM"
+if [ -n "$CLI" ]; then
+  run "$CLI" --version
+  echo "\$ claude plugin list --json"
+  PLUGIN_JSON=$("$CLI" plugin list --json 2>/dev/null); PLUGIN_RC=$?
+else
+  PLUGIN_JSON=""; PLUGIN_RC=127
+fi
 echo "claude plugin list --json -> exit=$PLUGIN_RC"
 PLUGIN_IDS=$(printf '%s' "$PLUGIN_JSON" | jq -r 'if type == "array" then (.[] | .id // empty) else empty end' 2>/dev/null); IDS_RC=$?
+PLUGIN_IDS=${PLUGIN_IDS//$'\r'/}
 PLUGIN_ARRAY=$(printf '%s' "$PLUGIN_JSON" | jq -r 'type' 2>/dev/null)
 echo "jq type of that output -> ${PLUGIN_ARRAY:-unreadable}"
 if [ "$PLUGIN_RC" -ne 0 ]; then CLI_PLUGINS=unknown
@@ -189,6 +227,9 @@ elif [ -z "$MAN_RAW" ]; then
   MAN_DIR=""; MAN_SHOW="absent or empty"
 else
   MAN_DIR="$MAN_RAW"; MAN_SHOW="$MAN_RAW"
+  if [ "$CYGPATH" != none ]; then
+    MAN_CONV=$(cygpath -u "$MAN_RAW" 2>/dev/null) && [ -n "$MAN_CONV" ] && MAN_DIR=$MAN_CONV && MAN_SHOW="$MAN_RAW, cygpath -u $MAN_CONV"
+  fi
   case "$MAN_DIR" in /*) ;; *) MAN_SHOW="$MAN_RAW (not an absolute path)"; MAN_DIR="" ;; esac
 fi
 echo "jq -r .config_dir $MANIFEST -> $MAN_SHOW"
@@ -225,6 +266,7 @@ LIVE_SETTINGS="$LIVE_DIR/settings.json"
 echo "test -f $DELIVERED_SETTINGS -> $([ -f "$DELIVERED_SETTINGS" ] && echo yes || echo no)"
 echo "test -f $LIVE_SETTINGS -> $([ -f "$LIVE_SETTINGS" ] && echo yes || echo no)"
 SKEYS=$(jq -r 'if type == "object" then keys_unsorted[] else empty end' "$DELIVERED_SETTINGS" 2>/dev/null); SKEYS_RC=$?
+SKEYS=${SKEYS//$'\r'/}
 if [ "$SKEYS_RC" -ne 0 ] || [ -z "$SKEYS" ]; then
   echo "FAIL settings: expected a JSON object with at least one key in $DELIVERED_SETTINGS, actual jq exit=$SKEYS_RC with $(printf '%s' "$SKEYS" | grep -a -c '') keys"
   fail=1
@@ -267,6 +309,26 @@ done <<SKEYS_EOF
 $SKEYS
 SKEYS_EOF
 
+HOOK_HARNESS_DIR=$(jq -r 'if type == "object" and (.env | type) == "object" then (.env.HARNESS_DIR // empty | strings) else empty end' "$LIVE_SETTINGS" 2>/dev/null); HOOK_HD_RC=$?
+HOOK_HARNESS_DIR=${HOOK_HARNESS_DIR%$'\r'}
+echo "jq -r .env.HARNESS_DIR $LIVE_SETTINGS -> exit=$HOOK_HD_RC value=$(sanitize "${HOOK_HARNESS_DIR:-absent}")"
+if [ -n "$HOOK_HARNESS_DIR" ]; then
+  HOOK_DIR_CMP=$HOOK_HARNESS_DIR
+  REPO_CMP=$REPO
+  if [ "$CYGPATH" != none ]; then
+    HOOK_CONV=$(cygpath -u "$HOOK_HARNESS_DIR" 2>/dev/null) && [ -n "$HOOK_CONV" ] && HOOK_DIR_CMP=$HOOK_CONV
+    REPO_CONV=$(cygpath -u "$REPO" 2>/dev/null) && [ -n "$REPO_CONV" ] && REPO_CMP=$REPO_CONV
+  fi
+  HOOK_REAL=$(readlink -f "$HOOK_DIR_CMP" 2>/dev/null)
+  REPO_REAL=$(readlink -f "$REPO_CMP" 2>/dev/null)
+  if [ "${HOOK_REAL:-unresolved-hook}" != "${REPO_REAL:-unresolved-repo}" ]; then
+    echo "FAIL hook harness dir: expected env.HARNESS_DIR in $LIVE_SETTINGS to name $REPO (resolves to ${REPO_REAL:-unresolved}), actual $(sanitize "$HOOK_HARNESS_DIR") (resolves to ${HOOK_REAL:-unresolved})"
+    fail=1
+  else
+    echo "compare env.HARNESS_DIR against $REPO -> yes, both resolve to $REPO_REAL"
+  fi
+fi
+
 GUARD_OK=no
 GUARD_MARK='attribution-guard: matched line ->'
 GUARD_BODY='what changed, in one sentence.
@@ -279,7 +341,7 @@ if [ "$GUARD_IN_RC" -ne 0 ] || [ -z "$GUARD_INPUT" ]; then
 elif [ "$GUARD_CMD_RC" -ne 0 ] || [ -z "$GUARD_CMD" ]; then
   GUARD_SHOW="no PreToolUse command in $LIVE_SETTINGS references attribution-guard.sh (jq exit=$GUARD_CMD_RC)"
 else
-  GUARD_ERR=$(printf '%s' "$GUARD_INPUT" | bash -c "$GUARD_CMD" 2>&1 >/dev/null); GUARD_RC=$?
+  GUARD_ERR=$(printf '%s' "$GUARD_INPUT" | hook_run "$GUARD_CMD" 2>&1 >/dev/null); GUARD_RC=$?
   if [ "$GUARD_RC" -ne 2 ]; then
     GUARD_SHOW="exit=$GUARD_RC"
   elif printf '%s\n' "$GUARD_ERR" | grep -a -q -F -- "$GUARD_MARK"; then
@@ -304,7 +366,7 @@ if [ "$POST_IN_RC" -ne 0 ] || [ -z "$POST_INPUT" ]; then
 elif [ "$POST_CMD_RC" -ne 0 ] || [ -z "$POST_CMD" ]; then
   POST_SHOW="no PostToolUse command in $LIVE_SETTINGS references attribution-guard.sh (jq exit=$POST_CMD_RC)"
 else
-  POST_ERR=$(printf '%s' "$POST_INPUT" | bash -c "$POST_CMD" 2>&1 >/dev/null); POST_RC=$?
+  POST_ERR=$(printf '%s' "$POST_INPUT" | hook_run "$POST_CMD" 2>&1 >/dev/null); POST_RC=$?
   if [ "$POST_RC" -ne 2 ]; then
     POST_SHOW="exit=$POST_RC"
   elif printf '%s\n' "$POST_ERR" | grep -a -q -F -- "$POST_MARK"; then
@@ -323,6 +385,7 @@ fi
 echo "test -f $REPO/config/plugins.tsv -> $([ -f "$REPO/config/plugins.tsv" ] && echo yes || echo no)"
 if [ -f "$REPO/config/plugins.tsv" ]; then
   while IFS=$'\t' read -r -u 3 mp_source plugin_id _rest || [ -n "${mp_source:-}" ]; do
+    mp_source=${mp_source%$'\r'}; plugin_id=${plugin_id%$'\r'}
     case "${mp_source:-}" in ''|'#'*) continue ;; esac
     [ -n "${plugin_id:-}" ] || continue
     if [ "$CLI_PLUGINS" = unknown ]; then

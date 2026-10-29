@@ -133,6 +133,101 @@ into `fails`. `git config --get user.email` counts only exits above 1. Exit 1 is
 git's key-not-found, which is a state this field admits, and a repository git
 cannot read is already counted by the `rev-parse` above it.
 
+## scripts/install-local.sh
+
+Delivers `config/` into a local Claude config directory. Run by the user from a
+checkout, in Git Bash on Windows and bash elsewhere. It carries bootstrap's
+steps with the same semantics, minus the `/home/user/.claude` symlink.
+
+It never sets `-e`. Every step prints its predicate and observed value. Its
+output goes to the terminal and to `.my-harness-wrapper.install.log` in the
+config directory, which each run rewrites at mode 600, the log carrying prior
+hook commands. Every command that changes state, or
+produces a value the manifest carries, counts into `fails`. A failed write of
+the log counts too. The exit status is `fails`, clamped to 255.
+
+| Step | What it does |
+| --- | --- |
+| 1 | Resolves the checkout from the script's own location, with `CDPATH` cleared, and the config directory as `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, converted with `cygpath -u` where `cygpath` exists. A path that is not absolute stops the run with exit 1 and no log. |
+| 2 | Creates the config directory and prints `command -v jq`. An absent `jq` counts once here, and again in each step that runs it. |
+| 3 | Copies `config/CLAUDE.md` to `CLAUDE.md` there, first printing `test -f` or `cmp -s` for the file it replaces, and keeping a differing one as `CLAUDE.md.pre-harness` where no such copy exists. |
+| 4 | Merges `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the checkout. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
+| 5 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status. |
+| 6 | Installs each plugin named in `config/plugins.tsv`, then prints how many rows carried a `plugin_id`. |
+| 7 | Writes `.my-harness-wrapper.manifest.json` there. |
+
+### Step 4, the settings file
+
+The merge is `jq -s '.[0] * .[1] * {env: {HARNESS_DIR: $h}}'`, the live file
+first. A key the live file holds and the delivered file does not is kept; a key
+both hold takes the delivered value, recursing into objects as bootstrap's step
+4 does. An array is replaced whole, so a live `hooks.<event>` array for an event
+the delivered file names is replaced by the delivered one. Before the merge the
+step prints the delivered top-level keys whose live value differs, and the live
+value of each `hooks.<event>` the delivered file
+names, or `"absent"`. Where the live file is absent or empty, the delivered file is
+merged over an empty object.
+
+The program reads every document in both files and fails unless it read
+exactly two, so a live file holding more than one document fails the step
+instead of displacing the delivered file.
+
+The result goes to a temporary file beside the destination and is renamed over
+it, as in bootstrap. The temporary file takes the destination's existing mode,
+read with `stat -c %a` or, where that fails, `stat -f %Lp`, and 600 where no
+destination exists or no mode is read; the `mode for` line prints it. A failed
+`jq`, `chmod` or `mv` leaves the previous file in place.
+
+On Windows, Git Bash converts a `/d/...` path argument to `D:/...` when it
+starts the native `jq.exe`, so `env.HARNESS_DIR`, `config_dir` and
+`local_checkout` are stored in that form. Git Bash reads either form as the same
+path. `jq.exe` also writes CRLF line endings, which every JSON reader here
+accepts.
+
+`env.HARNESS_DIR` is the only key the installer writes that
+`config/settings.json` does not carry. The CLI sets each `env` key in the
+environment of every hook and tool process, so the hook commands resolve the
+scripts in the checkout. The line after the merge prints the value read back.
+
+### Step 6, the plugins
+
+The CLI is taken from the first of three sources that yields one: `command -v
+claude`, `CLAUDE_CODE_EXECPATH` where it names a file, and the highest-sorting
+`claude.exe` under `$LOCALAPPDATA/Claude-Data/claude_*/claude-code/*/*/`, by
+`sort -V` on the full path. Claude Code sets `CLAUDE_CODE_EXECPATH` in the
+processes it starts. The desktop app keeps its bundled CLI under
+`$LOCALAPPDATA` and puts none on `PATH`. Where no source yields one, each
+plugin's line names the two commands to run instead and counts one failure.
+
+### Step 7, the manifest
+
+The fields are bootstrap's, plus `local_checkout`, the checkout's path.
+`bootstrap_version` is read from the `export BOOTSTRAP_VERSION=` line of
+`env/setup.sh` in the checkout, with the shapes `scripts/verify.sh` rejects
+counted as a failure and written empty. `config_dir` is the converted path from
+step 1. `scripts/session-check.sh` takes the local branch on a non-empty
+`local_checkout`.
+
+## How the hook commands resolve the harness directory
+
+The `PreToolUse`, `PostToolUse` and `SessionStart` commands in
+`config/settings.json` set `h=${HARNESS_DIR:-/opt/my-harness-wrapper}` and run
+the script under `$h`. A cloud session's hook processes carry no `HARNESS_DIR`,
+so `h` is the cloud clone. A local install's `settings.json` carries
+`env.HARNESS_DIR`, so `h` is the checkout. The committed file is one text for
+both targets.
+
+The commands use only POSIX parameter expansion, `[ -f ]` and double quotes,
+which the Linux hook shell and Git Bash both run. A checkout path carrying a
+space or non-ASCII characters is passed whole, `$h` being quoted. Each command
+prints nothing and exits 0 where the script is absent from `$h`, except the
+`SessionStart` command, which prints `test -f $h/scripts/session-check.sh -> no`.
+
+Claude Code on Windows runs a hook command through Git Bash. Four backslashes
+inside double quotes in a command reach the program it runs as one, where bash
+alone gives two. None of the three commands carries a backslash. The
+`UserPromptSubmit` command's one backslash, in `'\''`, reaches bash intact.
+
 ## scripts/verify.sh
 
 Run inside a session, by hand. Reports what bootstrap left behind, and where the
@@ -165,10 +260,10 @@ altered. The range is C0 plus DEL only, because `tr -c '[:print:]'` would mangle
 multi-byte UTF-8. Both `tr` calls run under `LC_ALL=C`, so those byte ranges
 mean what they say.
 
-Seven values pass through it. Three are git-derived: the contrast `user.email`,
+Eight values pass through it. Three are git-derived: the contrast `user.email`,
 each `git var` ident, and each `*.gpgsign` read. Two come from `env/setup.sh`:
 the matched `export` lines, and an export value outside `[0-9A-Za-z._-]`. Two
-are the settings probes, one per side. A
+are the settings probes, one per side. One is the live `env.HARNESS_DIR`. A
 value inside that set needs no pass, holding no control byte by construction.
 Every other printed value goes out without passing through it, some git output
 among them. That is a known gap, not a finding that the others are safe.
@@ -181,6 +276,12 @@ list would report clean.
 
 `CLAUDE_CONFIG_DIR` is read with the colon-less default, because the CLI treats
 a set-but-empty value as a value.
+
+Where `cygpath` exists, the resolved directory is converted with `cygpath -u`
+before the absolute-path gate, and the conversion is printed. A hook process the
+Windows CLI starts receives `CLAUDE_CONFIG_DIR` in the `C:/...` form, which the
+gate would reject. A failed or empty conversion keeps the original value.
+Without `cygpath` no line is printed.
 
 The resolution runs ahead of the `claude` calls. The CLI honours a relative
 `CLAUDE_CONFIG_DIR` by creating that directory under the operator's working
@@ -200,7 +301,9 @@ unreadable or holds a count of documents other than one. Only the first two
 are compared; the rest fail as their own state.
 
 `FAIL manifest.config_dir` compares the resolved directory against
-`manifest.config_dir`, both through `readlink -f`. Its two defaults,
+`manifest.config_dir`, both through `readlink -f`. Where `cygpath` exists the
+manifest value is first converted with `cygpath -u`, since the local installer
+stores it in the `C:/...` form, and the printed line shows both. Its two defaults,
 `unresolved-live` and `unresolved-manifest`, differ on purpose, so an
 unresolvable live directory and an unreadable manifest value never compare
 equal and pass.
@@ -212,6 +315,10 @@ either way is a value manufactured by a failure.
 
 Plugin state is read from `claude plugin list --json`, not from the command's
 human-readable output, which a wording, format or localisation change moves.
+
+The CLI is found the way `scripts/install-local.sh`'s step 6 finds it, and the
+`claude CLI ->` line names it and its source. Where none is found, the list is
+not run and its exit reads 127, which gives `CLI_PLUGINS=unknown`.
 
 Three states are separated. A non-zero exit, output whose top level is not an
 array, and a failure extracting the ids from a well-typed array all give
@@ -318,9 +425,9 @@ array and an absent key then each fail, and equal values of any type carry.
 The comparison reports a named state, not an exit status: `carries`, `does not
 carry`, absent from the live or the delivered file, a non-object top level on
 either side, or a document count other than one. A `jq` that could not run at
-all is reported as not determined. Under `--slurpfile` an absent file and a file
-holding no valid JSON both exit 2 with no output, so both reach that state; the
-`test -f` line printed above separates them.
+all is reported as not determined. An absent file and a file holding no valid
+JSON both make the slurping `jq -s` exit 2 with no output, so both reach that
+state; the `test -f` line printed above separates them.
 
 Both sides go through one `jq` program reporting three states: a top level that
 is not an object, a key absent, and a key present with its value. That program
@@ -336,10 +443,17 @@ A key absent from `config/settings.json` fails as a repository fault. A key
 absent from the live file, or holding a different value, fails with both sides
 printed.
 
-Each file is slurped into its own variable, and a file that does not yield
-exactly one JSON document is reported as that state. Reading both files into one
-array aligns them by position, and a live file holding two documents then
-displaces the delivered one out of the compared slot.
+Each file is slurped by its own `jq -c -s .`, read as a positional argument,
+into its own array, and the two arrays are piped into the comparing `jq` as two
+inputs. A file that does not yield exactly one JSON document is reported as that
+state. Reading both files into one array aligns them by position, and a live
+file holding two documents then displaces the delivered one out of the compared
+slot. `--slurpfile` is not used: `jq.exe` on Windows cannot open a path carrying
+non-ASCII characters through it, and opens the same path given as a positional
+argument.
+
+`jq.exe` on Windows ends each output line with CRLF. The delivered key list and
+the plugin id list have every CR removed before they are split into lines.
 
 `settings_probe`, which supplies the displayed value, still emits one line per
 document, so for such a file the displayed value is each document's probe in
@@ -467,10 +581,21 @@ Reports what a session starts with. Run by the `SessionStart` hook
 failed check never blocks session startup.
 
 `REPO` reads `${HARNESS_DIR:-/opt/my-harness-wrapper}`, the same default
-`scripts/verify.sh` reads, so both report on the delivered copy. The hook names
-that path literally, delivery putting the clone there.
+`scripts/verify.sh` reads, so both report on the delivered copy. The hook
+resolves the script's own path the same way.
 
-Each line goes to stdout and is appended to `/home/user/session-check.log`. A
+The script reads `local_checkout` from the manifest in
+`${CLAUDE_CONFIG_DIR-$HOME/.claude}`, converted with `cygpath -u` where
+`cygpath` exists. A non-empty string takes the local branch; an absent field,
+manifest or `jq` takes the cloud branch, whose output is the script's output
+before the local branch existed. The read prints nothing in the cloud branch.
+
+| Branch | Log | Lines before the `verify.sh` block |
+| --- | --- | --- |
+| Cloud | `/home/user/session-check.log` | The snapshot verdict and one line per directory under `/home/user`, as the table below sets out. |
+| Local | `session-check.log` in the config directory | `jq -r .local_checkout <manifest> -> <path>`, `test -f <install log> -> yes/no`, and, where it exists, `stat -c %y <install log> -> <mtime>` and `tail -n 1 <install log> -> fails -> N`. No line names `/home/user`. The path and the log line pass through the control-byte replacement. |
+
+Each line goes to stdout and is appended to the log. A
 failed append is discarded, so an unwritable log does not change the output.
 The log's own state is tested once at the start and printed as
 `append to <path> -> appendable` or `not appendable`, so a later reader of a
@@ -559,8 +684,9 @@ such process remains.
 
 ### The SessionStart hook
 
-`config/settings.json` registers it with matcher `startup`. The command guards
-on the script's own presence with `if`, not with `&&` and `||`, which would
+`config/settings.json` registers it with matcher `startup`. The command resolves
+the script under `${HARNESS_DIR:-/opt/my-harness-wrapper}`, and guards on its
+presence with `if`, not with `&&` and `||`, which would
 print the absent-file line when the script exists and fails. The `else` branch
 prints `test -f <path> -> no`, so a session where delivery never happened is
 distinguishable from one where the check ran and found nothing wrong. Every
@@ -683,6 +809,16 @@ front of the session after the call has run.
 
 ### The verify.sh assertion
 
+Both assertions run the live command with the `HARNESS_DIR` a hook process
+would receive: the live `settings.json`'s `env.HARNESS_DIR` where it is a
+string, and unset otherwise, whatever the caller's own `HARNESS_DIR` holds. The
+`jq -r .env.HARNESS_DIR` line before them prints that value. A local install
+missing that key therefore fails both assertions, as its hooks would find no
+guard. Where the value is present, it is compared against `REPO`, both
+converted with `cygpath -u` where available and resolved with `readlink -f`,
+and a difference is `FAIL hook harness dir`: the hooks would run another tree's
+scripts than the one every other check reads.
+
 `scripts/verify.sh` runs the first live `PreToolUse` command whose text names
 `attribution-guard.sh` against a sample `gh pr create` body carrying the
 footer, and expects exit 2 with the guard's own
@@ -770,10 +906,14 @@ passed, and 1 otherwise.
 
 `README.md` carries the format.
 
-Both scripts read the file on descriptor 3, so the loop body — `claude plugin
-install` in bootstrap, `grep` in verify — cannot consume it from stdin. The
-loop's `|| [ -n "${mp_source:-}" ]` clause processes a final line carrying no
-trailing newline.
+Bootstrap, the local installer and verify read the file on descriptor 3, so the
+loop body — `claude plugin install` in the first two, `grep` in verify — cannot
+consume it from stdin. The loop's `|| [ -n "${mp_source:-}" ]` clause processes
+a final line carrying no trailing newline.
+
+`scripts/install-local.sh` and `scripts/verify.sh` remove one trailing CR from
+`marketplace_source` and `plugin_id`, a Windows checkout carrying the file with
+CRLF line endings. `scripts/bootstrap.sh` does not, its Linux clone carrying LF.
 
 A `read` that fails on an I/O error mid-file ends the loop the same way
 end-of-file does, leaving later rows unread and nothing counted. That gap is
