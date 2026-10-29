@@ -885,13 +885,26 @@ session carries the hook, whatever it has attached.
 
 ## scripts/attribution-guard.sh
 
-Blocks a pull request or issue body carrying a Claude Code attribution line, and
-reports one that a pull request create call returns. Run by the `PreToolUse` and
-`PostToolUse` hooks `config/settings.json` registers, which pass the hook input
-to it on stdin as JSON. The `PreToolUse` hook matches `Bash`,
-`mcp__github__create_pull_request`, `mcp__github__update_pull_request` and
-`mcp__github__issue_write`. The `PostToolUse` hook matches
-`mcp__github__create_pull_request` only.
+Blocks a pull request, issue, comment, review or review reply body carrying a
+Claude Code attribution line, and reports one that a pull request create call
+returns. Run by the `PreToolUse` and `PostToolUse` hooks `config/settings.json`
+registers, which pass the hook input to it on stdin as JSON. The `PreToolUse`
+hook matches these tool names exactly.
+
+| Tool | Writes |
+| --- | --- |
+| `Bash` | Any command; the guard scans only the writes the table below names. |
+| `mcp__github__create_pull_request`, `mcp__github__update_pull_request` | A pull request description. |
+| `mcp__github__issue_write` | An issue. |
+| `mcp__github__add_issue_comment`, `mcp__github__update_issue_comment` | An issue or pull request conversation comment. |
+| `mcp__github__add_reply_to_pull_request_comment` | A reply to a pull request review comment. |
+| `mcp__github__pull_request_review_write` | A pull request review body. |
+| `mcp__github__add_comment_to_pending_review` | A comment in a pending pull request review. |
+
+The `PostToolUse` hook matches `mcp__github__create_pull_request` only. No
+comment, review or reply path has been observed appending the footer itself;
+`docs/environment.md` records that as unmeasured under "The footer on comments,
+reviews and replies".
 
 An input whose `hook_event_name` is `PostToolUse` takes the path under
 "The PostToolUse path" below. Any other input, one with no `hook_event_name`
@@ -899,7 +912,7 @@ among them, takes the `PreToolUse` path this table describes.
 
 | `tool_name` | What is scanned |
 | --- | --- |
-| `Bash` | The command, and every file it passes as a body, where the command runs `gh pr create`, `gh pr edit`, `gh issue create`, `gh issue edit`, `gh issue comment`, or `gh api` against an endpoint carrying `/pulls` or `/issues`. Any other command is left alone. |
+| `Bash` | The command, and every file it passes as a body, where the command runs `gh pr create`, `gh pr edit`, `gh pr comment`, `gh pr review`, `gh issue create`, `gh issue edit`, `gh issue comment`, or `gh api` against an endpoint carrying `/pulls` or `/issues`. Any other command is left alone. |
 | Anything else | Every string in `tool_input`, at any depth. |
 
 A body file is taken from four token forms: `--body-file <path>`,
@@ -907,13 +920,16 @@ A body file is taken from four token forms: `--body-file <path>`,
 `body=@<path>` after any flag spelling. A field named anything but `body` is
 recognised only after `-F`.
 
-In a command that runs `gh pr create`, `gh pr edit`, `gh issue create`,
-`gh issue edit` or `gh issue comment`, `-F` is the short form of `--body-file`,
+In a command that runs `gh pr create`, `gh pr edit`, `gh pr comment`,
+`gh pr review`, `gh issue create`, `gh issue edit` or `gh issue comment`, `-F`
+is the short form of `--body-file`,
 and the argument after it is taken as a body file in three spellings:
 `-F <path>`, `-F=<path>` and `-F<path>`. `gh` 2.101.0 accepts all three on both
 `gh pr` commands, and accepts `-F` clustered behind another short flag on
 `gh pr create`, as in `-dF<path>`. `gh` 2.63.2 opens the named file as the body
-for all three spellings on each of the three `gh issue` commands. The guard covers the three spellings and not
+for all three spellings on each of the three `gh issue` commands. `gh` 2.89.0
+lists `-b, --body` and `-F, --body-file` for both `gh pr comment` and
+`gh pr review`. The guard covers the three spellings and not
 the clustered one. A `-F` token is recognised only at the start of the command
 or after whitespace. One run of surrounding quotes is stripped from the
 path. A path that is not a readable regular file is skipped. The first mebibyte
@@ -928,8 +944,8 @@ The match is case-insensitive, against `Generated (with|by) \[?Claude Code` and
 | Nothing matched | 0 | None. |
 | Input that is not a JSON object, carries no `tool_name`, or arrives with no `jq` on `PATH` | 0 | None. |
 
-Scoping the `Bash` branch to pull request and issue writes keeps documentation
-quoting the footer writable. A `grep` for the footer text, or a `gh issue list`
+Scoping the `Bash` branch to pull request, issue, comment and review writes
+keeps documentation quoting the footer writable. A `grep` for the footer text, or a `gh issue list`
 searching for it, is not such a write, and is not scanned. A `gh api` read
 against a `/pulls` or `/issues` endpoint is scanned like a write, so one whose
 command carries the pattern is blocked.
@@ -940,12 +956,12 @@ an operator reads. The line printed is a line of the body or of a body file, so
 a body file the command names by mistake can put one of its lines in front of
 the session.
 
-These paths reach a pull request or issue body without being scanned. Each is accepted,
-not handled.
+These paths reach a pull request, issue, comment, review or reply body without
+being scanned. Each is accepted, not handled.
 
 | Path | Why it is missed |
 | --- | --- |
-| `--body "$(cat notes.md)"`, a heredoc, or any other shell substitution | The hook receives the command before the shell expands it, so the body text is not in what it reads. |
+| `--body "$(cat notes.md)"`, or any other shell substitution | The hook receives the command before the shell expands it, so the body text is not in what it reads. |
 | `curl`, `wget` or a script posting to `/repos/<owner>/<repo>/pulls` or `/issues` | None of `gh pr`, `gh issue` or `gh api` appears in the command, so the command is not classified as a write. |
 | `gh api graphql` mutating a pull request or an issue | The endpoint is `/graphql`, and the classifier requires `/pulls` or `/issues`. |
 | A body-file path carrying a space | The path is read up to the first space, and the truncated path is then skipped as unreadable. |
@@ -955,7 +971,6 @@ not handled.
 | A body read from standard input, `-F -` or `--body-file -` | The path `-` is not a regular file, so it is skipped. |
 | A body-file path carrying a variable, a `~` or another shell expansion | The hook receives the command before the shell expands it, so the path is read literally and skipped where no such file exists. |
 | A relative body-file path after a `cd` in the same command | The path is resolved against the hook's working directory, not the directory the command changes to. |
-| An issue comment through `mcp__github__add_issue_comment` or `mcp__github__update_issue_comment` | Neither tool is in the `PreToolUse` matcher, so the guard does not run. |
 | An issue created or edited through any tool but `mcp__github__issue_write` and `Bash` | The `PreToolUse` matcher names no other issue tool, so the guard does not run. |
 | A footer added to a pull request description after the tool call | The `PreToolUse` path sees the tool call, and the footer is not in it. The `PostToolUse` path covers the create call. `docs/environment.md` records the footer under "What the harness supplies regardless". |
 
@@ -1036,20 +1051,27 @@ above. A guard that predates the `PostToolUse` path scans the clean
 ## scripts/test-attribution-guard.sh
 
 Runs `scripts/attribution-guard.sh` from its own directory against a fixed set
-of cases. It is run by hand only. Neither `scripts/verify.sh` nor
+of cases, directly and through the `PreToolUse` command and matcher of the
+tree's `config/settings.json`. It is run by hand only. Neither `scripts/verify.sh` nor
 `scripts/session-check.sh` runs it.
 
 Each case pipes one JSON hook input into the guard: a tool call as the
 `PreToolUse` hook passes it, or, for the create response cases, a
-`PostToolUse` event carrying `tool_response`. Body files are written into a `mktemp -d` directory, which is the
+`PostToolUse` event carrying `tool_response`. A case marked as through the
+delivered hook runs only where its `tool_name` matches that entry's matcher as
+a whole string, and then runs the entry's command with `HARNESS_DIR` set to the
+tree's root; an unmatched tool exits 0, as a hook that does not fire. Body
+files are written into a `mktemp -d` directory, which is the
 working directory while the cases run and is removed on exit.
 
 | Line | What it reports |
 | --- | --- |
 | `test -f <guard> -> yes/no` | Whether the guard is at the path the script reads. |
 | `command -v jq -> <path>/none` | Whether `jq` is on `PATH`. The cases are built with it. |
+| `test -f <settings> -> yes/no` | Whether the tree's `config/settings.json` is at the path the script reads. |
+| `PreToolUse matcher naming attribution-guard.sh in <settings> -> <matcher>/none` | The matcher of the first `PreToolUse` entry in the tree's `config/settings.json` whose command names the guard. `none` stops the run. |
 | `<case> -> expected exit=N, actual ..., pass/FAIL` | One line per case. |
-| `fail -> N` | The number of failed cases. `not run` where the guard or `jq` is absent. |
+| `fail -> N` | The number of failed cases. `not run` where the guard or `jq` is absent, or where no `PreToolUse` entry names the guard. |
 
 A case expecting exit 2 passes only where the guard's stderr also carries its
 marker: `attribution-guard: matched line ->` for a `PreToolUse` case, and the
@@ -1083,6 +1105,16 @@ passed, and 1 otherwise.
 | Issue tool `body`, clean | A body with no footer | 0 |
 | `gh issue list` searching for the footer | A command carrying the footer that is not a write | 0 |
 | `gh issue commentary` with a body file carrying the footer | A subcommand name that only begins with `comment` | 0 |
+| `gh pr comment` and `gh pr review --comment`, `--body` and `-b` | A body ending in a `---` rule and the `Generated by` footer | 2 |
+| `gh pr comment` and `gh pr review --comment`, `--body-file <file>` and `-F <file>` | A body file ending in the `Generated by` footer | 2 |
+| `gh pr comment` and `gh pr review --comment`, `--body`, clean | A body with no footer | 0 |
+| `gh pr comment` and `gh pr review --comment`, `-F <file>`, clean | A body file with no footer | 0 |
+| `gh pr comments` and `gh pr reviews` with a body file carrying the footer | A subcommand name that only begins with `comment` or `review` | 0 |
+| `gh pr comment -F <file>` and `gh pr review --comment -F <file>`, through the delivered hook | A body file ending in the `Generated by` footer | 2 |
+| `gh pr comment -F <file>`, through the delivered hook, clean | A body file with no footer | 0 |
+| `mcp__github__add_issue_comment`, `mcp__github__update_issue_comment`, `mcp__github__add_reply_to_pull_request_comment`, `mcp__github__pull_request_review_write` and `mcp__github__add_comment_to_pending_review`, through the delivered hook | Each tool's own fields, with a `body` ending in a `---` rule and the `Generated by` footer | 2 |
+| The same five tools, through the delivered hook, clean | A `body` with no footer | 0 |
+| A tool outside the delivered matcher, through the delivered hook | `mcp__github__get_me` with a `body` carrying the footer | 0 |
 | Create response with a `body` carrying the marker | A `body` ending in a `---` rule and the `Generated by` footer carrying a session link | 2 |
 | Create response with a clean `body` | A `body` with no footer | 0 |
 | Create response with no `body` | An `id` and a `url` only | 2 |

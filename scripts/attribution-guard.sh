@@ -52,7 +52,7 @@ if [ "$TOOL" = Bash ]; then
   WRITE_OP=no
   SHORT_F=no
   if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+(pr|issue)[[:space:]]+(create|edit)([^[:alnum:]_-]|$)'; then WRITE_OP=yes; SHORT_F=yes; fi
-  if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+issue[[:space:]]+comment([^[:alnum:]_-]|$)'; then WRITE_OP=yes; SHORT_F=yes; fi
+  if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+(issue[[:space:]]+comment|pr[[:space:]]+(comment|review))([^[:alnum:]_-]|$)'; then WRITE_OP=yes; SHORT_F=yes; fi
   if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+api([[:space:]]|$)' \
      && printf '%s\n' "$CMD" | grep -a -q -E -- '/(pulls|issues)([^[:alnum:]_-]|$)'; then WRITE_OP=yes; fi
   if [ "$WRITE_OP" != yes ]; then exit 0; fi
