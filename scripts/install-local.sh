@@ -288,6 +288,8 @@ main() {
       if [ -z "$CLI" ]; then
         echo "claude plugin install $plugin_id -> not run, no CLI; run instead: claude plugin marketplace add $mp_source && claude plugin install $plugin_id --scope user --yes"
         fails=$((fails + 1))
+        echo "bash $DEPLOY/scripts/plugin-dependencies.sh <CLI> $plugin_id -> not run, no CLI"
+        fails=$((fails + 1))
         continue
       fi
       "$CLI" plugin marketplace add "$mp_source"; rc=$?
@@ -295,6 +297,9 @@ main() {
       [ "$rc" -eq 0 ] || fails=$((fails + 1))
       "$CLI" plugin install "$plugin_id" --scope user --yes; rc=$?
       echo "claude plugin install $plugin_id --scope user --yes -> exit=$rc"
+      [ "$rc" -eq 0 ] || fails=$((fails + 1))
+      bash "$DEPLOY/scripts/plugin-dependencies.sh" "$CLI" "$plugin_id"; rc=$?
+      echo "bash $DEPLOY/scripts/plugin-dependencies.sh $CLI $plugin_id -> exit=$rc"
       [ "$rc" -eq 0 ] || fails=$((fails + 1))
     done 3< "$PLUGINS"
     echo "plugins.tsv rows carrying a plugin_id -> $rows"

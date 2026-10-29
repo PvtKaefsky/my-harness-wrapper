@@ -107,6 +107,9 @@ if [ -f "$PLUGINS" ]; then
     claude plugin install "$plugin_id" --scope user --yes; rc=$?
     echo "claude plugin install $plugin_id --scope user --yes -> exit=$rc"
     [ "$rc" -eq 0 ] || fails=$((fails + 1))
+    bash "$SRC/scripts/plugin-dependencies.sh" claude "$plugin_id"; rc=$?
+    echo "bash $SRC/scripts/plugin-dependencies.sh claude $plugin_id -> exit=$rc"
+    [ "$rc" -eq 0 ] || fails=$((fails + 1))
   done 3< "$PLUGINS"
 else
   fails=$((fails + 1))
