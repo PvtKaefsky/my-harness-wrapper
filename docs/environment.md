@@ -7,9 +7,9 @@ What the sandbox is, and what the delivery path may assume about it.
 1. **Root-only container.** Setup scripts run as `uid=0` with `HOME=/root`.
    There is no `user` account. `/home/user` exists and is owned by `root:root`.
    Never use `runuser` or `su`, and never create accounts.
-2. **The init script fetches the repository itself.** It clones
-   branch `feat/claude-harness` of `$HARNESS_REPO_URL`, or of its own default
-   where that variable is unset or empty, `--depth 1` into
+2. **The init script fetches the repository itself.** It clones branch `main`
+   of `$HARNESS_REPO_URL`, or of its own default where that variable is unset
+   or empty, `--depth 1` into
    `/opt/my-harness-wrapper`, and runs `scripts/bootstrap.sh` from there. No
    session needs the repository attached.
 3. **An attached repository is cloned under `/home/user`.** The environment
@@ -101,10 +101,9 @@ bootstrap and is named in the log. The script always ends `exit 0`.
 only step that writes `/root/.claude`.
 
 `scripts/bootstrap.sh` copies the payload and merges the settings from the clone
-of `feat/claude-harness` made at build time, not of the default branch. A
-merged change therefore reaches the next build with no paste. No operator
-action triggers that build. The pasted copy supplies the clone URL and the
-version marker.
+of `main` made at build time. A merged change therefore reaches the next build
+with no paste. No operator action triggers that build. The pasted copy supplies
+the clone URL and the version marker.
 
 ## Waiting for a reviewer
 
@@ -257,8 +256,8 @@ restored the 17:42 build, not the 17:47 one.
 
 The clone is part of the snapshot rather than re-made per session. Its
 `origin/*` refs are the build's, plus whatever the session itself pushed, so
-they can be stale. Fetch before comparing `HEAD` against
-`origin/feat/claude-harness`.
+they can be stale. Fetch before comparing `HEAD` against `origin/main`. A clone
+built by a pasted `0.1.15` through `0.1.20` fetches only `feat/claude-harness`.
 
 Config is frozen at snapshot time while a session's own commits move `HEAD`.
 `scripts/verify.sh` reports the resulting drift by comparing `manifest.commit`

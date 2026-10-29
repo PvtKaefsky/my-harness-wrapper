@@ -7,26 +7,26 @@ A change sessions should receive is any change under `config/`, `scripts/` or
 
 1. Bump the `export BOOTSTRAP_VERSION=` line of `env/setup.sh` in the round's
    last commit.
-2. Merge the round to `feat/claude-harness`.
-3. Paste the full contents of `env/setup.sh`, read from `feat/claude-harness`,
-   unchanged, into the setup-script field of the cloud environment at
-   claude.ai → Settings → Environments.
+2. Merge the round to `main`.
+3. Paste the full contents of `env/setup.sh`, read from `main`, unchanged,
+   into the setup-script field of the cloud environment at claude.ai →
+   Settings → Environments.
 4. Start a session after the build and read `/home/user/bootstrap.log`.
 
 A version number is never reused for different contents.
 
-Pull requests here target a non-default base, so `Closes` lines close nothing.
-Descriptions carry `Refs:` lines. Issues stay open until the user closes them.
+Pull requests here target `main`, the default branch, so a `Closes` line in a
+description closes its issue when the pull request merges.
 
 A mismatch between the manifest and the clone, the `FAIL
 manifest.bootstrap_version` line of `scripts/verify.sh`, means a paste is due.
 The comparison does not separate an older pasted copy from a newer one. A copy
-pasted from an unmerged branch is the newer case: after the merge
-`feat/claude-harness` holds the same text, which does not rebuild, so the next
-bumped change, or a build another trigger starts, is what delivers it. A match
-does not mean no paste is due. A restored session's manifest and clone both
-come from its snapshot's build, so they match while `feat/claude-harness`
-carries a later bumped change no paste has delivered.
+pasted from an unmerged branch is the newer case: after the merge `main` holds
+the same text, which does not rebuild, so the next bumped change, or a build
+another trigger starts, is what delivers it. A match does not mean no paste is
+due. A restored session's manifest and clone both come from its snapshot's
+build, so they match while `main` carries a later bumped change no paste has
+delivered.
 
 The environment variables panel carries the four identity variables
 `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
@@ -39,8 +39,8 @@ The facts that fix that order:
   paste.
 * Pasting identical text does not rebuild. Only the text the dialog holds is
   compared, so a bump to any other file changes nothing.
-* A rebuild clones `feat/claude-harness` as it stands at build time, so a paste
-  made before the merge spends that version on the old tree.
+* A rebuild clones `main` as it stands at build time, so a paste made before
+  the merge spends that version on the old tree.
 * A merged change outside `env/setup.sh` is in the clone of the next build
   without a paste. No operator action other than a paste triggers that build.
 * A restored session keeps the `/opt/my-harness-wrapper` clone its snapshot was
@@ -61,6 +61,29 @@ The init script assigns its own default clone URL where `HARNESS_REPO_URL` is
 unset or empty. To clone a different repository, edit that default URL in the
 pasted copy of `env/setup.sh`. The cloned branch is the `HARNESS_REF` line of
 that copy.
+
+### Moving delivery to `main`
+
+Version `0.1.21` of `env/setup.sh` is the first to clone `main` by name.
+Pasted copies `0.1.15` through `0.1.20` clone `feat/claude-harness`. Copies
+`0.1.14` and earlier clone the default branch. The move runs in this order:
+
+1. Merge the pull request that moves delivery with "Create a merge commit". A
+   squash or rebase merge leaves the harness's own commits off `main`, and
+   step 4 deletes their only branch.
+2. Paste `env/setup.sh` at `0.1.21`, read from `main`, into the cloud
+   environment dialog. Start a new cloud session. Its `bootstrap.log` reads
+   `HARNESS_REF -> main`, and its session-start check ends
+   `verify.sh -> fail -> 0`. A paste before the merge clones the Codex adapter
+   tree, delivers no harness, and spends `0.1.21`.
+3. From a checkout of `main` at the merge, in Git Bash, run
+   `bash scripts/install-local.sh`. It ends `fails -> 0` and leaves the
+   deployed copy on `main`.
+4. Delete `feat/claude-harness` only after steps 2 and 3. Until the `0.1.21`
+   paste, the pasted `0.1.20` clones `feat/claude-harness`, and without that
+   branch its clone fails and the build delivers no harness while exiting 0.
+5. In the claude.ai Project instruction's harness table, name `main` for the
+   Claude harness and `platform/codex` for the Codex adapter.
 
 ## Installing locally
 
@@ -100,10 +123,10 @@ where Git is in its default location, from PowerShell as:
 ```
 
 It first checks `jq` and `git` as the prerequisites table states, then clones
-branch `feat/claude-harness` `--depth 1` into the deployed
-copy, `my-harness-wrapper` in `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, from
-`HARNESS_REPO_URL` where it is set and non-empty and from the default URL in
-`env/setup.sh` otherwise, and marks the clone with the local config key
+branch `main` `--depth 1` into the deployed copy, `my-harness-wrapper` in
+`${CLAUDE_CONFIG_DIR-$HOME/.claude}`, from `HARNESS_REPO_URL` where it is set
+and non-empty and from the default URL in `env/setup.sh` otherwise, and marks
+the clone with the local config key
 `harness.installer=install-local`. Where a marked deployed copy
 exists, it brings it to the branch's remote head instead and removes every
 change and untracked file in it. It refuses a deployed copy path that is a
@@ -190,8 +213,8 @@ bash scripts/install-local.sh
 ```
 
 Run from any checkout, on any branch. The hook commands run the scripts in the
-deployed copy, so a merge to `feat/claude-harness` reaches local sessions only
-when the installer runs again. A branch switch, a pull or an edit in a checkout
+deployed copy, so a merge to `main` reaches local sessions only when the
+installer runs again. A branch switch, a pull or an edit in a checkout
 changes no session.
 
 ### Verify
@@ -245,7 +268,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL manifest.commit: expected unresolved-repo` | `git -C <repo> rev-parse --short HEAD` produced nothing, so the repository being checked is absent or is not a git repository. | Read the path in the line. The deployed copy is missing, or `HARNESS_DIR` names something else. The two sides carry different defaults, so two unknowns never compare equal and pass. |
 | `git -C <repo> rev-parse --show-toplevel names <repo> -> ...` | Whether the repository under test is the top level of its own work tree: `yes`, `no, the top level is [<path>]`, `unreadable (git exit=N)`, or `repo unreadable` where the `rev-parse --git-dir` line above is non-zero. Anything but `yes` fails both checks below without running them. | Read the path. `HARNESS_DIR` names a directory inside another repository, or the deployed copy lost its `.git`. |
 | `git -C <repo> symbolic-ref -q HEAD -> ...` | The repository under test's branch as a full ref: `[refs/heads/<name>]`, `detached HEAD (git exit=1)`, `unreadable (git exit=N)`, or `not read`. | Nothing, unless `FAIL deployed copy branch` follows it. |
-| `FAIL deployed copy branch` | The repository under test is not on `refs/heads/feat/claude-harness`, is detached, is not the top level of its work tree, or git could not read its branch. | Locally, re-run `scripts/install-local.sh`, which checks the branch out at its remote head. In the cloud, rebuild. Where the repository under test is a working checkout, run against the deployed copy instead. |
+| `FAIL deployed copy branch` | The repository under test is not on `refs/heads/main`, is detached, is not the top level of its work tree, or git could not read its branch. | Locally, re-run `scripts/install-local.sh`, which checks the branch out at its remote head. In the cloud, rebuild. Where the repository under test is a working checkout, run against the deployed copy instead. |
 | `git -C <repo> status --porcelain --untracked-files=all --ignore-submodules=none -> ...` | The repository under test's uncommitted and untracked entries against its own `HEAD`: `no entries`, a count with up to five entries of up to 120 bytes each joined by ` \| `, `unreadable` with git's first error line, `unreadable, git wrote to stderr`, `timed out after 10s`, or `not read`. | Nothing, unless `FAIL deployed copy changes` follows it. |
 | `git -C <repo> ls-files -v, entries marked skip-worktree or assume-unchanged -> N` | How many index entries hide their file from `status`, `unreadable (git exit=N)`, or `not read`. | Nothing, unless `FAIL deployed copy changes` follows it. |
 | `FAIL deployed copy changes` | The repository under test has an entry differing from its `HEAD`, an index entry marked skip-worktree or assume-unchanged, or a status git could not read in full. | In the cloud, read the entries: nothing in this repository writes into the clone. Locally, re-run `scripts/install-local.sh`, which discards them. Where the repository under test is a working checkout, run against the deployed copy instead. |
@@ -329,8 +352,8 @@ Hand-run `scripts/bootstrap.sh`, `scripts/verify.sh` and
 `scripts/install-local.sh` against a copy of the config directory, with
 `CLAUDE_CONFIG_DIR` naming the copy, never against the live one. That run
 exercises `scripts/plugin-dependencies.sh` through a deployed copy cloned from a
-local repository whose `feat/claude-harness` carries the change, named in
-`HARNESS_REPO_URL`. Run
+local repository whose `main` carries the change, named in `HARNESS_REPO_URL`.
+Run
 `scripts/test-attribution-guard.sh` before committing a change to
 `scripts/attribution-guard.sh` or to the test script itself; it exits 0 only
 where every case passes. `bash -n` is not

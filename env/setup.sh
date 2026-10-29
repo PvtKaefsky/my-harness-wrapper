@@ -1,11 +1,11 @@
 #!/bin/bash
 set -uo pipefail
 exec > /home/user/bootstrap.log 2>&1
-export BOOTSTRAP_VERSION=0.1.20
+export BOOTSTRAP_VERSION=0.1.21
 echo "BOOTSTRAP_VERSION=$BOOTSTRAP_VERSION"
 
 HARNESS_DIR=/opt/my-harness-wrapper
-HARNESS_REF=feat/claude-harness
+HARNESS_REF=main
 echo "HARNESS_DIR -> $HARNESS_DIR"
 echo "HARNESS_REF -> $HARNESS_REF"
 if [ -z "${HARNESS_REPO_URL+set}" ]; then URL_STATE=unset

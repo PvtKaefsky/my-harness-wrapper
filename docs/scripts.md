@@ -140,8 +140,8 @@ cannot read is already counted by the `rev-parse` above it.
 ## scripts/install-local.sh
 
 Delivers `config/` into a local Claude config directory from a deployed copy of
-`feat/claude-harness`. Run by the user from any checkout, in Git Bash on Windows
-and bash elsewhere. It carries bootstrap's steps with the same semantics, minus
+`main`. Run by the user from any checkout, in Git Bash on Windows and bash
+elsewhere. It carries bootstrap's steps with the same semantics, minus
 the `/home/user/.claude` symlink.
 
 It never sets `-e`. Every step prints its predicate and observed value. Its
@@ -187,7 +187,7 @@ printed and not compared.
 
 ### Step 3, the deployed copy
 
-The branch is `feat/claude-harness`. The clone URL is `HARNESS_REPO_URL` where
+The branch is `main`. The clone URL is `HARNESS_REPO_URL` where
 it is set and non-empty, and the default URL `env/setup.sh` carries otherwise.
 The `HARNESS_REPO_URL ->` line names which, as the init script's does. A URL
 beginning with `-` is refused. The step unsets `GIT_DIR`, `GIT_WORK_TREE`,
@@ -197,8 +197,8 @@ and prints which of them were set.
 
 | State of the deployed copy | What runs |
 | --- | --- |
-| Absent | `git clone -q -c harness.installer=install-local --depth 1 --branch feat/claude-harness`, which writes the marker into the clone's local config in the same step |
-| A directory, not a symlink, holding a `.git` directory, at the top level of its work tree, with `harness.installer` set to `install-local` in its local config | `remote set-url origin`, `fetch -q --depth 1` of the branch into `refs/remotes/origin/feat/claude-harness`, `checkout -f -B feat/claude-harness` at that ref, and `clean -ffdx` |
+| Absent | `git clone -q -c harness.installer=install-local --depth 1 --branch main`, which writes the marker into the clone's local config in the same step |
+| A directory, not a symlink, holding a `.git` directory, at the top level of its work tree, with `harness.installer` set to `install-local` in its local config | `remote set-url origin`, `fetch -q --depth 1` of the branch into `refs/remotes/origin/main`, `checkout -f -B main` at that ref, and `clean -ffdx` |
 | Anything else: a symlink, a linked worktree, a plain directory, a directory inside another work tree, or a clone the installer did not make | Nothing; counted as a failure |
 
 The installer owns the copy it marked: a refresh discards every change and
@@ -211,7 +211,7 @@ count of index entries marked skip-worktree or assume-unchanged, whether
 `config/CLAUDE.md`, `config/settings.json`, `config/plugins.tsv` and
 `env/setup.sh` are tracked, and `log -1`. A failed read prints the first line of
 git's error. The copy is ready where `HEAD` equals the remote ref, the branch is
-`feat/claude-harness`, `remote.origin.url` equals the clone URL, the status has
+`main`, `remote.origin.url` equals the clone URL, the status has
 no entries, no index entry is marked, and the four files are tracked. The stored
 value is compared, not the `url.<base>.insteadOf` rewrite `remote get-url`
 prints, so a rewrite in the user's git config does not fail the check. A clone
@@ -617,7 +617,7 @@ probe and gated on it. Each runs `git` with `GIT_DIR`, `GIT_WORK_TREE`,
 | Probe | Passes where | Fails on |
 | --- | --- | --- |
 | Top level | `rev-parse --show-toplevel` resolves, through `cygpath -u` where it exists and `readlink -f`, to the repository under test | a parent repository's top level; a non-zero exit |
-| `FAIL deployed copy branch` | `symbolic-ref -q HEAD` prints `refs/heads/feat/claude-harness` | another ref, a tag among them; a detached `HEAD`, exit 1; any other non-zero exit; a failed top-level probe |
+| `FAIL deployed copy branch` | `symbolic-ref -q HEAD` prints `refs/heads/main` | another ref, a tag among them; a detached `HEAD`, exit 1; any other non-zero exit; a failed top-level probe |
 | `FAIL deployed copy changes` | `status --porcelain` exits 0 with no output and nothing on stderr, and `ls-files -v` lists no entry tagged `S` or lowercase | any status entry, modified, staged or untracked; any stderr output; a non-zero exit; a status that ran past 10 seconds; a marked index entry; a failed top-level probe |
 
 The branch probe runs before the status probe. The status command carries
@@ -1170,7 +1170,7 @@ URL comes from `HARNESS_REPO_URL` where that variable is set and non-empty, and
 from the script's own default, this repository's URL, where it is unset or
 empty. A value the environment supplies is never overwritten. The destination
 is the literal `/opt/my-harness-wrapper`. The cloned branch is the literal
-`feat/claude-harness`.
+`main`.
 
 | Line | What it reports |
 | --- | --- |

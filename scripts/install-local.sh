@@ -24,7 +24,7 @@ esac
 mkdir -p "$CONFIG_DIR"; MKDIR_RC=$?
 LOG="$CONFIG_DIR/.my-harness-wrapper.install.log"
 DEPLOY="$CONFIG_DIR/my-harness-wrapper"
-HARNESS_REF=feat/claude-harness
+HARNESS_REF=main
 if [ -z "${HARNESS_REPO_URL+set}" ]; then URL_STATE=unset
 elif [ -z "$HARNESS_REPO_URL" ]; then URL_STATE="set but empty"
 else URL_STATE=set; fi

@@ -2,7 +2,7 @@
 set -uo pipefail
 
 REPO=${HARNESS_DIR:-/opt/my-harness-wrapper}
-HARNESS_REF=feat/claude-harness
+HARNESS_REF=main
 HARNESS_MAIL="noreply@anthropic.com"
 run() { echo "\$ $*"; "$@" 2>&1; echo "exit=$?"; }
 sanitize() { printf '%s' "$1" | LC_ALL=C tr '\n' ' ' | LC_ALL=C tr '\000-\037\177' '?'; }
