@@ -38,16 +38,23 @@ rebuild an operator controls is a change to the pasted init script text.
 ### Local sessions
 
 1. The user runs `scripts/install-local.sh` in Git Bash, or in bash elsewhere,
-   from a checkout of `feat/claude-harness`.
-2. It copies `config/CLAUDE.md` into `${CLAUDE_CONFIG_DIR-$HOME/.claude}`,
-   merges `config/settings.json` into that directory's `settings.json` with
-   `env.HARNESS_DIR` set to the checkout, sets both `*.gpgsign` keys to `false`
-   globally, installs the plugins named in `config/plugins.tsv`, and writes the
-   manifest with a `local_checkout` field.
-3. Every Claude Code session started after that reads the directory. Its hook
-   commands run the scripts in the checkout, through `HARNESS_DIR`.
+   from any checkout of this repository.
+2. It clones branch `feat/claude-harness` `--depth 1` into the deployed copy,
+   `${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper`, or brings an
+   existing deployed copy to that branch's remote head, clean. The clone URL
+   follows the init script's rule. A failed clone or refresh stops the run
+   before anything else is written.
+3. From the deployed copy, it copies `config/CLAUDE.md` into
+   `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, merges `config/settings.json` into that
+   directory's `settings.json` with `env.HARNESS_DIR` set to the deployed copy,
+   sets both `*.gpgsign` keys to `false` globally, installs the plugins named in
+   `config/plugins.tsv`, and writes the manifest with a `local_checkout` field
+   naming the deployed copy.
+4. Every Claude Code session started after that reads the directory. Its hook
+   commands run the scripts in the deployed copy, through `HARNESS_DIR`.
 
-The payload is a copy. A `git pull` reaches local sessions only after the
+The invoking checkout is not read for delivery, so a branch switch or an edit
+in it changes no session. Merged changes reach local sessions only after the
 installer runs again.
 
 The default branch `main` holds the Codex adapter, and this harness is branch
@@ -62,7 +69,7 @@ The default branch `main` holds the Codex adapter, and this harness is branch
 | `config/plugins.tsv` | The plugins bootstrap installs. |
 | `env/setup.sh` | The init script pasted into the environment dialog. It clones this repository and is the only version source. |
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
-| `scripts/install-local.sh` | The local delivery step. Run by the user from a checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}` and the global git config. |
+| `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config. |
 | `scripts/session-check.sh` | Reports what a session starts with. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
 | `scripts/attribution-guard.sh` | Blocks a pull request or issue body carrying a Claude Code attribution line, and tells the session to resend a description the create call returns with one. Run by the `PreToolUse` and `PostToolUse` hooks `config/settings.json` registers. |
@@ -96,11 +103,10 @@ are in `docs/runbook.md`.
 
 ### Install or update locally
 
-Git Bash, Node and `jq` are prerequisites. From the checkout, on
-`feat/claude-harness`:
+Git Bash, Node, `git` and `jq` are prerequisites. From any checkout, on any
+branch:
 
 ```
-git pull
 bash scripts/install-local.sh
 ```
 
@@ -113,10 +119,10 @@ prerequisites and how to read the log.
 bash /opt/my-harness-wrapper/scripts/verify.sh
 ```
 
-Locally, from the checkout:
+Locally, against the deployed copy:
 
 ```
-HARNESS_DIR="$PWD" bash scripts/verify.sh
+d="${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper"; HARNESS_DIR="$d" bash "$d/scripts/verify.sh"
 ```
 
 Exit 0 means no check failed. A `NOTE` line can appear alongside it and does

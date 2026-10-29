@@ -23,6 +23,13 @@ case "$CONFIG_DIR" in
 esac
 mkdir -p "$CONFIG_DIR"; MKDIR_RC=$?
 LOG="$CONFIG_DIR/.my-harness-wrapper.install.log"
+DEPLOY="$CONFIG_DIR/my-harness-wrapper"
+HARNESS_REF=feat/claude-harness
+if [ -z "${HARNESS_REPO_URL+set}" ]; then URL_STATE=unset
+elif [ -z "$HARNESS_REPO_URL" ]; then URL_STATE="set but empty"
+else URL_STATE=set; fi
+if [ "$URL_STATE" = set ]; then REPO_URL=$HARNESS_REPO_URL; URL_SOURCE=environment
+else REPO_URL=https://github.com/PvtKaefsky/my-harness-wrapper.git; URL_SOURCE=default; fi
 
 keep_first() {
   local backup="$1.pre-harness" rc
@@ -49,6 +56,88 @@ resolve_cli() {
   CLI=""; CLI_FROM=none
 }
 
+first_line() {
+  printf '%s' "${1%%$'\n'*}" | LC_ALL=C tr '\000-\037\177' '?'
+}
+
+deploy() {
+  local rc out cdup marker prior head want head_rc want_rc branch branch_rc st st_rc entries
+  local flagged flag_rc url url_rc url_match payload_rc var was_set=""
+  for var in GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR GIT_ALTERNATE_OBJECT_DIRECTORIES; do
+    [ -z "${!var+set}" ] || was_set="$was_set $var"
+    unset "$var"
+  done
+  echo "repository-redirecting GIT_* variables set before the unset ->${was_set:- none}"
+  echo "deployed copy -> $DEPLOY"
+  echo "HARNESS_REF -> $HARNESS_REF"
+  echo "HARNESS_REPO_URL -> $URL_STATE; clone URL from $URL_SOURCE"
+  echo "command -v git -> $GIT"
+  if [ "$GIT" = none ]; then fails=$((fails + 1)); return 1; fi
+  case "$REPO_URL" in
+    -*) echo "clone URL begins with - -> yes, refused"; fails=$((fails + 1)); return 1 ;;
+  esac
+  if [ ! -e "$DEPLOY" ] && [ ! -L "$DEPLOY" ]; then
+    echo "test -e $DEPLOY -> no"
+    git clone -q -c harness.installer=install-local --depth 1 --branch "$HARNESS_REF" -- "$REPO_URL" "$DEPLOY"; rc=$?
+    echo "git clone -q -c harness.installer=install-local --depth 1 --branch $HARNESS_REF -- \$HARNESS_REPO_URL $DEPLOY -> exit=$rc"
+    [ "$rc" -eq 0 ] || { fails=$((fails + 1)); return 1; }
+  else
+    echo "test -e $DEPLOY -> yes"
+    echo "test -L $DEPLOY -> $([ -L "$DEPLOY" ] && echo yes || echo no)"
+    echo "test -d $DEPLOY/.git -> $([ -d "$DEPLOY/.git" ] && echo yes || echo no)"
+    if [ -L "$DEPLOY" ] || [ ! -d "$DEPLOY/.git" ]; then fails=$((fails + 1)); return 1; fi
+    cdup=$(git -C "$DEPLOY" rev-parse --show-cdup 2>&1); rc=$?
+    echo "git -C $DEPLOY rev-parse --show-cdup -> exit=$rc value=[$(first_line "$cdup")]"
+    if [ "$rc" -ne 0 ] || [ -n "$cdup" ]; then fails=$((fails + 1)); return 1; fi
+    marker=$(git -C "$DEPLOY" config --local --get harness.installer 2>&1); rc=$?
+    echo "git -C $DEPLOY config --local --get harness.installer -> exit=$rc value=[$(first_line "$marker")]"
+    if [ "$rc" -ne 0 ] || [ "$marker" != install-local ]; then fails=$((fails + 1)); return 1; fi
+    prior=$(git -C "$DEPLOY" rev-parse HEAD 2>&1); rc=$?
+    echo "git -C $DEPLOY rev-parse HEAD, before the refresh -> exit=$rc value=[$(first_line "$prior")]"
+    git -C "$DEPLOY" remote set-url -- origin "$REPO_URL"; rc=$?
+    echo "git -C $DEPLOY remote set-url -- origin \$HARNESS_REPO_URL -> exit=$rc"
+    [ "$rc" -eq 0 ] || { fails=$((fails + 1)); return 1; }
+    git -C "$DEPLOY" fetch -q --depth 1 origin "+refs/heads/$HARNESS_REF:refs/remotes/origin/$HARNESS_REF"; rc=$?
+    echo "git -C $DEPLOY fetch -q --depth 1 origin +refs/heads/$HARNESS_REF:refs/remotes/origin/$HARNESS_REF -> exit=$rc"
+    [ "$rc" -eq 0 ] || { fails=$((fails + 1)); return 1; }
+    git -C "$DEPLOY" checkout -q -f -B "$HARNESS_REF" "refs/remotes/origin/$HARNESS_REF"; rc=$?
+    echo "git -C $DEPLOY checkout -q -f -B $HARNESS_REF refs/remotes/origin/$HARNESS_REF -> exit=$rc"
+    [ "$rc" -eq 0 ] || { fails=$((fails + 1)); return 1; }
+    git -C "$DEPLOY" clean -q -ffdx; rc=$?
+    echo "git -C $DEPLOY clean -q -ffdx -> exit=$rc"
+    [ "$rc" -eq 0 ] || { fails=$((fails + 1)); return 1; }
+  fi
+  head=$(git -C "$DEPLOY" rev-parse HEAD 2>&1); head_rc=$?
+  echo "git -C $DEPLOY rev-parse HEAD -> exit=$head_rc value=[$(first_line "$head")]"
+  want=$(git -C "$DEPLOY" rev-parse "refs/remotes/origin/$HARNESS_REF" 2>&1); want_rc=$?
+  echo "git -C $DEPLOY rev-parse refs/remotes/origin/$HARNESS_REF -> exit=$want_rc value=[$(first_line "$want")]"
+  branch=$(git -C "$DEPLOY" symbolic-ref --short -q HEAD 2>&1); branch_rc=$?
+  echo "git -C $DEPLOY symbolic-ref --short -q HEAD -> exit=$branch_rc value=[$(first_line "$branch")]"
+  url=$(git -C "$DEPLOY" config --local --get remote.origin.url 2>&1); url_rc=$?
+  if [ "$url_rc" -eq 0 ] && [ "$url" = "$REPO_URL" ]; then url_match=yes; else url_match=no; fi
+  echo "git -C $DEPLOY config --local --get remote.origin.url equals \$HARNESS_REPO_URL -> exit=$url_rc $url_match"
+  st=$(git -C "$DEPLOY" status --porcelain 2>&1); st_rc=$?
+  if [ "$st_rc" -eq 0 ]; then
+    entries=$(printf '%s' "$st" | grep -a -c '')
+    echo "git -C $DEPLOY status --porcelain -> exit=0 entries=$entries"
+  else
+    echo "git -C $DEPLOY status --porcelain -> exit=$st_rc entries=unread value=[$(first_line "$st")]"
+  fi
+  out=$(git -C "$DEPLOY" ls-files -v 2>&1); flag_rc=$?
+  flagged=$( [ "$flag_rc" -eq 0 ] && printf '%s\n' "$out" | grep -a -c -E '^([a-z]|S) ')
+  echo "git -C $DEPLOY ls-files -v, entries marked skip-worktree or assume-unchanged -> exit=$flag_rc count=${flagged:-unread}$([ "$flag_rc" -eq 0 ] || printf ' value=[%s]' "$(first_line "$out")")"
+  out=$(git -C "$DEPLOY" ls-files --error-unmatch -- config/CLAUDE.md config/settings.json config/plugins.tsv env/setup.sh 2>&1); payload_rc=$?
+  echo "git -C $DEPLOY ls-files --error-unmatch config/CLAUDE.md config/settings.json config/plugins.tsv env/setup.sh -> exit=$payload_rc$([ "$payload_rc" -eq 0 ] || printf ' value=[%s]' "$(first_line "$out")")"
+  echo "git -C $DEPLOY log -1 --format='%h %cI' -> $(first_line "$(git -C "$DEPLOY" log -1 --format='%h %cI' 2>&1)")"
+  if [ "$head_rc" -ne 0 ] || [ "$want_rc" -ne 0 ] || [ -z "$head" ] || [ "$head" != "$want" ] \
+    || [ "$branch_rc" -ne 0 ] || [ "$branch" != "$HARNESS_REF" ] || [ "$url_match" != yes ] \
+    || [ "$st_rc" -ne 0 ] || [ -n "$st" ] || [ "$flag_rc" -ne 0 ] || [ "${flagged:-1}" != 0 ] \
+    || [ "$payload_rc" -ne 0 ]; then
+    fails=$((fails + 1)); return 1
+  fi
+  return 0
+}
+
 main() {
   local fails=0 rc ch_rc mv_rc rm_rc TMP MTMP
   echo "id -> $(id -u):$(id -g) HOME=${HOME:-}"
@@ -67,7 +156,15 @@ main() {
   echo "command -v jq -> $JQ"
   [ "$JQ" != none ] || fails=$((fails + 1))
 
-  local SRC_MD="$SRC/config/CLAUDE.md"
+  local GIT
+  GIT=$(command -v git || echo none)
+  if ! deploy; then
+    echo "delivery -> stopped before $CONFIG_DIR/CLAUDE.md and $CONFIG_DIR/settings.json, the deployed copy step failed for $DEPLOY"
+    [ "$fails" -le 255 ] || fails=255
+    return "$fails"
+  fi
+
+  local SRC_MD="$DEPLOY/config/CLAUDE.md"
   echo "test -f $SRC_MD -> $([ -f "$SRC_MD" ] && echo yes || echo no)"
   if [ -f "$CONFIG_DIR/CLAUDE.md" ]; then
     cmp -s "$SRC_MD" "$CONFIG_DIR/CLAUDE.md"; rc=$?
@@ -84,7 +181,7 @@ main() {
     fails=$((fails + 1))
   fi
 
-  local SRC_SETTINGS="$SRC/config/settings.json"
+  local SRC_SETTINGS="$DEPLOY/config/settings.json"
   local DST_SETTINGS="$CONFIG_DIR/settings.json"
   local MERGE='if length != 2 then error("expected one JSON document in each file, read \(length) in all") else .[0] * .[1] * {env: {HARNESS_DIR: $h}} end'
   local DIFFERS='if length == 2 and (.[0] | type) == "object" and (.[1] | type) == "object" then .[0] as $l | [.[1] | to_entries[] | .key as $k | select(($l | has($k)) and $l[$k] != .value) | $k] | join(" ") else "not compared" end'
@@ -113,11 +210,11 @@ main() {
       fails=$((fails + 1))
     else
       if [ -s "$DST_SETTINGS" ]; then
-        jq -s --arg h "$SRC" "$MERGE" "$DST_SETTINGS" "$SRC_SETTINGS" > "$TMP"; rc=$?
-        echo "jq -s --arg h $SRC '$MERGE' $DST_SETTINGS $SRC_SETTINGS -> exit=$rc"
+        jq -s --arg h "$DEPLOY" "$MERGE" "$DST_SETTINGS" "$SRC_SETTINGS" > "$TMP"; rc=$?
+        echo "jq -s --arg h $DEPLOY '$MERGE' $DST_SETTINGS $SRC_SETTINGS -> exit=$rc"
       else
-        jq -s --arg h "$SRC" "[{}] + . | $MERGE" "$SRC_SETTINGS" > "$TMP"; rc=$?
-        echo "jq -s --arg h $SRC '[{}] + . | $MERGE' $SRC_SETTINGS -> exit=$rc"
+        jq -s --arg h "$DEPLOY" "[{}] + . | $MERGE" "$SRC_SETTINGS" > "$TMP"; rc=$?
+        echo "jq -s --arg h $DEPLOY '[{}] + . | $MERGE' $SRC_SETTINGS -> exit=$rc"
       fi
       if [ "$rc" -eq 0 ]; then
         chmod "$MODE" "$TMP"; ch_rc=$?
@@ -155,7 +252,7 @@ main() {
   done
 
   local CLI CLI_FROM mp_source plugin_id _rest rows=0
-  local PLUGINS="$SRC/config/plugins.tsv"
+  local PLUGINS="$DEPLOY/config/plugins.tsv"
   resolve_cli
   echo "command -v claude -> $(command -v claude || echo none)"
   echo "CLAUDE_CODE_EXECPATH -> ${CLAUDE_CODE_EXECPATH:-unset or empty}"
@@ -185,7 +282,7 @@ main() {
     fails=$((fails + 1))
   fi
 
-  local SETUP="$SRC/env/setup.sh" VER_LINES VER_RC VERSION=""
+  local SETUP="$DEPLOY/env/setup.sh" VER_LINES VER_RC VERSION=""
   VER_LINES=$(grep -a '^export BOOTSTRAP_VERSION=' "$SETUP" 2>/dev/null); VER_RC=$?
   if [ "$VER_RC" -eq 0 ] && [ -n "$VER_LINES" ] && [ "$VER_LINES" = "${VER_LINES%%$'\n'*}" ]; then
     VERSION=${VER_LINES#export BOOTSTRAP_VERSION=}
@@ -196,8 +293,8 @@ main() {
   [ -n "$VERSION" ] || fails=$((fails + 1))
 
   local COMMIT GIT_EMAIL INSTALLED_AT
-  COMMIT=$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null); rc=$?
-  echo "git -C $SRC rev-parse --short HEAD -> exit=$rc value=${COMMIT:-}"
+  COMMIT=$(git -C "$DEPLOY" rev-parse --short HEAD 2>/dev/null); rc=$?
+  echo "git -C $DEPLOY rev-parse --short HEAD -> exit=$rc value=${COMMIT:-}"
   [ "$rc" -eq 0 ] || fails=$((fails + 1))
   GIT_EMAIL=$(git -C "$SRC" config --get user.email 2>/dev/null); rc=$?
   echo "git -C $SRC config --get user.email -> exit=$rc value=${GIT_EMAIL:-}"
@@ -217,7 +314,7 @@ main() {
       --arg config_dir "$CONFIG_DIR" \
       --arg git_user_email "${GIT_EMAIL:-}" \
       --arg installed_at "${INSTALLED_AT:-}" \
-      --arg local_checkout "$SRC" \
+      --arg local_checkout "$DEPLOY" \
       '{bootstrap_version: $bootstrap_version, commit: $commit, config_dir: $config_dir, git_user_email: $git_user_email, installed_at: $installed_at, local_checkout: $local_checkout}' \
       > "$MTMP"; rc=$?
     echo "jq -n > $MTMP -> exit=$rc"
@@ -247,15 +344,17 @@ main() {
   return "$fails"
 }
 
-( umask 077; : >> "$LOG" ) 2>/dev/null
-chmod 600 "$LOG" 2>/dev/null
-main 2>&1 | tee "$LOG"
-PIPE_RCS=("${PIPESTATUS[@]}")
-FAILS=${PIPE_RCS[0]}; TEE_RC=${PIPE_RCS[1]}
-if [ "$TEE_RC" -ne 0 ]; then
-  echo "tee $LOG -> exit=$TEE_RC"
-  FAILS=$((FAILS + 1))
-fi
-echo "fails -> $FAILS" | tee -a "$LOG"
-[ "$FAILS" -le 255 ] || FAILS=255
-exit "$FAILS"
+{
+  ( umask 077; : >> "$LOG" ) 2>/dev/null
+  chmod 600 "$LOG" 2>/dev/null
+  main 2>&1 | tee "$LOG"
+  PIPE_RCS=("${PIPESTATUS[@]}")
+  FAILS=${PIPE_RCS[0]}; TEE_RC=${PIPE_RCS[1]}
+  if [ "$TEE_RC" -ne 0 ]; then
+    echo "tee $LOG -> exit=$TEE_RC"
+    FAILS=$((FAILS + 1))
+  fi
+  echo "fails -> $FAILS" | tee -a "$LOG"
+  [ "$FAILS" -le 255 ] || FAILS=255
+  exit "$FAILS"
+}
