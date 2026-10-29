@@ -75,6 +75,7 @@ are untested.
 | Node | ECC's hook commands are `node -e` commands. |
 | `git` | `command -v git` resolves and `git --version` exits 0 in the shell the installer runs in; otherwise the installer refuses before any write. The clone URL is reachable; otherwise the installer counts a failure and stops before writing `CLAUDE.md`. |
 | `jq` | `command -v jq` resolves and `jq -n 1` prints `1` in the shell the installer runs in; otherwise the installer refuses before any write. Without it in the hook environment the attribution guard exits 0 without scanning. On Windows, `winget install jqlang.jq`, then restart the terminal and the app. |
+| `npm` | `command -v npm` resolves in the shell the installer runs in, for the plugin dependency step. It is checked only where a plugin has an unresolved dependency; then an absent `npm` counts one failure and the run goes on. Node's installer ships it. |
 
 A refusal writes only the config directory, where it was absent, and the
 install log. It counts one failure per tool that failed.
@@ -121,8 +122,14 @@ replaces `CLAUDE.md` there whole, and replaces each `hooks.<event>` array that
 differing from the payload, copies it to `settings.json.pre-harness` or
 `CLAUDE.md.pre-harness` beside it; later runs leave that copy alone. The log
 also prints each replaced hook array's prior value. Its log is
-`.my-harness-wrapper.install.log` in that directory, mode 600, rewritten on
-each run.
+`.my-harness-wrapper.install.log` in that directory, rewritten on each run. The
+installer creates it under `umask 077` and runs `chmod 600` on it.
+
+| Platform | Mode of the log |
+| --- | --- |
+| Windows 11, NTFS, Git Bash | `-rw-r--r--` from `ls -l`, 644 from `stat -c %a`, after the installer's `chmod 600`. Git Bash derives these values from the file's ACL; they do not establish which accounts can read it. `Get-Acl` lists only inherited allow entries: full control for the owner, `SYSTEM` and `Administrators`, and read and execute for the machine's local `CodexSandboxUsers` group. |
+| Linux, macOS | not observed |
+
 Every line prints a predicate and its observed value. The exit status is the
 failure count, clamped to 255, and the last line is `fails -> N`. A session
 started after the run carries the harness.
@@ -141,6 +148,40 @@ as the highest-sorting `claude.exe` under
 `$LOCALAPPDATA/Claude-Data/claude_*/claude-code/*/*/`. The `claude CLI ->` line
 names the one used. Where none is found, each plugin's line names the two
 commands to run instead, and each counts as a failure.
+
+After each plugin's install the plugin step runs the dependency step,
+`scripts/plugin-dependencies.sh`. Its lines appear in the install log and, in
+the cloud, in `/home/user/bootstrap.log`.
+
+| Line | What it means | What to do |
+| --- | --- | --- |
+| `plugin dependencies of <id> -> claude CLI <cli>` | The dependency step started for that plugin with that CLI. | Nothing. |
+| `plugin dependencies -> not run, plugin_id or CLI empty` | An argument was empty; one failure. | Report it as a defect in the calling script. |
+| `claude plugin list --json -> exit=N` | The CLI's plugin list exit status. A non-zero `N` stops the step with one failure. | Run `claude plugin list --json` by hand for the error. |
+| `jq installPath of <id> from claude plugin list --json -> exit=N count=C value=[...]` | The distinct `installPath` values listed for that id. It passes where `N` is 0 and `C` is 1. | `C` 0: the plugin is not installed; read its `claude plugin install` line above. `C` above 1: the id is listed with different paths; read `claude plugin list --json`. |
+| `cygpath -u <path> -> exit=N value=[...]` | Printed only where `cygpath` exists. The `installPath` converted to the `/c/...` form. | Nothing. |
+| `installPath <path> is an absolute path -> no` | The path, converted where possible, is relative; one failure. | Read the `jq installPath` line above. |
+| `test -d <path> -> no` | No directory at the `installPath`; one failure. | Reinstall the plugin. |
+| `test -f <path>/package.json -> no` | The plugin carries no `package.json`, so it declares no npm dependency. `npm ci in <path> -> not run, no package.json` follows, and the step passes. | Nothing. |
+| `jq .dependencies keys <path>/package.json -> exit=N count=C` | `C` names declared. A non-zero `N` means the file does not parse, its top level is not an object, or `dependencies` is not an object; one failure. | Report it to the plugin's maintainers. |
+| `dependency name [<name>] matches <pattern> -> no` | A declared name is outside the npm name form; one failure, nothing installed. | Report it to the plugin's maintainers. |
+| `test -f <path>/node_modules/<name>/package.json -> yes` or `-> no` | Whether that dependency resolves under the `installPath`. | Nothing; the lines after it decide. |
+| `unresolved dependencies of <id> -> <names>` | The names whose test read `no`, or `none`. | Nothing. |
+| `npm ci in <path> -> not run, every declared dependency resolves` | Every declared dependency resolves, so nothing runs and the step passes. | On a fresh install, see "Removing the dependency step". |
+| `command -v npm -> none` | `npm` does not resolve while a dependency is unresolved; one failure. | Install Node with `npm`, then re-run the installer. |
+| `npm ci --omit=dev --ignore-scripts --no-audit --no-fund in <path> -> exit=N` | npm's exit status; npm's own output is above it. A non-zero `N` is one failure. | Read npm's error above it. |
+| `unresolved dependencies of <id> after npm ci -> <names>` | The names still unresolved after `npm ci`. Any name is one failure. | Read npm's output above it. |
+| `bash <dir>/scripts/plugin-dependencies.sh <cli> <id> -> exit=N` | The step's result as the installer counts it: 0 passes, 1 is one failure. | Read the step's lines above it. |
+| `bash <dir>/scripts/plugin-dependencies.sh <CLI> <id> -> not run, no CLI` | No CLI was found, so the step did not run; one failure. | Act on the `claude CLI -> none` line. |
+
+### Removing the dependency step
+
+The dependency step can be deleted once a fresh install, into a config
+directory with no copy of the plugin, logs
+`npm ci in <path> -> not run, every declared dependency resolves` for every
+plugin. The plugin or the CLI then delivers the dependencies itself. A re-run
+over an existing install logs the same line after an earlier `npm ci`, so only
+a fresh install shows it.
 
 ### Update
 
@@ -231,6 +272,18 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL config/plugins.tsv` | No file at that path under the repository being checked. | Read the `test -f` line above it. The deployed copy is absent, incomplete, or `HARNESS_DIR` names another tree. |
 | `FAIL plugin: ... among the installed ids` | A plugin named in `config/plugins.tsv` is not among the ids `claude plugin list --json` reports. | Read the `claude plugin install ... -> exit=` line in `/home/user/bootstrap.log`, then re-run the install by hand for the current error. |
 | `FAIL plugin: ... expected an id list` | No id list could be read, so the plugin could not be tested. | Act on the `FAIL live config dir agreement` line above it. |
+| `jq installPath of <id> from claude plugin list --json -> exit=N count=C value=[...]` | Printed for each listed `config/plugins.tsv` plugin: the distinct `installPath` values the list carries for it. | Nothing, unless `FAIL plugin installPath` follows it. |
+| `FAIL plugin installPath: expected one installPath` | The list carries no `installPath` for that id, or several different ones, or `jq` could not read it. | Read `claude plugin list --json` by hand. Re-run the installer, or rebuild in the cloud. |
+| `FAIL plugin installPath: expected an absolute installPath` | The `installPath`, converted with `cygpath -u` where it exists, is relative. | Read `claude plugin list --json` by hand. |
+| `test -d <path> -> yes` or `-> no` | Whether a directory exists at the `installPath`. | Nothing, unless `FAIL plugin installPath` follows it. |
+| `FAIL plugin installPath: expected a directory` | The CLI lists the plugin at a path that does not exist. | Re-run the installer, or rebuild in the cloud. |
+| `test -f <path>/package.json -> yes` or `-> no` | Whether the plugin carries a `package.json`. `no` means it declares no npm dependency, and nothing further is checked for it. | Nothing. |
+| `jq .dependencies keys <path>/package.json -> exit=N count=C` | `C` dependency names declared. | Nothing, unless `FAIL plugin dependencies` follows it. |
+| `FAIL plugin dependencies: expected an object or no dependencies key` | The plugin's `package.json` does not parse, its top level is not an object, or its `dependencies` is not an object. | Report it to the plugin's maintainers. |
+| `FAIL plugin dependency: expected a package name matching` | A declared name is outside the npm name form, so no path was tested for it. | Report it to the plugin's maintainers. |
+| `test -f <path>/node_modules/<name>/package.json -> yes` | That declared dependency resolves under the `installPath`. | Nothing. |
+| `test -f <path>/node_modules/<name>/package.json -> no` | That declared dependency does not resolve. `FAIL plugin dependency` follows it. | Act on the `FAIL` line. |
+| `FAIL plugin dependency: expected <name>, declared by <id>, to resolve` | No `node_modules/<name>/package.json` under the `installPath`; the plugin's code that requires it fails to load, ECC's `SessionStart` hook among it. | Locally, re-run `scripts/install-local.sh` and read its dependency step lines. In the cloud, read those lines in `/home/user/bootstrap.log`, then rebuild. |
 | `FAIL git AUTHOR variables` / `FAIL git COMMITTER variables` | That role's `GIT_*_NAME` or `GIT_*_EMAIL` is unset or empty. The line above names which, and separates the two. | Set both in the environment variables panel. Nothing in this repository supplies an identity. |
 | `FAIL git AUTHOR identity` / `FAIL git COMMITTER identity`, `... expected an identity of the form Name <email>` | `git var` returned nothing usable for that role. | Read the state on the line above. An empty `GIT_*_NAME` exits 128; a repository git will not read is reported as such. |
 | `FAIL git AUTHOR identity` / `FAIL git COMMITTER identity`, `... from that role's GIT_*_NAME and GIT_*_EMAIL` | Git did not resolve that role to the pair the session was given. | Check for a `GIT_CONFIG_KEY_n` overlay or a repository-local `user.*`. |
@@ -274,7 +327,10 @@ its first reply.
 Hand-run `scripts/bootstrap.sh`, `scripts/verify.sh` and
 `scripts/session-check.sh` before committing a change to them. Hand-run
 `scripts/install-local.sh` against a copy of the config directory, with
-`CLAUDE_CONFIG_DIR` naming the copy, never against the live one. Run
+`CLAUDE_CONFIG_DIR` naming the copy, never against the live one. That run
+exercises `scripts/plugin-dependencies.sh` through a deployed copy cloned from a
+local repository whose `feat/claude-harness` carries the change, named in
+`HARNESS_REPO_URL`. Run
 `scripts/test-attribution-guard.sh` before committing a change to
 `scripts/attribution-guard.sh` or to the test script itself; it exits 0 only
 where every case passes. `bash -n` is not

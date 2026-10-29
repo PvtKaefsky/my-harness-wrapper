@@ -27,7 +27,7 @@ The logged `fails` is the true count. The exit status is that count clamped to
 | 3 | Copies `config/CLAUDE.md` to `/root/.claude/CLAUDE.md`. |
 | 4 | Merges `config/settings.json` into `/root/.claude/settings.json`. |
 | 5 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally. |
-| 6 | Installs each plugin named in `config/plugins.tsv`. |
+| 6 | Installs each plugin named in `config/plugins.tsv`, then runs `scripts/plugin-dependencies.sh` for it. |
 | 7 | Writes `/root/.claude/.my-harness-wrapper.manifest.json`. |
 
 ### Step 2, the config directory
@@ -110,6 +110,10 @@ reporting whatever config resolves to, step 7's read included.
 The CLI owns `extraKnownMarketplaces` and `enabledPlugins` at user scope.
 Neither key is ever hand-written.
 
+After each plugin's install, whatever its exit status, the step runs
+`bash "$SRC/scripts/plugin-dependencies.sh" claude <plugin_id>` and counts a
+non-zero exit as one failure.
+
 ### Step 7, the manifest
 
 `git_user_email` records what `git config --get user.email` answers inside the
@@ -142,8 +146,9 @@ the `/home/user/.claude` symlink.
 
 It never sets `-e`. Every step prints its predicate and observed value. Its
 output goes to the terminal and to `.my-harness-wrapper.install.log` in the
-config directory, which each run rewrites at mode 600, the log carrying prior
-hook commands. Every command that changes state, or
+config directory, which each run creates under `umask 077`, runs `chmod 600`
+on, then rewrites, the log carrying prior hook commands. `docs/runbook.md`
+carries the mode observed per platform. Every command that changes state, or
 produces a value the manifest carries, counts into `fails`. A failed write of
 the log counts too. The exit status is `fails`, clamped to 255.
 
@@ -158,7 +163,7 @@ before step 3 can rewrite it in a deployed copy the script runs from.
 | 4 | Copies `config/CLAUDE.md` from the deployed copy to `CLAUDE.md` there, first printing `test -f` or `cmp -s` for the file it replaces, and keeping a differing one as `CLAUDE.md.pre-harness` where no such copy exists. |
 | 5 | Merges the deployed copy's `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the deployed copy. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
 | 6 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status. |
-| 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv`, then prints how many rows carried a `plugin_id`. |
+| 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv` and runs the deployed copy's `scripts/plugin-dependencies.sh` for it, then prints how many rows carried a `plugin_id`. |
 | 8 | Writes `.my-harness-wrapper.manifest.json` there. |
 
 ### Step 2, the prerequisites
@@ -274,6 +279,11 @@ processes it starts. The desktop app keeps its bundled CLI under
 `$LOCALAPPDATA` and puts none on `PATH`. Where no source yields one, each
 plugin's line names the two commands to run instead and counts one failure.
 
+After each plugin's install, whatever its exit status, the step runs
+`bash "$DEPLOY/scripts/plugin-dependencies.sh" "$CLI" <plugin_id>` with the CLI
+it found, and counts a non-zero exit as one failure. Where no CLI is found, the
+dependency step is not run and counts one failure of its own.
+
 ### Step 8, the manifest
 
 The fields are bootstrap's, plus `local_checkout`, the deployed copy's path.
@@ -282,6 +292,50 @@ The fields are bootstrap's, plus `local_checkout`, the deployed copy's path.
 counted as a failure and written empty. `config_dir` is the converted path from
 step 1. `scripts/session-check.sh` takes the local branch on a non-empty
 `local_checkout`.
+
+## scripts/plugin-dependencies.sh
+
+Installs a delivered plugin's npm dependencies where its install left any
+unresolved. Run once per plugin, after that plugin's install, by
+`scripts/bootstrap.sh` step 6 and `scripts/install-local.sh` step 7. Both run it
+as `bash <harness>/scripts/plugin-dependencies.sh <CLI> <plugin_id>`, so the two
+loops share one implementation.
+
+| Argument | Value |
+| --- | --- |
+| 1 | The CLI to run: `claude` in bootstrap, the CLI `scripts/install-local.sh` step 7 found locally. |
+| 2 | The `plugin_id` from `config/plugins.tsv`. |
+
+| Step | What it does |
+| --- | --- |
+| 1 | Runs `<CLI> plugin list --json` and reads the distinct `installPath` values of the entries whose `id` is the plugin id. Exactly one passes. |
+| 2 | Converts that path with `cygpath -u` where `cygpath` exists, since the Windows CLI reports it in the `C:\...` form. The result must be absolute and name a directory. |
+| 3 | Reads the keys of `dependencies` in `package.json` there. An absent `package.json` declares none: the step prints `npm ci in <path> -> not run, no package.json` and exits 0. An absent `dependencies` key declares none too. Each name must match the npm name form, an optional `@scope/` and a name, neither beginning with `.`, which keeps each tested path inside `node_modules`. |
+| 4 | Tests `node_modules/<name>/package.json` under that path for each name, one `test -f` line each, then prints the unresolved names or `none`. |
+| 5 | Where every name resolves, prints `npm ci in <path> -> not run, every declared dependency resolves` and exits 0. |
+| 6 | Otherwise prints `command -v npm`, runs `npm ci --omit=dev --ignore-scripts --no-audit --no-fund` in that path, prints its exit status, and repeats step 4. |
+
+It exits 0 where every declared name resolves at the end, and 1 otherwise: an
+empty argument, a failed plugin list, an `installPath` count other than one, a
+path that is not absolute or not a directory, an unreadable `package.json`, a
+name outside the npm form, an absent `npm`, a failed `npm ci`, or a name still
+unresolved after it. Each case prints its predicate line before the exit. The
+caller counts exit 1 as one failure and goes on to the next plugin.
+
+`npm ci` installs the versions `package-lock.json` pins, and fails where that
+file is absent or disagrees with `package.json`. `--omit=dev` leaves out
+`devDependencies`. `--ignore-scripts` runs no lifecycle script of the plugin or
+of any dependency. `npm ci` removes an existing `node_modules` before it
+installs. The names read in step 3 only build test paths; npm reads the
+lockfile.
+
+The test is the presence of `node_modules/<name>/package.json`. It does not
+separate a dependency npm installed from one put there by other means, and it
+reads neither the installed version nor the dependency's own dependencies.
+
+The step exists because the CLI installs `ecc@ecc` 2.2.3 without its npm
+dependencies; `docs/environment.md` records the observations under "ECC's npm
+dependencies". `docs/runbook.md` carries when the step can be removed.
 
 ## How the hook commands resolve the harness directory
 
@@ -343,7 +397,8 @@ These values pass through it:
 | `env/setup.sh` | the matched `export` lines, and an export value outside `[0-9A-Za-z._-]` |
 | the settings files | the delivered key list, both settings probes, the carrying state, and the live `env.HARNESS_DIR` |
 | the hook commands | each guard check's stderr |
-| the CLI | the plugin id list |
+| the CLI | the plugin id list, and each `installPath` and the path converted from it |
+| a plugin's `package.json` | a dependency name outside the npm name form |
 | the environment | `HARNESS_ASSIGNEE` |
 
 A version value inside `[0-9A-Za-z._-]` needs no pass, holding no control byte
@@ -412,6 +467,16 @@ an untestable id pass.
 
 The per-plugin test compares whole ids, not substrings, so an id that is a
 prefix of an installed one does not match.
+
+For each `config/plugins.tsv` plugin found in the list, `plugin_deps_check`
+reads its `installPath` from the same `claude plugin list --json` output,
+converts it with `cygpath -u` where `cygpath` exists, and tests
+`node_modules/<name>/package.json` there for each name in `package.json`'s
+`dependencies`. Each unresolved name is its own `FAIL`. An `installPath` count
+other than one, a path that is not absolute or not a directory, an unreadable
+`package.json` and a name outside the npm name form are each a `FAIL` too. An
+absent `package.json` declares no dependencies and is not one. The predicate is
+the one `scripts/plugin-dependencies.sh` tests, with the same limits.
 
 An absent `config/plugins.tsv` is a `FAIL`, not a skipped check. Reading no
 rows and having no file to read produce different output, so the check's

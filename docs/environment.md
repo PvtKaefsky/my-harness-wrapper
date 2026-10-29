@@ -174,6 +174,62 @@ Neither option reaches the reviewers the review gate uses. Those are agent
 definitions under the plugin's `agents/` directory, invoked directly. No entry
 in `hooks/hooks.json` matches the agent tool.
 
+## ECC's npm dependencies
+
+The paths in this section are inside the installed plugin's own tree, its
+`installPath` from `claude plugin list --json`, not in this repository.
+
+### The plugin and the CLI's note
+
+| Fact | Observed |
+| --- | --- |
+| `package.json` `dependencies` of `ecc@ecc` 2.2.3 | `@iarna/toml` 2.2.5, `ajv` 8.20.0, `js-yaml` 4.3.2, `sql.js` 1.14.2, `zod` 4.6.7 |
+| `package.json` `overrides` | set, eight entries |
+| `package-lock.json` | shipped |
+| `node_modules` after `claude plugin install ecc@ecc` | absent |
+| The CLI's note | `claude plugin list --json` carries, for `ecc@ecc`, `notes` reading "The packages it lists were not installed, because its package.json sets overrides, which this install does not apply" and `noteDetails` of type `dependencies-refused` |
+| The cause, as the note states it | `package.json` sets `overrides`, which the CLI's install does not apply, so the CLI installs none of the packages it lists |
+
+### A Linux replica, CLI 2.1.311
+
+Observed outside this repository.
+
+| Step | Observed |
+| --- | --- |
+| A clean `claude plugin install ecc@ecc --scope user --yes` | `installPath` `/root/.claude/plugins/cache/ecc/ecc/2.2.3` |
+| Before | none of the five dependencies resolves; of ECC's two `SessionStart` commands, one exits 1 with `Cannot find module 'js-yaml'` and the other exits 0 |
+| `npm ci --omit=dev --ignore-scripts --no-audit --no-fund` in `installPath` | exit 0, 2 s, "added 10 packages", `node_modules` 36 MB |
+| After | all five resolve, both `SessionStart` commands exit 0, and `claude plugin list` no longer prints the note |
+
+### A cloud session at `3abfe68`, `BOOTSTRAP_VERSION` `0.1.17`
+
+| Probe | Observed |
+| --- | --- |
+| `claude plugin list` | `"ecc@synced" from claude.ai not loaded — "ecc@ecc" on this machine has the same name and takes precedence` |
+| ECC's hook records | 38 `PreToolUse:Bash` `hook_success`, and one `SessionStart` `hook_non_blocking_error` on `js-yaml` |
+| ECC records grouped by `toolUseID` and command | every group of size 1 |
+| `session-start.js`'s `stderr` | `Cannot find module 'js-yaml'`, require stack `scripts/lib/project-detect.js` then `scripts/hooks/session-start.js` |
+
+### Windows 11, CLI 2.1.309
+
+Observed on the machine under "Local sessions on Windows", with npm 11.9.0 and
+Node v24.14.0, against a scratch config directory holding no copy of ECC,
+through `scripts/install-local.sh` with `scripts/plugin-dependencies.sh`.
+
+| Probe | Observed |
+| --- | --- |
+| The live config directory's `ecc@ecc` 2.2.3, installed 2026-10-27 | the note above, and no `node_modules` |
+| `installPath` in `claude plugin list --json` | the `C:\...\plugins\cache\ecc\ecc\2.2.3` form; `cygpath -u` converts it |
+| A fresh install | the step found all five unresolved, ran `npm ci`, exit 0, "added 10 packages in 3s", and all five resolved after it; the run ended `fails -> 0` |
+| `claude plugin list --json` after it | `notes` and `noteDetails` `null` |
+| A re-run | the step found all five resolved and ran nothing; the run ended `fails -> 0` |
+| `node scripts/hooks/session-start.js`, run directly with `CLAUDE_PLUGIN_ROOT` at `installPath`, on a `SessionStart` input | with `node_modules`: exit 0, stdout `{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":""}}`; without it: exit 1, `Cannot find module 'js-yaml'` with the require stack above |
+| `node_modules` removed | `scripts/verify.sh` printed one `FAIL plugin dependency` line for each of the five |
+| `node_modules` removed, then the installer run with the dependency step deleted | the run ended `fails -> 0`, `node_modules` stayed absent, and `scripts/verify.sh` printed the same five `FAIL plugin dependency` lines and no other `FAIL` |
+
+ECC's `SessionStart` commands are `node -e` wrappers, which fail on Windows for
+the backslash reason under "Hooks", so the hook script was run directly.
+
 ## Snapshot caching
 
 The init script runs only in the session that builds the environment snapshot.
@@ -570,6 +626,8 @@ that records observations records the sandbox.
   different single repository attached left the 17:42 build as the snapshot a
   later session with this repository attached restored.
 * The shape of `tool_response` a `PostToolUse` hook receives for an MCP tool.
+* Which ECC release or CLI version, if any, installs `ecc@ecc`'s npm
+  dependencies itself.
 * Whether a `claude plugin install` of a later CLI version, or a delivered key
   of a different shape, preserves what this one did. The build settled the case
   it ran: bootstrap wrote `config/settings.json` whole before the CLI

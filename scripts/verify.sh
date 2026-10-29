@@ -49,6 +49,64 @@ hook_run() {
   if [ -n "$HOOK_HARNESS_DIR" ]; then HARNESS_DIR=$HOOK_HARNESS_DIR bash -c "$1"
   else env -u HARNESS_DIR bash -c "$1"; fi
 }
+plugin_deps_check() {
+  local id=$1 raw rc count p conv p_show names name
+  local name_re='^(@[A-Za-z0-9_~-][A-Za-z0-9._~-]*/)?[A-Za-z0-9_~-][A-Za-z0-9._~-]*$'
+  raw=$(printf '%s' "$PLUGIN_JSON" | jq -r --arg id "$id" 'if type == "array" then [.[] | select(.id == $id) | .installPath | strings] | unique | .[] else error("top level is " + type) end' 2>/dev/null); rc=$?
+  raw=${raw//$'\r'/}
+  count=$(printf '%s' "$raw" | grep -a -c '')
+  echo "jq installPath of $id from claude plugin list --json -> exit=$rc count=$count value=[$(sanitize "$raw")]"
+  if [ "$rc" -ne 0 ] || [ "$count" != 1 ]; then
+    echo "FAIL plugin installPath: expected one installPath for $id from claude plugin list --json, actual jq exit=$rc count=$count"
+    fail=1
+    return
+  fi
+  p=$raw
+  if [ "$CYGPATH" != none ]; then
+    conv=$(cygpath -u "$raw" 2>/dev/null) && [ -n "$conv" ] && p=$conv
+  fi
+  p_show=$(sanitize "$p")
+  case "$p" in
+    /*) ;;
+    *) echo "FAIL plugin installPath: expected an absolute installPath for $id, actual [$p_show]"
+       fail=1
+       return ;;
+  esac
+  echo "test -d $p_show -> $([ -d "$p" ] && echo yes || echo no)"
+  if [ ! -d "$p" ]; then
+    echo "FAIL plugin installPath: expected a directory at the installPath of $id, actual [$p_show] absent"
+    fail=1
+    return
+  fi
+  echo "test -f $p_show/package.json -> $([ -f "$p/package.json" ] && echo yes || echo no)"
+  [ -f "$p/package.json" ] || return
+  names=$(jq -r 'if type != "object" then error("top level is " + type)
+    elif (has("dependencies") | not) then empty
+    elif (.dependencies | type) != "object" then error("dependencies is " + (.dependencies | type))
+    else .dependencies | keys[] end' "$p/package.json" 2>/dev/null); rc=$?
+  names=${names//$'\r'/}
+  echo "jq .dependencies keys $p_show/package.json -> exit=$rc count=$(printf '%s' "$names" | grep -a -c '')"
+  if [ "$rc" -ne 0 ]; then
+    echo "FAIL plugin dependencies: expected an object or no dependencies key in $p_show/package.json of $id, actual jq exit=$rc"
+    fail=1
+    return
+  fi
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    if ! [[ "$name" =~ $name_re ]]; then
+      echo "FAIL plugin dependency: expected a package name matching $name_re in $p_show/package.json of $id, actual [$(sanitize "$name")]"
+      fail=1
+      continue
+    fi
+    if [ -f "$p/node_modules/$name/package.json" ]; then
+      echo "test -f $p_show/node_modules/$name/package.json -> yes"
+    else
+      echo "test -f $p_show/node_modules/$name/package.json -> no"
+      echo "FAIL plugin dependency: expected $name, declared by $id, to resolve at $p_show/node_modules/$name/package.json, actual absent"
+      fail=1
+    fi
+  done <<< "$names"
+}
 
 run id
 echo "HOME -> ${HOME:-}"
@@ -403,6 +461,7 @@ $PLUGIN_IDS
 IDS_EOF
     if [ "$FOUND" = yes ]; then
       echo "plugin_id $plugin_id in claude plugin list --json -> yes"
+      plugin_deps_check "$plugin_id"
     else
       echo "FAIL plugin: expected $plugin_id from $REPO/config/plugins.tsv among the installed ids, actual $(sanitize "${PLUGIN_IDS:-none}")"
       fail=1

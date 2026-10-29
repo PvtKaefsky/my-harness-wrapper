@@ -23,7 +23,8 @@ into a session's Claude config directory.
 4. `scripts/bootstrap.sh` creates `/root/.claude`, symlinks `/home/user/.claude`
    to it where that path is absent, copies `config/CLAUDE.md` there, merges
    `config/settings.json` there, sets both `*.gpgsign` keys to `false`
-   globally, installs the plugins named in `config/plugins.tsv`, and writes
+   globally, installs the plugins named in `config/plugins.tsv`, runs
+   `scripts/plugin-dependencies.sh` after each plugin's install, and writes
    `/root/.claude/.my-harness-wrapper.manifest.json`.
 5. Claude Code launches and reads `/root/.claude`, which `/home/user/.claude`
    also resolves to.
@@ -48,8 +49,16 @@ rebuild an operator controls is a change to the pasted init script text.
    `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, merges `config/settings.json` into that
    directory's `settings.json` with `env.HARNESS_DIR` set to the deployed copy,
    sets both `*.gpgsign` keys to `false` globally, installs the plugins named in
-   `config/plugins.tsv`, and writes the manifest with a `local_checkout` field
-   naming the deployed copy.
+   `config/plugins.tsv`, runs the deployed copy's
+   `scripts/plugin-dependencies.sh` after each plugin's install, and writes the
+   manifest with a `local_checkout` field naming the deployed copy.
+
+The dependency step reads each plugin's `installPath` from
+`claude plugin list --json`. Where a name in that plugin's `package.json`
+`dependencies` has no `node_modules/<name>/package.json` there, it runs
+`npm ci --omit=dev --ignore-scripts --no-audit --no-fund` in that path; where
+every name resolves, it runs nothing. The CLI installs `ecc@ecc` 2.2.3 without
+its npm dependencies, which ECC's `SessionStart` hook needs.
 4. Every Claude Code session started after that reads the directory. Its hook
    commands run the scripts in the deployed copy, through `HARNESS_DIR`.
 
@@ -70,6 +79,7 @@ The default branch `main` holds the Codex adapter, and this harness is branch
 | `env/setup.sh` | The init script pasted into the environment dialog. It clones this repository and is the only version source. |
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config. |
+| `scripts/plugin-dependencies.sh` | Installs a delivered plugin's npm dependencies where any is unresolved, and runs nothing otherwise. Run by both delivery scripts after each plugin's install. Needs `npm` only where it installs. |
 | `scripts/session-check.sh` | Reports what a session starts with. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
 | `scripts/attribution-guard.sh` | Blocks a pull request or issue body carrying a Claude Code attribution line, and tells the session to resend a description the create call returns with one. Run by the `PreToolUse` and `PostToolUse` hooks `config/settings.json` registers. |
@@ -103,8 +113,8 @@ are in `docs/runbook.md`.
 
 ### Install or update locally
 
-Git Bash, Node, `git` and `jq` are prerequisites. From any checkout, on any
-branch:
+Git Bash, Node with `npm`, `git` and `jq` are prerequisites. From any
+checkout, on any branch:
 
 ```
 bash scripts/install-local.sh
