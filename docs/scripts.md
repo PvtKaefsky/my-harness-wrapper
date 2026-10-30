@@ -472,13 +472,31 @@ the pattern is rejected.
 
 ### Forwarding
 
-The repository's own hook is `<common dir>/hooks/<name>`. The common dir is
-`git rev-parse --git-common-dir`, run in the hook's working directory and
-environment. Where that fails and `GIT_DIR` is set, it is
-`${GIT_COMMON_DIR:-$GIT_DIR}`: `git init` and `git clone` run
-`reference-transaction` before the new repository answers `rev-parse`. Where it
-fails with `GIT_DIR` unset, the hook exits 1 with a line saying the
-repository's hook was not looked up.
+The repository's own hook is `<common dir>/hooks/<name>`. `hook_common_dir`
+finds the git dir in the shell, starting no process, by the first row that
+applies; it looks only at the working directory, never a parent:
+
+| Row | Git dir |
+| --- | --- |
+| `GIT_COMMON_DIR` set | None; the common dir is `GIT_COMMON_DIR` |
+| `GIT_DIR` set | `GIT_DIR` |
+| A `.git` directory in the working directory, holding `HEAD`, `objects/` and `refs/` | That directory |
+| A `.git` file in the working directory, its first line `gitdir: <path>` | `<path>`, relative to the working directory unless absolute |
+| The working directory itself holding `HEAD`, `objects/` and `refs/` | The working directory, as in a bare repository |
+
+The common dir is then the first line of `<git dir>/commondir`, relative to the
+git dir unless absolute, where that file exists, and the git dir otherwise. A
+trailing carriage return is removed from the `.git` file's line, and trailing
+whitespace from the `commondir` line. Where no row applies, a `.git` directory
+lacks those entries, or a `.git` file or `commondir` cannot be read or holds no
+path, the common dir is `git rev-parse --git-common-dir`; where that fails too,
+the hook exits 1 with a line saying the repository's hook was not looked up.
+
+githooks(5) states that git starts a hook in the top of the working tree, or in
+the git dir of a bare repository. `git init` and `git clone` run
+`reference-transaction` with `GIT_DIR` set before the new repository answers
+`rev-parse`, so the `GIT_DIR` row decides there. A hook run by hand from a
+subdirectory finds no row and takes the `rev-parse` fallback.
 
 The path is never resolved through `core.hooksPath`, which names this
 directory. In a linked worktree the common dir is the main repository's git
@@ -520,9 +538,18 @@ endings. Git for Windows runs them.
 | A tool that installs hooks into the directory `core.hooksPath` names | It finds the harness files there. `git lfs install --local` 3.7.0 printed `Hook already exists: pre-push` and installed nothing, so a repository without its own LFS hooks gets none, and its pushes do not upload LFS objects through `pre-push`. Placing LFS's hooks in `<common dir>/hooks` by hand, from `git lfs update --manual`, restores them through forwarding. |
 | A tool that refuses to install hooks while `core.hooksPath` is set, such as `pre-commit install` | It refuses in every repository. |
 
-Every hook git runs starts bash and, for forwarding, one `git rev-parse`, for
-every repository on the machine. One commit and one checkout ran 13
-`reference-transaction` hooks on Git for Windows 2.51.0.
+Every hook git runs starts bash, for every repository on the machine; forwarding
+starts no further process unless the fallback above runs. One commit and one
+checkout ran 13 `reference-transaction` hooks on Git for Windows 2.51.0.
+
+| Git for Windows 2.51.0, one repository | `git commit --allow-empty` | `git checkout` of another branch |
+| --- | --- | --- |
+| No `core.hooksPath` | about 80 ms | about 60 ms |
+| `git-hooks/`, the common dir from `git rev-parse` | about 800 ms | about 680 ms |
+| `git-hooks/`, the common dir from `hook_common_dir` | about 450 ms | about 320 ms |
+
+One hook run alone took about 47 ms with `hook_common_dir` and about 83 ms with
+`git rev-parse`; `bash -c :` alone took about 41 ms.
 
 ## How the hook commands resolve the harness directory
 

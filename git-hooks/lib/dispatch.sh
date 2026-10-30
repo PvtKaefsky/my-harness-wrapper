@@ -63,14 +63,50 @@ hook_push_to_checkout_default() {
   exit 0
 }
 
+hook_relative() {
+  case "$2" in
+    /*|[A-Za-z]:/*|[A-Za-z]:\\*) printf -v "$3" '%s' "$2" ;;
+    *) printf -v "$3" '%s/%s' "$1" "$2" ;;
+  esac
+}
+
+hook_is_gitdir() { [ -f "$1/HEAD" ] && [ -d "$1/objects" ] && [ -d "$1/refs" ]; }
+
+hook_common_dir() {
+  local gitdir="" line=""
+  if [ -n "${GIT_COMMON_DIR-}" ]; then common=$GIT_COMMON_DIR; return 0; fi
+  if [ -n "${GIT_DIR-}" ]; then
+    gitdir=$GIT_DIR
+  elif [ -d .git ]; then
+    hook_is_gitdir .git || return 1
+    gitdir="$PWD/.git"
+  elif [ -f .git ]; then
+    IFS= read -r line < .git || [ -n "$line" ] || return 1
+    line=${line%$'\r'}
+    case "$line" in "gitdir: "?*) hook_relative "$PWD" "${line#gitdir: }" gitdir ;; *) return 1 ;; esac
+  elif hook_is_gitdir .; then
+    gitdir=$PWD
+  else
+    return 1
+  fi
+  if [ -f "$gitdir/commondir" ]; then
+    line=""
+    IFS= read -r line < "$gitdir/commondir" || [ -n "$line" ] || return 1
+    line=${line%"${line##*[![:space:]]}"}
+    [ -n "$line" ] || return 1
+    hook_relative "$gitdir" "$line" common
+  else
+    common=$gitdir
+  fi
+}
+
 hook_forward() {
-  local common rc target
-  common=$(git rev-parse --git-common-dir 2>/dev/null); rc=$?
-  if [ "$rc" -ne 0 ] || [ -z "$common" ]; then
-    if [ -z "${GIT_DIR-}" ]; then
-      hook_refuse "git rev-parse --git-common-dir -> exit=$rc and GIT_DIR is unset, so the repository's own $hook_name hook was not looked up."
+  local common="" rc target
+  if ! hook_common_dir; then
+    common=$(git rev-parse --git-common-dir 2>/dev/null); rc=$?
+    if [ "$rc" -ne 0 ] || [ -z "$common" ]; then
+      hook_refuse "the repository's git directory was not found from $PWD, and git rev-parse --git-common-dir -> exit=$rc, so the repository's own $hook_name hook was not looked up."
     fi
-    common=${GIT_COMMON_DIR:-$GIT_DIR}
   fi
   target="$common/hooks/$hook_name"
   if [ -f "$target" ] && ! [ "$common/hooks" -ef "$HOOK_DIR" ] && ! [ "$target" -ef "$0" ]; then
