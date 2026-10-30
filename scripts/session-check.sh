@@ -51,9 +51,9 @@ else
     case "${BOOT_EPOCH:-}" in ''|*[!0-9]*) ;; *) BOOT_OK=yes ;; esac
     if [ "$LOG_OK" = yes ] && [ "$BOOT_OK" = yes ]; then
       if [ "$LOG_EPOCH" -ge "$BOOT_EPOCH" ]; then
-        emit "log mtime >= boot time -> yes, this session built the snapshot"
+        emit "log mtime >= boot time -> yes"
       else
-        emit "log mtime >= boot time -> no, this session restored the snapshot"
+        emit "log mtime >= boot time -> no"
       fi
     else
       emit "snapshot state -> undetermined, log epoch [${LOG_EPOCH:-empty}] boot epoch [${BOOT_EPOCH:-empty}]"

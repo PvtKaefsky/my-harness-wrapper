@@ -217,6 +217,17 @@ value is compared, not the `url.<base>.insteadOf` rewrite `remote get-url`
 prints, so a rewrite in the user's git config does not fail the check. A clone
 URL given as a relative path is stored absolute and fails it.
 
+Git for Windows stores a clone source given as `/d/...` as `D:/...`, and one
+under `/tmp` as the `%TEMP%` path, often in 8.3 short form. Where `cygpath`
+exists, `url_canon` therefore compares a URL beginning with `/`, `X:/` or `X:\`
+in the canonical form `scripts/verify.sh`'s `canon_path` uses: `cygpath -u`,
+`readlink -f`, `cygpath -m -l`, ASCII letters lowercased. Every other URL, and
+every URL where `cygpath` is absent, is compared exactly. The limits of
+`canon_path` under "Comparing paths" apply. A side whose last conversion fails
+is compared unconverted, and so reads `no`. The line prints `yes` or `no` only,
+never either URL. The check confirms the form git stored the clone URL in. It
+does not authenticate the origin: a refresh sets the URL before it fetches.
+
 Where a command fails, or the copy is not ready, the step
 counts one failure, prints `delivery -> stopped`, and the run ends before steps
 4 to 8. `CLAUDE.md`, `settings.json` and the manifest stay as they were. The
@@ -421,6 +432,33 @@ Windows CLI starts receives `CLAUDE_CONFIG_DIR` in the `C:/...` form, which the
 gate would reject. A failed or empty conversion keeps the original value.
 Without `cygpath` no line is printed.
 
+### Comparing paths
+
+Every path comparison passes both sides through `canon_path`. Where `cygpath`
+exists, it converts the path with `cygpath -u`, resolves it with `readlink -f`,
+converts the result with `cygpath -m -l`, and lowercases ASCII letters; the
+printed predicate names those steps. Where `cygpath` is absent, it is
+`readlink -f` alone, compared case-sensitively.
+
+| Form of one directory | Canonical form |
+| --- | --- |
+| `C:/Users/<long name>/...`, `/c/Users/<long name>/...` | `c:/users/<long name>/...` |
+| An 8.3 short name, `C:/Users/88DF~1/...` or `/c/Users/88DF~1/...` | the long form, expanded by `cygpath -l` |
+| Git Bash's `/tmp/...` mount | the long form of `%TEMP%\...` |
+
+`readlink -f` does not expand 8.3 short names, and `cygpath -u` maps a
+`%TEMP%` path to `/tmp`, so without the last step those forms of one directory
+compare unequal. Non-ASCII letters are compared case-sensitively: `tr` runs
+under `LC_ALL=C`. A side that does not resolve yields nothing, and each
+comparison keeps its own differing defaults. The `cygpath` steps take `--`
+before the path. The printed canonical values pass through `sanitize`.
+
+| Limit | Effect |
+| --- | --- |
+| `cygpath -l` expands a short name only in a path that exists | A missing last component keeps its 8.3 form, so a missing directory compares unequal to its long form. |
+| ASCII case is folded on every Windows path | Two directories differing only in ASCII case, in an NTFS directory set case-sensitive, compare equal. |
+| A relative `HARNESS_DIR` or `env.HARNESS_DIR` | It resolves against the working directory `scripts/verify.sh` runs in, as before canonicalization. |
+
 The resolution runs ahead of the `claude` calls. The CLI honours a relative
 `CLAUDE_CONFIG_DIR` by creating that directory under the operator's working
 directory, so invoking it before this gate has a side effect on a bad value.
@@ -439,7 +477,7 @@ unreadable or holds a count of documents other than one. Only the first two
 are compared; the rest fail as their own state.
 
 `FAIL manifest.config_dir` compares the resolved directory against
-`manifest.config_dir`, both through `readlink -f`. Where `cygpath` exists the
+`manifest.config_dir`, both through `canon_path`. Where `cygpath` exists the
 manifest value is first converted with `cygpath -u`, since the local installer
 stores it in the `C:/...` form, and the printed line shows both. Its two defaults,
 `unresolved-live` and `unresolved-manifest`, differ on purpose, so an
@@ -616,7 +654,7 @@ probe and gated on it. Each runs `git` with `GIT_DIR`, `GIT_WORK_TREE`,
 
 | Probe | Passes where | Fails on |
 | --- | --- | --- |
-| Top level | `rev-parse --show-toplevel` resolves, through `cygpath -u` where it exists and `readlink -f`, to the repository under test | a parent repository's top level; a non-zero exit |
+| Top level | `rev-parse --show-toplevel` and the repository under test have one canonical form through `canon_path` | a parent repository's top level; a non-zero exit |
 | `FAIL deployed copy branch` | `symbolic-ref -q HEAD` prints `refs/heads/main` | another ref, a tag among them; a detached `HEAD`, exit 1; any other non-zero exit; a failed top-level probe |
 | `FAIL deployed copy changes` | `status --porcelain` exits 0 with no output and nothing on stderr, and `ls-files -v` lists no entry tagged `S` or lowercase | any status entry, modified, staged or untracked; any stderr output; a non-zero exit; a status that ran past 10 seconds; a marked index entry; a failed top-level probe |
 
@@ -631,8 +669,8 @@ entry count and the first five entries, each cut to 120 bytes, joined by
 line are each cut to 120 bytes too.
 
 A sparse checkout marks entries skip-worktree, so it fails the changes check.
-A repository under test named by a Windows 8.3 short path fails the top-level
-probe, `readlink -f` not expanding short names; the line prints the long path.
+A repository under test named by a Windows 8.3 short path or through the `/tmp`
+mount passes the top-level probe where `cygpath` exists.
 
 A cloud clone made by `env/setup.sh` and a deployed copy the installer cloned
 or refreshed pass all three.
@@ -649,6 +687,41 @@ The checks cannot separate these states from a clean copy:
 
 The checks report drift in the copy. They do not establish its integrity
 against a change made to defeat them.
+
+### The remote main head
+
+After the deployed copy's state, the script reads the copy's full `HEAD` with
+`rev-parse --verify -q HEAD`, and the head of `refs/heads/main` on its origin
+with `ls-remote -- <URL> refs/heads/main`, the URL read from the copy's
+`remote.origin.url`. `ls-remote` runs from `/`, outside the copy, so the copy's
+own config, such as `remote.origin.uploadpack`, `core.sshCommand` or a proxy,
+does not apply to it; the user's global and system config do. The read runs
+under `timeout -k 2 5`, with `GIT_TERMINAL_PROMPT=0`, stdin from `/dev/null`
+and stderr discarded, so it adds at most 7 seconds to the run and the origin
+URL is never printed. Where `timeout` is absent the read does not run. Both
+reads use the `GIT_*`-stripped `git` the copy's other probes use. A head is
+read only from a line of 40 or 64 hex digits, a tab and `refs/heads/main`.
+
+| `not read` state | What it establishes |
+| --- | --- |
+| `timed out after 5s (exit=124)` | The read ran past its bound. |
+| `timed out after 5s (exit=137)` | The read ran past its bound, or `git` was killed by `SIGKILL` from outside. |
+| `(timeout or env exit=N)`, `N` 125 to 127 | `timeout` or `env` failed to run `git`. |
+| `(git exit=N)` | `git ls-remote` failed. The cause is not captured, stderr being discarded: an unreachable host, refused authentication, a missing repository, a TLS error and a relative origin URL, which resolves from `/`, all read the same. |
+| `no refs/heads/main line (git exit=0)` | No `refs/heads/main` line of the expected shape was returned. An origin without `main` and one that hides the ref read the same. |
+| `git -C <repo> config --get remote.origin.url -> exit=N` | The copy has no readable origin URL; `exit=0 value=empty` where the key holds an empty value. |
+
+The run's other bounded steps, the status probe and `claude plugin list`
+among them, are not bounded together; `scripts/session-check.sh`'s 20-second
+bound reports a run that exceeds it.
+
+Equal values print a `compare` line. Differing values, and a value that was
+not read, print a `NOTE`, which does not set the exit status. The comparison
+separates a copy at `main`'s head from one that is not. It does not separate a
+difference that touches the delivered files from one that does not, nor an
+origin `main` that moved forward from one that was rewound. A `NOTE` line makes
+`scripts/session-check.sh` print the `FAIL` and `NOTE` lines instead of the
+`fail -> N` tally.
 
 ### Git identity
 
@@ -783,7 +856,7 @@ before the local branch existed. The read prints nothing in the cloud branch.
 
 | Branch | Log | Lines before the `verify.sh` block |
 | --- | --- | --- |
-| Cloud | `/home/user/session-check.log` | The snapshot verdict and one line per directory under `/home/user`, as the table below sets out. |
+| Cloud | `/home/user/session-check.log` | The boot-time comparison and one line per directory under `/home/user`, as the table below sets out. |
 | Local | `session-check.log` in the config directory | `jq -r .local_checkout <manifest> -> <path>`, `test -f <install log> -> yes/no`, and, where it exists, `stat -c %y <install log> -> <mtime>` and `tail -n 1 <install log> -> fails -> N`. No line names `/home/user`. The path and the log line pass through the control-byte replacement. |
 
 Each line goes to stdout and is appended to the log. A
@@ -796,9 +869,9 @@ session was quiet.
 | Line | What it reports |
 | --- | --- |
 | `session-check -> exit=N value=...` | When the run started, and `date`'s own exit status. |
-| `uptime -s` and `stat -c %y` on the boot log | The two values behind the snapshot verdict. |
+| `uptime -s` and `stat -c %y` on the boot log | The two values behind the boot-time comparison. |
 | `test -f <boot log> -> yes/no` | Whether the boot log is at the path this script reads. |
-| `log mtime >= boot time` | `yes` where this session built the snapshot, `no` where it restored one. |
+| `log mtime >= boot time -> yes/no` | Whether the boot log's mtime is at or after the boot time. `docs/runbook.md`, under "Reading the session-start check", carries what each value does and does not establish. |
 | `snapshot state -> undetermined, log epoch [...] boot epoch [...]` | Either epoch was missing or non-numeric. Both values are printed. |
 | `snapshot state -> undetermined, ... absent` | The boot log is not at the path this script reads, so neither epoch exists. |
 | `git -C <dir> rev-parse --abbrev-ref HEAD, --short HEAD` | One line per directory under `/home/user`, with its branch and short HEAD. |
@@ -817,14 +890,14 @@ An absent `/home/user/bootstrap.log`, an absent `scripts/verify.sh`, and a
 directory git would not read each produce a line naming the path or the
 predicate rather than a conclusion about why.
 
-The snapshot verdict needs both epochs. Each is tested on its own, because
+The boot-time comparison needs both epochs. Each is tested on its own, because
 testing them joined lets one empty value pass while the other supplies the
-digits, and the comparison then runs against an empty operand and reports a
-restored snapshot. Either one missing or non-numeric reports undetermined
-instead, with both values printed.
+digits, and the comparison then runs against an empty operand and reads `no`.
+Either one missing or non-numeric reports undetermined instead,
+with both values printed.
 
 The boot epoch is computed only where `uptime -s` exited 0, so output from a
-failed call cannot reach the verdict.
+failed call cannot reach the comparison.
 
 The echoed `verify.sh` output is capped at `SESSION_CHECK_OUT_LINE_CAP` lines,
 40 by default. The line above it states the file's total and how many follow.
@@ -1020,8 +1093,8 @@ would receive: the live `settings.json`'s `env.HARNESS_DIR` where it is a
 string, and unset otherwise, whatever the caller's own `HARNESS_DIR` holds. The
 `jq -r .env.HARNESS_DIR` line before them prints that value. A local install
 missing that key therefore fails both assertions, as its hooks would find no
-guard. Where the value is present, it is compared against `REPO`, both
-converted with `cygpath -u` where available and resolved with `readlink -f`,
+guard. Where the value is present, it is compared against `REPO`,
+both through `canon_path`,
 and a difference is `FAIL hook harness dir`: the hooks would run another tree's
 scripts than the one every other check reads.
 
@@ -1047,6 +1120,16 @@ stderr, which the guard prints only on a footer match. The
 selection, the broken-shell ambiguity and the trust in the live file are as
 above. A guard that predates the `PostToolUse` path scans the clean
 `tool_input` instead, exits 0, and fails the assertion.
+
+Each of the two commands is then run on an input carrying no footer, and
+expected to exit 0: a `gh pr create` body for the `PreToolUse` command, and a
+`mcp__github__create_pull_request` response whose `body` carries no footer for
+the `PostToolUse` command. Any other exit is a `FAIL` naming that input, with
+the first line of the command's stderr, cut to 120 bytes. A command that exits 2 with the guard's
+marker on every input passes the footer assertion and fails this one. The
+function `guard_clean_check` runs both. Where the command or the sample input
+is missing, it prints the same state the footer assertion prints, and fails
+too.
 
 ## scripts/test-attribution-guard.sh
 
@@ -1124,6 +1207,53 @@ passed, and 1 otherwise.
 | Create response over 1 MiB with a clean `body` | A `body` of 1,100,000 bytes with no footer | 2 |
 | Update response with a `body` carrying the marker | A `PostToolUse` event whose `tool_name` is `mcp__github__update_pull_request` | 0 |
 | Create response text content carrying a `body` with the marker | A text content block whose JSON-encoded text carries that `body` | 2 |
+
+## scripts/check-hook-matchers.sh
+
+Compares the tool names the `PreToolUse` and `PostToolUse` matchers of its own
+tree's `config/settings.json` name with a file of a session's tool names, one
+per line. Run by hand only; `docs/runbook.md` carries the procedure under
+"Checking the hook matchers".
+
+Each matcher is split on `|`, empty alternatives kept. An alternative of
+letters, digits, `_` and `-` is a tool name and is compared whole against the
+file. An empty matcher and `*` match every tool and are printed as not
+compared; an entry with no `matcher` key reads as empty. Any other alternative,
+an empty one among them, is printed as not a
+literal tool name and counted as uncompared. A non-object top level or `hooks`,
+a `PreToolUse` or `PostToolUse` value that is not an array, an entry that is
+not an object, a `matcher` key holding anything but a string, and a matcher
+carrying a control character each make `jq` fail, and the check does not run.
+The file's lines have CR and surrounding blanks removed, and empty lines are
+skipped.
+
+| Line | What it reports |
+| --- | --- |
+| `test -f <settings> -> yes/no` | Whether the tree's `config/settings.json` is at the path the script reads. |
+| `command -v jq -> <path>/none` | Whether `jq` is on `PATH`. |
+| `tool names file argument -> absent` | No file was named. |
+| `test -f <file> -> yes/no`, `test -r <file> -> yes/no` | Whether the named file exists and is readable. |
+| `jq PreToolUse and PostToolUse matchers of <settings> -> exit=N count=C [<error>]` | The matchers read, with `jq`'s first error line where `N` is not 0. |
+| `PreToolUse entries -> N`, `PostToolUse entries -> N` | The entries read for each event. |
+| `distinct tool names in <file> -> N` | The names read from the file. |
+| `<event> matcher -> [<matcher>]` | One line per matcher. |
+| `<event> matcher [<matcher>] -> matches every tool, not compared` | An empty matcher or `*`. |
+| `<event> matcher alternative [<text>] -> not a literal tool name, not compared` | An alternative counted as uncompared. |
+| `<event> matcher name <name> in the tool names file -> yes/no` | One line per name the matcher carries. |
+| `MISSING <name>: ...` | A matcher name absent from the file. |
+| `UNMATCHED <name>: ...` | A `mcp__github__` name in the file that no matcher names, for a person to judge whether it writes a body the guard should scan. |
+| `UNMATCHED check -> not run, ...` | An empty matcher or `*` was read, or an alternative was not compared, so no `UNMATCHED` line is printed. |
+| `compared -> N`, `uncompared -> N` | The names compared, and the alternatives counted as uncompared. |
+| `unmatched mcp__github__ names -> N` | The `UNMATCHED` count. |
+| `missing -> N` | The `MISSING` count, one per matcher entry naming the name. `not run` where no file was named, the settings file or the names file is absent or unreadable, `jq` is absent or failed, `PreToolUse` or `PostToolUse` has no entry, or the file holds no name. |
+
+| Exit | Where |
+| --- | --- |
+| 0 | Nothing is missing, at least one name was compared, and no alternative is uncompared. |
+| 1 | Any name is missing. |
+| 2 | The check did not run, no name was compared, or an alternative is uncompared. |
+
+`UNMATCHED` lines do not set the exit status.
 
 ## config/plugins.tsv
 

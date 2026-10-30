@@ -56,6 +56,19 @@ resolve_cli() {
   CLI=""; CLI_FROM=none
 }
 
+url_canon() {
+  local u r m
+  case "$1" in
+    /*|[A-Za-z]:/*|[A-Za-z]:\\*) ;;
+    *) printf '%s' "$1"; return ;;
+  esac
+  if [ "$CYGPATH" = none ]; then printf '%s' "$1"; return; fi
+  u=$(cygpath -u -- "$1" 2>/dev/null); [ -n "$u" ] || u=$1
+  r=$(readlink -f -- "$u" 2>/dev/null); [ -n "$r" ] || r=$u
+  m=$(cygpath -m -l -- "$r" 2>/dev/null); [ -n "$m" ] || { printf '%s' "$1"; return; }
+  printf '%s' "$m" | LC_ALL=C tr 'A-Z' 'a-z'
+}
+
 first_line() {
   printf '%s' "${1%%$'\n'*}" | LC_ALL=C tr '\000-\037\177' '?'
 }
@@ -114,7 +127,7 @@ deploy() {
   branch=$(git -C "$DEPLOY" symbolic-ref --short -q HEAD 2>&1); branch_rc=$?
   echo "git -C $DEPLOY symbolic-ref --short -q HEAD -> exit=$branch_rc value=[$(first_line "$branch")]"
   url=$(git -C "$DEPLOY" config --local --get remote.origin.url 2>&1); url_rc=$?
-  if [ "$url_rc" -eq 0 ] && [ "$url" = "$REPO_URL" ]; then url_match=yes; else url_match=no; fi
+  if [ "$url_rc" -eq 0 ] && [ "$(url_canon "$url")" = "$(url_canon "$REPO_URL")" ]; then url_match=yes; else url_match=no; fi
   echo "git -C $DEPLOY config --local --get remote.origin.url equals \$HARNESS_REPO_URL -> exit=$url_rc $url_match"
   st=$(git -C "$DEPLOY" status --porcelain 2>&1); st_rc=$?
   if [ "$st_rc" -eq 0 ]; then

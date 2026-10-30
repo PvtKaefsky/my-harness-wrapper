@@ -45,9 +45,38 @@ resolve_cli() {
   fi
   CLI=""; CLI_FROM=none
 }
+canon_path() {
+  local u r m
+  [ -n "$1" ] || return 1
+  if [ "$CYGPATH" = none ]; then readlink -f "$1" 2>/dev/null; return; fi
+  u=$(cygpath -u -- "$1" 2>/dev/null); [ -n "$u" ] || u=$1
+  r=$(readlink -f -- "$u" 2>/dev/null); [ -n "$r" ] || return 1
+  m=$(cygpath -m -l -- "$r" 2>/dev/null); [ -n "$m" ] || return 1
+  printf '%s' "$m" | LC_ALL=C tr 'A-Z' 'a-z'
+}
 hook_run() {
   if [ -n "$HOOK_HARNESS_DIR" ]; then HARNESS_DIR=$HOOK_HARNESS_DIR bash -c "$1"
   else env -u HARNESS_DIR bash -c "$1"; fi
+}
+guard_clean_check() {
+  local input=$1 in_rc=$2 cmd=$3 cmd_rc=$4 event=$5 what=$6 err rc show ok=no
+  if [ "$in_rc" -ne 0 ] || [ -z "$input" ]; then
+    show="sample input not built (jq exit=$in_rc)"
+  elif [ "$cmd_rc" -ne 0 ] || [ -z "$cmd" ]; then
+    show="no $event command in $LIVE_SETTINGS references attribution-guard.sh (jq exit=$cmd_rc)"
+  else
+    err=$(printf '%s' "$input" | hook_run "$cmd" 2>&1 >/dev/null); rc=$?
+    if [ "$rc" -eq 0 ]; then
+      show="exit=0"; ok=yes
+    else
+      show="exit=$rc [$(sanitize "$(cap "$err")")]"
+    fi
+  fi
+  echo "run the live $event command on $what -> $show"
+  if [ "$ok" != yes ]; then
+    echo "FAIL $event attribution guard: expected exit=0 from the live $event command in $LIVE_SETTINGS on $what, actual $show"
+    fail=1
+  fi
 }
 plugin_deps_check() {
   local id=$1 raw rc count p conv p_show names name
@@ -128,8 +157,10 @@ case "${LIVE_DIR:-}" in
   /*) ;;
   *) echo "FAIL live config dir path: expected an absolute path, actual ${LIVE_DIR:-empty}"; exit 1 ;;
 esac
-LIVE_REAL=$(readlink -f "$LIVE_DIR" 2>/dev/null)
-echo "readlink -f $LIVE_DIR -> ${LIVE_REAL:-unresolved}"
+if [ "$CYGPATH" = none ]; then CANON_HOW="readlink -f"
+else CANON_HOW="readlink -f, cygpath -m -l, ASCII lowercased"; fi
+LIVE_REAL=$(canon_path "$LIVE_DIR")
+echo "$CANON_HOW $LIVE_DIR -> $(sanitize "${LIVE_REAL:-unresolved}")"
 
 resolve_cli
 echo "command -v claude -> $(command -v claude || echo none)"
@@ -293,9 +324,9 @@ else
   case "$MAN_DIR" in /*) ;; *) MAN_SHOW="$MAN_RAW (not an absolute path)"; MAN_DIR="" ;; esac
 fi
 echo "jq -r .config_dir $MANIFEST -> $MAN_SHOW"
-MAN_REAL=$([ -n "$MAN_DIR" ] && readlink -f "$MAN_DIR" 2>/dev/null)
+MAN_REAL=$([ -n "$MAN_DIR" ] && canon_path "$MAN_DIR")
 if [ "${LIVE_REAL:-unresolved-live}" != "${MAN_REAL:-unresolved-manifest}" ]; then
-  echo "FAIL manifest.config_dir: expected $LIVE_DIR (resolves to ${LIVE_REAL:-unresolved}), actual $MAN_SHOW (resolves to ${MAN_REAL:-unresolved})"
+  echo "FAIL manifest.config_dir: expected $LIVE_DIR (resolves to $(sanitize "${LIVE_REAL:-unresolved}")), actual $MAN_SHOW (resolves to $(sanitize "${MAN_REAL:-unresolved}"))"
   fail=1
 fi
 
@@ -373,19 +404,13 @@ HOOK_HARNESS_DIR=$(jq -r 'if type == "object" and (.env | type) == "object" then
 HOOK_HARNESS_DIR=${HOOK_HARNESS_DIR%$'\r'}
 echo "jq -r .env.HARNESS_DIR $LIVE_SETTINGS -> exit=$HOOK_HD_RC value=$(sanitize "${HOOK_HARNESS_DIR:-absent}")"
 if [ -n "$HOOK_HARNESS_DIR" ]; then
-  HOOK_DIR_CMP=$HOOK_HARNESS_DIR
-  REPO_CMP=$REPO
-  if [ "$CYGPATH" != none ]; then
-    HOOK_CONV=$(cygpath -u "$HOOK_HARNESS_DIR" 2>/dev/null) && [ -n "$HOOK_CONV" ] && HOOK_DIR_CMP=$HOOK_CONV
-    REPO_CONV=$(cygpath -u "$REPO" 2>/dev/null) && [ -n "$REPO_CONV" ] && REPO_CMP=$REPO_CONV
-  fi
-  HOOK_REAL=$(readlink -f "$HOOK_DIR_CMP" 2>/dev/null)
-  REPO_REAL=$(readlink -f "$REPO_CMP" 2>/dev/null)
+  HOOK_REAL=$(canon_path "$HOOK_HARNESS_DIR")
+  REPO_REAL=$(canon_path "$REPO")
   if [ "${HOOK_REAL:-unresolved-hook}" != "${REPO_REAL:-unresolved-repo}" ]; then
-    echo "FAIL hook harness dir: expected env.HARNESS_DIR in $LIVE_SETTINGS to name $REPO (resolves to ${REPO_REAL:-unresolved}), actual $(sanitize "$HOOK_HARNESS_DIR") (resolves to ${HOOK_REAL:-unresolved})"
+    echo "FAIL hook harness dir: expected env.HARNESS_DIR in $LIVE_SETTINGS to name $REPO (resolves to $(sanitize "${REPO_REAL:-unresolved}")), actual $(sanitize "$HOOK_HARNESS_DIR") (resolves to $(sanitize "${HOOK_REAL:-unresolved}"))"
     fail=1
   else
-    echo "compare env.HARNESS_DIR against $REPO -> yes, both resolve to $REPO_REAL"
+    echo "compare env.HARNESS_DIR against $REPO -> yes, both resolve to $(sanitize "$REPO_REAL")"
   fi
 fi
 
@@ -416,6 +441,9 @@ if [ "$GUARD_OK" != yes ]; then
   echo "FAIL PreToolUse attribution guard: expected exit=2 carrying $GUARD_MARK from the live PreToolUse command in $LIVE_SETTINGS on a gh pr create body carrying the footer, actual $GUARD_SHOW"
   fail=1
 fi
+CLEAN_BODY='what changed, in one sentence.'
+CLEAN_INPUT=$(jq -n --arg c "gh pr create --title t --body \"$CLEAN_BODY\"" '{tool_name:"Bash",tool_input:{command:$c}}' 2>/dev/null); CLEAN_IN_RC=$?
+guard_clean_check "$CLEAN_INPUT" "$CLEAN_IN_RC" "$GUARD_CMD" "$GUARD_CMD_RC" PreToolUse "a gh pr create body without the footer"
 
 POST_OK=no
 POST_MARK='attribution-guard: matched line in the response body ->'
@@ -441,6 +469,8 @@ if [ "$POST_OK" != yes ]; then
   echo "FAIL PostToolUse attribution guard: expected exit=2 carrying $POST_MARK from the live PostToolUse command in $LIVE_SETTINGS on a create response whose body carries the footer, actual $POST_SHOW"
   fail=1
 fi
+POST_CLEAN_INPUT=$(jq -n --arg b "$CLEAN_BODY" '{hook_event_name:"PostToolUse",tool_name:"mcp__github__create_pull_request",tool_input:{body:$b},tool_response:{body:$b}}' 2>/dev/null); POST_CLEAN_IN_RC=$?
+guard_clean_check "$POST_CLEAN_INPUT" "$POST_CLEAN_IN_RC" "$POST_CMD" "$POST_CMD_RC" PostToolUse "a create response whose body carries no footer"
 
 echo "test -f $REPO/config/plugins.tsv -> $([ -f "$REPO/config/plugins.tsv" ] && echo yes || echo no)"
 if [ -f "$REPO/config/plugins.tsv" ]; then
@@ -482,15 +512,12 @@ if [ "$REPO_RC" -ne 0 ]; then
   COPY_SHOW="repo unreadable (git rev-parse exit=$REPO_RC)"
 else
   TOP_RAW=$("${RGIT[@]}" -C "$REPO" rev-parse --show-toplevel 2>/dev/null); TOP_RC=$?
-  TOP_CMP=$TOP_RAW; REPO_TOP_CMP=$REPO
-  if [ "$CYGPATH" != none ]; then
-    TOP_CONV=$(cygpath -u "$TOP_RAW" 2>/dev/null) && [ -n "$TOP_CONV" ] && TOP_CMP=$TOP_CONV
-    REPO_TOP_CONV=$(cygpath -u "$REPO" 2>/dev/null) && [ -n "$REPO_TOP_CONV" ] && REPO_TOP_CMP=$REPO_TOP_CONV
-  fi
-  TOP_REAL=$([ -n "$TOP_RAW" ] && readlink -f "$TOP_CMP" 2>/dev/null)
-  REPO_TOP_REAL=$(readlink -f "$REPO_TOP_CMP" 2>/dev/null)
-  if [ "$TOP_RC" -ne 0 ] || [ -z "$TOP_REAL" ]; then
+  TOP_REAL=$([ -n "$TOP_RAW" ] && canon_path "$TOP_RAW")
+  REPO_TOP_REAL=$(canon_path "$REPO")
+  if [ "$TOP_RC" -ne 0 ] || [ -z "$TOP_RAW" ]; then
     COPY_SHOW="unreadable (git exit=$TOP_RC)"
+  elif [ -z "$TOP_REAL" ]; then
+    COPY_SHOW="no, the top level [$(sanitize "$(cap "$TOP_RAW")")] did not resolve through canon_path"
   elif [ "$TOP_REAL" != "${REPO_TOP_REAL:-unresolved-repo}" ]; then
     COPY_SHOW="no, the top level is [$(sanitize "$(cap "$TOP_RAW")")]"
   else
@@ -560,6 +587,55 @@ echo "git -C $REPO ls-files -v, entries marked skip-worktree or assume-unchanged
 if [ "$STATUS_OK" != yes ]; then
   echo "FAIL deployed copy changes: expected no entries from git -C $REPO status --porcelain --untracked-files=all --ignore-submodules=none and no entry marked skip-worktree or assume-unchanged, actual status $STATUS_SHOW, marked $FLAG_SHOW"
   fail=1
+fi
+REMOTE_TIMEOUT=5
+REMOTE_REF="refs/heads/$HARNESS_REF"
+DEPLOYED=""; REMOTE_HEAD=""
+if [ "$REPO_RC" -ne 0 ]; then
+  DEPLOYED_SHOW="not read, repo unreadable (git rev-parse exit=$REPO_RC)"
+else
+  DEPLOYED_OUT=$("${RGIT[@]}" -C "$REPO" rev-parse --verify -q HEAD 2>/dev/null); DEPLOYED_RC=$?
+  if [ "$DEPLOYED_RC" -eq 0 ] && [[ "$DEPLOYED_OUT" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]; then
+    DEPLOYED=$DEPLOYED_OUT; DEPLOYED_SHOW="[$DEPLOYED]"
+  else
+    DEPLOYED_SHOW="unreadable (git exit=$DEPLOYED_RC) [$(sanitize "$(cap "$DEPLOYED_OUT")")]"
+  fi
+fi
+echo "git -C $REPO rev-parse --verify -q HEAD -> $DEPLOYED_SHOW"
+if [ "$REPO_RC" -ne 0 ]; then
+  REMOTE_SHOW="not read, repo unreadable (git rev-parse exit=$REPO_RC)"
+elif ! command -v timeout >/dev/null 2>&1; then
+  REMOTE_SHOW="not read, command -v timeout -> none"
+else
+  ORIGIN_URL=$("${RGIT[@]}" -C "$REPO" config --get remote.origin.url 2>/dev/null); ORIGIN_RC=$?
+  if [ "$ORIGIN_RC" -ne 0 ] || [ -z "$ORIGIN_URL" ]; then
+    REMOTE_SHOW="not read, git -C $REPO config --get remote.origin.url -> exit=$ORIGIN_RC$([ "$ORIGIN_RC" -ne 0 ] || printf ' value=empty')"
+  else
+    REMOTE_OUT=$(cd / && GIT_TERMINAL_PROMPT=0 timeout -k 2 "$REMOTE_TIMEOUT" "${RGIT[@]}" ls-remote -- "$ORIGIN_URL" "$REMOTE_REF" </dev/null 2>/dev/null); REMOTE_RC=$?
+    REMOTE_OUT=${REMOTE_OUT//$'\r'/}
+    REMOTE_LINE=$(printf '%s\n' "$REMOTE_OUT" | LC_ALL=C grep -a -E "^([0-9a-f]{40}|[0-9a-f]{64})"$'\t'"$REMOTE_REF\$" | head -n 1)
+    if [ "$REMOTE_RC" -eq 124 ] || [ "$REMOTE_RC" -eq 137 ]; then
+      REMOTE_SHOW="not read, timed out after ${REMOTE_TIMEOUT}s (exit=$REMOTE_RC)"
+    elif [ "$REMOTE_RC" -ge 125 ] && [ "$REMOTE_RC" -le 127 ]; then
+      REMOTE_SHOW="not read (timeout or env exit=$REMOTE_RC)"
+    elif [ "$REMOTE_RC" -ne 0 ]; then
+      REMOTE_SHOW="not read (git exit=$REMOTE_RC)"
+    elif [ -z "$REMOTE_LINE" ]; then
+      REMOTE_SHOW="not read, no $REMOTE_REF line (git exit=0)"
+    else
+      REMOTE_HEAD=${REMOTE_LINE%%$'\t'*}; REMOTE_SHOW="[$REMOTE_HEAD]"
+    fi
+  fi
+fi
+echo "git ls-remote -- <origin URL of $REPO> $REMOTE_REF, under timeout ${REMOTE_TIMEOUT}s -> $REMOTE_SHOW"
+if [ -z "$REMOTE_HEAD" ]; then
+  echo "NOTE remote $HARNESS_REF head: expected a head from git ls-remote -- <origin URL of $REPO> $REMOTE_REF, actual $REMOTE_SHOW; not counted into the exit status"
+elif [ -z "$DEPLOYED" ]; then
+  echo "NOTE remote $HARNESS_REF head: expected the deployed commit from git -C $REPO rev-parse --verify -q HEAD to compare against $REMOTE_HEAD, actual $DEPLOYED_SHOW; not counted into the exit status"
+elif [ "$DEPLOYED" != "$REMOTE_HEAD" ]; then
+  echo "NOTE remote $HARNESS_REF head: expected the deployed commit $DEPLOYED to equal the head of $REMOTE_REF on origin, actual $REMOTE_HEAD; not counted into the exit status"
+else
+  echo "compare the deployed commit against the head of $REMOTE_REF on origin -> yes, both $DEPLOYED"
 fi
 CFG_MAIL=$(git -C "$REPO" config --get user.email 2>/dev/null); CFG_RC=$?
 if [ "$REPO_RC" -ne 0 ]; then
