@@ -1048,6 +1048,16 @@ selection, the broken-shell ambiguity and the trust in the live file are as
 above. A guard that predates the `PostToolUse` path scans the clean
 `tool_input` instead, exits 0, and fails the assertion.
 
+Each of the two commands is then run on an input carrying no footer, and
+expected to exit 0: a `gh pr create` body for the `PreToolUse` command, and a
+`mcp__github__create_pull_request` response whose `body` carries no footer for
+the `PostToolUse` command. Any other exit is a `FAIL` naming that input, with
+the first line of the command's stderr, cut to 120 bytes. A command that exits 2 with the guard's
+marker on every input passes the footer assertion and fails this one. The
+function `guard_clean_check` runs both. Where the command or the sample input
+is missing, it prints the same state the footer assertion prints, and fails
+too.
+
 ## scripts/test-attribution-guard.sh
 
 Runs `scripts/attribution-guard.sh` from its own directory against a fixed set

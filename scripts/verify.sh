@@ -49,6 +49,26 @@ hook_run() {
   if [ -n "$HOOK_HARNESS_DIR" ]; then HARNESS_DIR=$HOOK_HARNESS_DIR bash -c "$1"
   else env -u HARNESS_DIR bash -c "$1"; fi
 }
+guard_clean_check() {
+  local input=$1 in_rc=$2 cmd=$3 cmd_rc=$4 event=$5 what=$6 err rc show ok=no
+  if [ "$in_rc" -ne 0 ] || [ -z "$input" ]; then
+    show="sample input not built (jq exit=$in_rc)"
+  elif [ "$cmd_rc" -ne 0 ] || [ -z "$cmd" ]; then
+    show="no $event command in $LIVE_SETTINGS references attribution-guard.sh (jq exit=$cmd_rc)"
+  else
+    err=$(printf '%s' "$input" | hook_run "$cmd" 2>&1 >/dev/null); rc=$?
+    if [ "$rc" -eq 0 ]; then
+      show="exit=0"; ok=yes
+    else
+      show="exit=$rc [$(sanitize "$(cap "$err")")]"
+    fi
+  fi
+  echo "run the live $event command on $what -> $show"
+  if [ "$ok" != yes ]; then
+    echo "FAIL $event attribution guard: expected exit=0 from the live $event command in $LIVE_SETTINGS on $what, actual $show"
+    fail=1
+  fi
+}
 plugin_deps_check() {
   local id=$1 raw rc count p conv p_show names name
   local name_re='^(@[A-Za-z0-9_~-][A-Za-z0-9._~-]*/)?[A-Za-z0-9_~-][A-Za-z0-9._~-]*$'
@@ -416,6 +436,9 @@ if [ "$GUARD_OK" != yes ]; then
   echo "FAIL PreToolUse attribution guard: expected exit=2 carrying $GUARD_MARK from the live PreToolUse command in $LIVE_SETTINGS on a gh pr create body carrying the footer, actual $GUARD_SHOW"
   fail=1
 fi
+CLEAN_BODY='what changed, in one sentence.'
+CLEAN_INPUT=$(jq -n --arg c "gh pr create --title t --body \"$CLEAN_BODY\"" '{tool_name:"Bash",tool_input:{command:$c}}' 2>/dev/null); CLEAN_IN_RC=$?
+guard_clean_check "$CLEAN_INPUT" "$CLEAN_IN_RC" "$GUARD_CMD" "$GUARD_CMD_RC" PreToolUse "a gh pr create body without the footer"
 
 POST_OK=no
 POST_MARK='attribution-guard: matched line in the response body ->'
@@ -441,6 +464,8 @@ if [ "$POST_OK" != yes ]; then
   echo "FAIL PostToolUse attribution guard: expected exit=2 carrying $POST_MARK from the live PostToolUse command in $LIVE_SETTINGS on a create response whose body carries the footer, actual $POST_SHOW"
   fail=1
 fi
+POST_CLEAN_INPUT=$(jq -n --arg b "$CLEAN_BODY" '{hook_event_name:"PostToolUse",tool_name:"mcp__github__create_pull_request",tool_input:{body:$b},tool_response:{body:$b}}' 2>/dev/null); POST_CLEAN_IN_RC=$?
+guard_clean_check "$POST_CLEAN_INPUT" "$POST_CLEAN_IN_RC" "$POST_CMD" "$POST_CMD_RC" PostToolUse "a create response whose body carries no footer"
 
 echo "test -f $REPO/config/plugins.tsv -> $([ -f "$REPO/config/plugins.tsv" ] && echo yes || echo no)"
 if [ -f "$REPO/config/plugins.tsv" ]; then
