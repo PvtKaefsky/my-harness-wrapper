@@ -1,5 +1,0 @@
-* text=auto eol=lf
-config/codex/upstream/** -text whitespace=-blank-at-eol
-config/codex/pack/** -text whitespace=-blank-at-eol
-*.png binary
-*.jpg binary
