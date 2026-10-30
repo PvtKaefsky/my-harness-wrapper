@@ -400,7 +400,7 @@ names against the matchers:
 | Line | What to do |
 | --- | --- |
 | `MISSING <name>` | The file lacks that name. Where the file holds the tool under a new name, replace the name in `config/settings.json`'s matcher and in `docs/scripts.md`'s tool table under `scripts/attribution-guard.sh`. Where it holds none, change nothing: confirm the session listed every tool, deferred ones included, and that its GitHub MCP server is connected, then re-run. Never remove a name from a matcher on this check alone. |
-| `UNMATCHED <name>` | Decide whether that tool writes a pull request, issue, comment or review body. Where it does, add it to the `PreToolUse` matcher and to that tool table. |
+| `UNMATCHED <name>` | Decide whether that tool writes a pull request, issue, comment or review body, or makes a commit. Where it does, add it to the `PreToolUse` matcher and to that tool table. |
 | `missing -> not run` | Act on the line above it that failed: `tool names file argument -> absent`, a `test -f` or `test -r ... -> no`, `command -v jq -> none`, a `jq ... matchers ... -> exit=N` with its error, `count=0`, `<event> entries -> 0`, or `distinct tool names ... -> 0`. |
 | `uncompared -> N`, `N` above 0 | A matcher alternative is not a literal tool name, so the tools it matches were not checked. Read its `not compared` line and check that matcher by hand. |
 

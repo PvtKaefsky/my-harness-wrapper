@@ -90,6 +90,11 @@ if [ "$TOOL" = Bash ]; then
       fi
     } | sed -E 's/^["'"'"']+//; s/["'"'"']+$//')
 else
-  scan "$(printf '%s' "$INPUT" | jq -r 'if (.tool_input | type) == "object" or (.tool_input | type) == "array" then ([.tool_input | .. | strings] | .[]) else empty end' 2>/dev/null)"
+  case "$TOOL" in
+    mcp__github__push_files|mcp__github__create_or_update_file|mcp__github__delete_file|mcp__github__merge_pull_request|mcp__github__enable_pr_auto_merge)
+      KEEP='if type == "object" then del(.content) | (if (.files | type) == "array" then .files |= map(if type == "object" then del(.content) else . end) else . end) else . end' ;;
+    *) KEEP='.' ;;
+  esac
+  scan "$(printf '%s' "$INPUT" | jq -r "if (.tool_input | type) == \"object\" or (.tool_input | type) == \"array\" then ([.tool_input | $KEEP | .. | strings] | .[]) else empty end" 2>/dev/null)"
 fi
 exit 0
