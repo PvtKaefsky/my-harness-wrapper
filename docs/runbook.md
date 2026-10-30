@@ -322,6 +322,37 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 In the session that first creates these files, verify fails on the missing
 manifest. That is the correct result.
 
+## Checking the hook matchers
+
+The attribution guard's hooks name GitHub tools exactly, so a tool renamed in a
+session drops out of the guard without a `FAIL`. To check a session's tool
+names against the matchers:
+
+1. In the session to check, have it write the name of every tool it has, one
+   per line, to a file, for example `/tmp/tool-names.txt`.
+2. Run the script from the tree whose matchers are to be checked, the deployed
+   copy for a delivered session:
+
+   ```
+   bash /opt/my-harness-wrapper/scripts/check-hook-matchers.sh /tmp/tool-names.txt
+   ```
+
+   Locally, use `${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper` in
+   place of `/opt/my-harness-wrapper`.
+3. Read the result.
+
+| Line | What to do |
+| --- | --- |
+| `MISSING <name>` | The file lacks that name. Where the file holds the tool under a new name, replace the name in `config/settings.json`'s matcher and in `docs/scripts.md`'s tool table under `scripts/attribution-guard.sh`. Where it holds none, change nothing: confirm the session listed every tool, deferred ones included, and that its GitHub MCP server is connected, then re-run. Never remove a name from a matcher on this check alone. |
+| `UNMATCHED <name>` | Decide whether that tool writes a pull request, issue, comment or review body. Where it does, add it to the `PreToolUse` matcher and to that tool table. |
+| `missing -> not run` | Act on the line above it that failed: `tool names file argument -> absent`, a `test -f` or `test -r ... -> no`, `command -v jq -> none`, a `jq ... matchers ... -> exit=N` with its error, `count=0`, `<event> entries -> 0`, or `distinct tool names ... -> 0`. |
+| `uncompared -> N`, `N` above 0 | A matcher alternative is not a literal tool name, so the tools it matches were not checked. Read its `not compared` line and check that matcher by hand. |
+
+The file is the session's own report. A name in it that equals a matcher name
+reads as present whether or not the session has the tool. Only names it omits
+are detected. A renamed tool outside `mcp__github__` produces no `UNMATCHED`
+line.
+
 ## Reading the session-start check
 
 ```

@@ -1135,6 +1135,53 @@ passed, and 1 otherwise.
 | Update response with a `body` carrying the marker | A `PostToolUse` event whose `tool_name` is `mcp__github__update_pull_request` | 0 |
 | Create response text content carrying a `body` with the marker | A text content block whose JSON-encoded text carries that `body` | 2 |
 
+## scripts/check-hook-matchers.sh
+
+Compares the tool names the `PreToolUse` and `PostToolUse` matchers of its own
+tree's `config/settings.json` name with a file of a session's tool names, one
+per line. Run by hand only; `docs/runbook.md` carries the procedure under
+"Checking the hook matchers".
+
+Each matcher is split on `|`, empty alternatives kept. An alternative of
+letters, digits, `_` and `-` is a tool name and is compared whole against the
+file. An empty matcher and `*` match every tool and are printed as not
+compared; an entry with no `matcher` key reads as empty. Any other alternative,
+an empty one among them, is printed as not a
+literal tool name and counted as uncompared. A non-object top level or `hooks`,
+a `PreToolUse` or `PostToolUse` value that is not an array, an entry that is
+not an object, a `matcher` key holding anything but a string, and a matcher
+carrying a control character each make `jq` fail, and the check does not run.
+The file's lines have CR and surrounding blanks removed, and empty lines are
+skipped.
+
+| Line | What it reports |
+| --- | --- |
+| `test -f <settings> -> yes/no` | Whether the tree's `config/settings.json` is at the path the script reads. |
+| `command -v jq -> <path>/none` | Whether `jq` is on `PATH`. |
+| `tool names file argument -> absent` | No file was named. |
+| `test -f <file> -> yes/no`, `test -r <file> -> yes/no` | Whether the named file exists and is readable. |
+| `jq PreToolUse and PostToolUse matchers of <settings> -> exit=N count=C [<error>]` | The matchers read, with `jq`'s first error line where `N` is not 0. |
+| `PreToolUse entries -> N`, `PostToolUse entries -> N` | The entries read for each event. |
+| `distinct tool names in <file> -> N` | The names read from the file. |
+| `<event> matcher -> [<matcher>]` | One line per matcher. |
+| `<event> matcher [<matcher>] -> matches every tool, not compared` | An empty matcher or `*`. |
+| `<event> matcher alternative [<text>] -> not a literal tool name, not compared` | An alternative counted as uncompared. |
+| `<event> matcher name <name> in the tool names file -> yes/no` | One line per name the matcher carries. |
+| `MISSING <name>: ...` | A matcher name absent from the file. |
+| `UNMATCHED <name>: ...` | A `mcp__github__` name in the file that no matcher names, for a person to judge whether it writes a body the guard should scan. |
+| `UNMATCHED check -> not run, ...` | An empty matcher or `*` was read, or an alternative was not compared, so no `UNMATCHED` line is printed. |
+| `compared -> N`, `uncompared -> N` | The names compared, and the alternatives counted as uncompared. |
+| `unmatched mcp__github__ names -> N` | The `UNMATCHED` count. |
+| `missing -> N` | The `MISSING` count, one per matcher entry naming the name. `not run` where no file was named, the settings file or the names file is absent or unreadable, `jq` is absent or failed, `PreToolUse` or `PostToolUse` has no entry, or the file holds no name. |
+
+| Exit | Where |
+| --- | --- |
+| 0 | Nothing is missing, at least one name was compared, and no alternative is uncompared. |
+| 1 | Any name is missing. |
+| 2 | The check did not run, no name was compared, or an alternative is uncompared. |
+
+`UNMATCHED` lines do not set the exit status.
+
 ## config/plugins.tsv
 
 `README.md` carries the format.
