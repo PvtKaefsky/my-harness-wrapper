@@ -856,7 +856,7 @@ before the local branch existed. The read prints nothing in the cloud branch.
 
 | Branch | Log | Lines before the `verify.sh` block |
 | --- | --- | --- |
-| Cloud | `/home/user/session-check.log` | The snapshot verdict and one line per directory under `/home/user`, as the table below sets out. |
+| Cloud | `/home/user/session-check.log` | The boot-time comparison and one line per directory under `/home/user`, as the table below sets out. |
 | Local | `session-check.log` in the config directory | `jq -r .local_checkout <manifest> -> <path>`, `test -f <install log> -> yes/no`, and, where it exists, `stat -c %y <install log> -> <mtime>` and `tail -n 1 <install log> -> fails -> N`. No line names `/home/user`. The path and the log line pass through the control-byte replacement. |
 
 Each line goes to stdout and is appended to the log. A
@@ -869,9 +869,9 @@ session was quiet.
 | Line | What it reports |
 | --- | --- |
 | `session-check -> exit=N value=...` | When the run started, and `date`'s own exit status. |
-| `uptime -s` and `stat -c %y` on the boot log | The two values behind the snapshot verdict. |
+| `uptime -s` and `stat -c %y` on the boot log | The two values behind the boot-time comparison. |
 | `test -f <boot log> -> yes/no` | Whether the boot log is at the path this script reads. |
-| `log mtime >= boot time` | `yes` where this session built the snapshot, `no` where it restored one. |
+| `log mtime >= boot time -> yes/no` | Whether the boot log's mtime is at or after the boot time. `docs/runbook.md`, under "Reading the session-start check", carries what each value does and does not establish. |
 | `snapshot state -> undetermined, log epoch [...] boot epoch [...]` | Either epoch was missing or non-numeric. Both values are printed. |
 | `snapshot state -> undetermined, ... absent` | The boot log is not at the path this script reads, so neither epoch exists. |
 | `git -C <dir> rev-parse --abbrev-ref HEAD, --short HEAD` | One line per directory under `/home/user`, with its branch and short HEAD. |
@@ -890,14 +890,14 @@ An absent `/home/user/bootstrap.log`, an absent `scripts/verify.sh`, and a
 directory git would not read each produce a line naming the path or the
 predicate rather than a conclusion about why.
 
-The snapshot verdict needs both epochs. Each is tested on its own, because
+The boot-time comparison needs both epochs. Each is tested on its own, because
 testing them joined lets one empty value pass while the other supplies the
-digits, and the comparison then runs against an empty operand and reports a
-restored snapshot. Either one missing or non-numeric reports undetermined
-instead, with both values printed.
+digits, and the comparison then runs against an empty operand and reads `no`.
+Either one missing or non-numeric reports undetermined instead,
+with both values printed.
 
 The boot epoch is computed only where `uptime -s` exited 0, so output from a
-failed call cannot reach the verdict.
+failed call cannot reach the comparison.
 
 The echoed `verify.sh` output is capped at `SESSION_CHECK_OUT_LINE_CAP` lines,
 40 by default. The line above it states the file's total and how many follow.

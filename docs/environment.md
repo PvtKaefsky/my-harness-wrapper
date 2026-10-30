@@ -671,9 +671,10 @@ that records observations records the sandbox.
   backslashes from a hook command.
 * Which component rewrites `/root/.gitconfig`, and what triggers it.
 * What triggers a rebuild. A session's check reported
-  `log mtime >= boot time -> yes, this session built the snapshot`. That line
-  says a build ran in that container. It does not say which of the three
-  triggers caused it, and it does not separate a build from any other write to
+  `log mtime >= boot time -> yes, this session built the snapshot`, the line's
+  form before #56. That value says `/home/user/bootstrap.log` was written after
+  boot in that container. It does not say which of the three triggers caused a
+  build, and it does not separate a build from any other write to
   `/home/user/bootstrap.log` after boot. A build at 17:47:23 in a session with a
   different single repository attached left the 17:42 build as the snapshot a
   later session with this repository attached restored.

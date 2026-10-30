@@ -370,15 +370,19 @@ bash /opt/my-harness-wrapper/scripts/session-check.sh
 The `SessionStart` hook runs it at every session start, and its output arrives
 beside the first prompt. It exits 0 in every case.
 
-In a cloud session it names whether this session built the snapshot or restored
-one, and each repository under `/home/user` with its branch and short HEAD. In
-a local session, one whose manifest carries `local_checkout`, it names that
-deployed copy, the installer's log and the log's mtime instead. In both it names
-`verify.sh`'s
-result: every `FAIL` and `NOTE` line, or the `fail -> N` tally where there are
-none, or, where it printed neither, its output lines prefixed `verify.sh |` up
-to `SESSION_CHECK_OUT_LINE_CAP` of them. A `FAIL` line is decoded by the table
-above.
+In a cloud session it prints whether `/home/user/bootstrap.log`'s mtime is at or
+after the boot time, and each repository under `/home/user` with its branch and
+short HEAD. In a local session, one whose manifest carries `local_checkout`, it
+names that deployed copy, the installer's log and the log's mtime instead. In
+both it names `verify.sh`'s result: every `FAIL` and `NOTE` line, or the
+`fail -> N` tally where there are none, or, where it printed neither, its
+output lines prefixed `verify.sh |` up to `SESSION_CHECK_OUT_LINE_CAP` of them.
+A `FAIL` line is decoded by the table above.
+
+| Line | What it establishes | What it does not establish |
+| --- | --- | --- |
+| `log mtime >= boot time -> yes` | `/home/user/bootstrap.log` was last written at or after `uptime -s`'s boot time. | That this session built the snapshot: any write to the log after boot, such as a hand-run of the init script, also reads `yes`. |
+| `log mtime >= boot time -> no` | The log was last written before the boot time. | That this session restored a snapshot: any log last written before the boot time reads `no`, whatever wrote it. |
 
 `/home/user/session-check.log` holds every run's output, appended. Locally the
 file is `session-check.log` in the config directory.
