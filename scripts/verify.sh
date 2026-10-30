@@ -45,6 +45,15 @@ resolve_cli() {
   fi
   CLI=""; CLI_FROM=none
 }
+canon_path() {
+  local u r m
+  [ -n "$1" ] || return 1
+  if [ "$CYGPATH" = none ]; then readlink -f "$1" 2>/dev/null; return; fi
+  u=$(cygpath -u -- "$1" 2>/dev/null); [ -n "$u" ] || u=$1
+  r=$(readlink -f -- "$u" 2>/dev/null); [ -n "$r" ] || return 1
+  m=$(cygpath -m -l -- "$r" 2>/dev/null); [ -n "$m" ] || return 1
+  printf '%s' "$m" | LC_ALL=C tr 'A-Z' 'a-z'
+}
 hook_run() {
   if [ -n "$HOOK_HARNESS_DIR" ]; then HARNESS_DIR=$HOOK_HARNESS_DIR bash -c "$1"
   else env -u HARNESS_DIR bash -c "$1"; fi
@@ -148,8 +157,10 @@ case "${LIVE_DIR:-}" in
   /*) ;;
   *) echo "FAIL live config dir path: expected an absolute path, actual ${LIVE_DIR:-empty}"; exit 1 ;;
 esac
-LIVE_REAL=$(readlink -f "$LIVE_DIR" 2>/dev/null)
-echo "readlink -f $LIVE_DIR -> ${LIVE_REAL:-unresolved}"
+if [ "$CYGPATH" = none ]; then CANON_HOW="readlink -f"
+else CANON_HOW="readlink -f, cygpath -m -l, ASCII lowercased"; fi
+LIVE_REAL=$(canon_path "$LIVE_DIR")
+echo "$CANON_HOW $LIVE_DIR -> $(sanitize "${LIVE_REAL:-unresolved}")"
 
 resolve_cli
 echo "command -v claude -> $(command -v claude || echo none)"
@@ -313,9 +324,9 @@ else
   case "$MAN_DIR" in /*) ;; *) MAN_SHOW="$MAN_RAW (not an absolute path)"; MAN_DIR="" ;; esac
 fi
 echo "jq -r .config_dir $MANIFEST -> $MAN_SHOW"
-MAN_REAL=$([ -n "$MAN_DIR" ] && readlink -f "$MAN_DIR" 2>/dev/null)
+MAN_REAL=$([ -n "$MAN_DIR" ] && canon_path "$MAN_DIR")
 if [ "${LIVE_REAL:-unresolved-live}" != "${MAN_REAL:-unresolved-manifest}" ]; then
-  echo "FAIL manifest.config_dir: expected $LIVE_DIR (resolves to ${LIVE_REAL:-unresolved}), actual $MAN_SHOW (resolves to ${MAN_REAL:-unresolved})"
+  echo "FAIL manifest.config_dir: expected $LIVE_DIR (resolves to $(sanitize "${LIVE_REAL:-unresolved}")), actual $MAN_SHOW (resolves to $(sanitize "${MAN_REAL:-unresolved}"))"
   fail=1
 fi
 
@@ -393,19 +404,13 @@ HOOK_HARNESS_DIR=$(jq -r 'if type == "object" and (.env | type) == "object" then
 HOOK_HARNESS_DIR=${HOOK_HARNESS_DIR%$'\r'}
 echo "jq -r .env.HARNESS_DIR $LIVE_SETTINGS -> exit=$HOOK_HD_RC value=$(sanitize "${HOOK_HARNESS_DIR:-absent}")"
 if [ -n "$HOOK_HARNESS_DIR" ]; then
-  HOOK_DIR_CMP=$HOOK_HARNESS_DIR
-  REPO_CMP=$REPO
-  if [ "$CYGPATH" != none ]; then
-    HOOK_CONV=$(cygpath -u "$HOOK_HARNESS_DIR" 2>/dev/null) && [ -n "$HOOK_CONV" ] && HOOK_DIR_CMP=$HOOK_CONV
-    REPO_CONV=$(cygpath -u "$REPO" 2>/dev/null) && [ -n "$REPO_CONV" ] && REPO_CMP=$REPO_CONV
-  fi
-  HOOK_REAL=$(readlink -f "$HOOK_DIR_CMP" 2>/dev/null)
-  REPO_REAL=$(readlink -f "$REPO_CMP" 2>/dev/null)
+  HOOK_REAL=$(canon_path "$HOOK_HARNESS_DIR")
+  REPO_REAL=$(canon_path "$REPO")
   if [ "${HOOK_REAL:-unresolved-hook}" != "${REPO_REAL:-unresolved-repo}" ]; then
-    echo "FAIL hook harness dir: expected env.HARNESS_DIR in $LIVE_SETTINGS to name $REPO (resolves to ${REPO_REAL:-unresolved}), actual $(sanitize "$HOOK_HARNESS_DIR") (resolves to ${HOOK_REAL:-unresolved})"
+    echo "FAIL hook harness dir: expected env.HARNESS_DIR in $LIVE_SETTINGS to name $REPO (resolves to $(sanitize "${REPO_REAL:-unresolved}")), actual $(sanitize "$HOOK_HARNESS_DIR") (resolves to $(sanitize "${HOOK_REAL:-unresolved}"))"
     fail=1
   else
-    echo "compare env.HARNESS_DIR against $REPO -> yes, both resolve to $REPO_REAL"
+    echo "compare env.HARNESS_DIR against $REPO -> yes, both resolve to $(sanitize "$REPO_REAL")"
   fi
 fi
 
@@ -507,15 +512,12 @@ if [ "$REPO_RC" -ne 0 ]; then
   COPY_SHOW="repo unreadable (git rev-parse exit=$REPO_RC)"
 else
   TOP_RAW=$("${RGIT[@]}" -C "$REPO" rev-parse --show-toplevel 2>/dev/null); TOP_RC=$?
-  TOP_CMP=$TOP_RAW; REPO_TOP_CMP=$REPO
-  if [ "$CYGPATH" != none ]; then
-    TOP_CONV=$(cygpath -u "$TOP_RAW" 2>/dev/null) && [ -n "$TOP_CONV" ] && TOP_CMP=$TOP_CONV
-    REPO_TOP_CONV=$(cygpath -u "$REPO" 2>/dev/null) && [ -n "$REPO_TOP_CONV" ] && REPO_TOP_CMP=$REPO_TOP_CONV
-  fi
-  TOP_REAL=$([ -n "$TOP_RAW" ] && readlink -f "$TOP_CMP" 2>/dev/null)
-  REPO_TOP_REAL=$(readlink -f "$REPO_TOP_CMP" 2>/dev/null)
-  if [ "$TOP_RC" -ne 0 ] || [ -z "$TOP_REAL" ]; then
+  TOP_REAL=$([ -n "$TOP_RAW" ] && canon_path "$TOP_RAW")
+  REPO_TOP_REAL=$(canon_path "$REPO")
+  if [ "$TOP_RC" -ne 0 ] || [ -z "$TOP_RAW" ]; then
     COPY_SHOW="unreadable (git exit=$TOP_RC)"
+  elif [ -z "$TOP_REAL" ]; then
+    COPY_SHOW="no, the top level [$(sanitize "$(cap "$TOP_RAW")")] did not resolve through canon_path"
   elif [ "$TOP_REAL" != "${REPO_TOP_REAL:-unresolved-repo}" ]; then
     COPY_SHOW="no, the top level is [$(sanitize "$(cap "$TOP_RAW")")]"
   else

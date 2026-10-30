@@ -421,6 +421,33 @@ Windows CLI starts receives `CLAUDE_CONFIG_DIR` in the `C:/...` form, which the
 gate would reject. A failed or empty conversion keeps the original value.
 Without `cygpath` no line is printed.
 
+### Comparing paths
+
+Every path comparison passes both sides through `canon_path`. Where `cygpath`
+exists, it converts the path with `cygpath -u`, resolves it with `readlink -f`,
+converts the result with `cygpath -m -l`, and lowercases ASCII letters; the
+printed predicate names those steps. Where `cygpath` is absent, it is
+`readlink -f` alone, compared case-sensitively.
+
+| Form of one directory | Canonical form |
+| --- | --- |
+| `C:/Users/<long name>/...`, `/c/Users/<long name>/...` | `c:/users/<long name>/...` |
+| An 8.3 short name, `C:/Users/88DF~1/...` or `/c/Users/88DF~1/...` | the long form, expanded by `cygpath -l` |
+| Git Bash's `/tmp/...` mount | the long form of `%TEMP%\...` |
+
+`readlink -f` does not expand 8.3 short names, and `cygpath -u` maps a
+`%TEMP%` path to `/tmp`, so without the last step those forms of one directory
+compare unequal. Non-ASCII letters are compared case-sensitively: `tr` runs
+under `LC_ALL=C`. A side that does not resolve yields nothing, and each
+comparison keeps its own differing defaults. The `cygpath` steps take `--`
+before the path. The printed canonical values pass through `sanitize`.
+
+| Limit | Effect |
+| --- | --- |
+| `cygpath -l` expands a short name only in a path that exists | A missing last component keeps its 8.3 form, so a missing directory compares unequal to its long form. |
+| ASCII case is folded on every Windows path | Two directories differing only in ASCII case, in an NTFS directory set case-sensitive, compare equal. |
+| A relative `HARNESS_DIR` or `env.HARNESS_DIR` | It resolves against the working directory `scripts/verify.sh` runs in, as before canonicalization. |
+
 The resolution runs ahead of the `claude` calls. The CLI honours a relative
 `CLAUDE_CONFIG_DIR` by creating that directory under the operator's working
 directory, so invoking it before this gate has a side effect on a bad value.
@@ -439,7 +466,7 @@ unreadable or holds a count of documents other than one. Only the first two
 are compared; the rest fail as their own state.
 
 `FAIL manifest.config_dir` compares the resolved directory against
-`manifest.config_dir`, both through `readlink -f`. Where `cygpath` exists the
+`manifest.config_dir`, both through `canon_path`. Where `cygpath` exists the
 manifest value is first converted with `cygpath -u`, since the local installer
 stores it in the `C:/...` form, and the printed line shows both. Its two defaults,
 `unresolved-live` and `unresolved-manifest`, differ on purpose, so an
@@ -616,7 +643,7 @@ probe and gated on it. Each runs `git` with `GIT_DIR`, `GIT_WORK_TREE`,
 
 | Probe | Passes where | Fails on |
 | --- | --- | --- |
-| Top level | `rev-parse --show-toplevel` resolves, through `cygpath -u` where it exists and `readlink -f`, to the repository under test | a parent repository's top level; a non-zero exit |
+| Top level | `rev-parse --show-toplevel` and the repository under test have one canonical form through `canon_path` | a parent repository's top level; a non-zero exit |
 | `FAIL deployed copy branch` | `symbolic-ref -q HEAD` prints `refs/heads/main` | another ref, a tag among them; a detached `HEAD`, exit 1; any other non-zero exit; a failed top-level probe |
 | `FAIL deployed copy changes` | `status --porcelain` exits 0 with no output and nothing on stderr, and `ls-files -v` lists no entry tagged `S` or lowercase | any status entry, modified, staged or untracked; any stderr output; a non-zero exit; a status that ran past 10 seconds; a marked index entry; a failed top-level probe |
 
@@ -631,8 +658,8 @@ entry count and the first five entries, each cut to 120 bytes, joined by
 line are each cut to 120 bytes too.
 
 A sparse checkout marks entries skip-worktree, so it fails the changes check.
-A repository under test named by a Windows 8.3 short path fails the top-level
-probe, `readlink -f` not expanding short names; the line prints the long path.
+A repository under test named by a Windows 8.3 short path or through the `/tmp`
+mount passes the top-level probe where `cygpath` exists.
 
 A cloud clone made by `env/setup.sh` and a deployed copy the installer cloned
 or refreshed pass all three.
@@ -1020,8 +1047,8 @@ would receive: the live `settings.json`'s `env.HARNESS_DIR` where it is a
 string, and unset otherwise, whatever the caller's own `HARNESS_DIR` holds. The
 `jq -r .env.HARNESS_DIR` line before them prints that value. A local install
 missing that key therefore fails both assertions, as its hooks would find no
-guard. Where the value is present, it is compared against `REPO`, both
-converted with `cygpath -u` where available and resolved with `readlink -f`,
+guard. Where the value is present, it is compared against `REPO`,
+both through `canon_path`,
 and a difference is `FAIL hook harness dir`: the hooks would run another tree's
 scripts than the one every other check reads.
 
