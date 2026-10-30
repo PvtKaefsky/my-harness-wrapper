@@ -410,7 +410,7 @@ These values pass through it:
 | the hook commands | each guard check's stderr |
 | the CLI | the plugin id list, and each `installPath` and the path converted from it |
 | a plugin's `package.json` | a dependency name outside the npm name form |
-| the environment | `HARNESS_ASSIGNEE` |
+| the environment | `HARNESS_ASSIGNEE`, and a `GIT_*_EMAIL` value that fails the address form |
 
 A version value inside `[0-9A-Za-z._-]` needs no pass, holding no control byte
 by construction. Every other printed value goes out without passing through it,
@@ -732,7 +732,7 @@ happen to agree. `git var` resolves the same precedence git uses at commit
 time, so that is what is asserted. The `user.email` read is shown for contrast
 only.
 
-No name or email is written into this repository. Four assertions stand in
+No name or email is written into this repository. Five assertions stand in
 place of the literals it used to carry:
 
 | Assertion | What it catches |
@@ -741,13 +741,14 @@ place of the literals it used to carry:
 | `git var` resolving each role to that role's own pair | Git not reading the pair the session was given |
 | Author and committer naming one identity | A commit attributed to two people |
 | Neither email being `noreply@anthropic.com` | The harness identity taking over |
+| Each set email holding the address form | An email that is not in the form of an address |
 
-The last assertion catches a failure that has occurred here. With the pair
-absent, `git var` resolves from `/root/.gitconfig`, which holds
-`Claude <noreply@anthropic.com>` after every rewrite. The four are checked
+The harness-default assertion catches a failure that has occurred here. With
+the pair absent, `git var` resolves from `/root/.gitconfig`, which holds
+`Claude <noreply@anthropic.com>` after every rewrite. The first four are checked
 together: a role can be unset and still yield an identity, so the variable
 assertions alone miss that case, and a set-but-wrong pair carries no harness
-email, so the email assertion alone misses that one.
+email, so the harness-default assertion alone misses that one.
 
 Deriving the expected identity from the same variables `git var` reads makes
 that third assertion narrow: it tests that git honours the pair, not that the
@@ -784,6 +785,38 @@ test and the agreement test are both gated on the parse having succeeded, so an
 error string is never compared as if it were an address. Where either role did
 not parse, the agreement test prints `not run` and names which role, rather than
 finding two identical diagnostic strings and reporting them as one identity.
+
+### The email address form
+
+Each role's `GIT_*_EMAIL` is checked against the address form where it is set
+and non-empty. An unset or empty variable is already a `FAIL git <ROLE>
+variables` line, and is not checked again.
+
+| State | Line |
+| --- | --- |
+| The address form | `GIT_<ROLE>_EMAIL address form -> yes` |
+| Not the address form | `FAIL git <ROLE> email: expected GIT_<ROLE>_EMAIL to hold one @, ..., actual [<value>] with <causes>` |
+
+The causes are listed together where several hold, in the style of the
+assignee check:
+
+| Cause | Test |
+| --- | --- |
+| `<N> @ signs` | The value holds other than exactly one `@`. No other cause is tested. |
+| `an empty local part` | Nothing precedes the `@`. |
+| `whitespace, < or > in the local part` | The part before the `@` holds a space, tab, newline, carriage return, vertical tab, form feed, `<` or `>`. |
+| `a domain of a single label` | The part after the `@` holds no `.`. |
+| `an empty domain label` | A label between dots, or at either end, is empty. |
+| `a domain label longer than 63 characters` | A label holds more than 63 characters. |
+| `a domain label carrying a character other than an ASCII letter, digit or hyphen` | A label holds a character outside `A-Z`, `a-z`, `0-9` and `-`, spelled out so the locale cannot widen it. |
+| `a domain label with a leading or trailing hyphen` | A label starts or ends with `-`. |
+| `a check that did not complete (email_causes exit=N)` | The function that tests the form exited non-zero. |
+
+The variable is checked, not the `git var` ident: git strips `<` and `>` from an
+ident, so the ident cannot show them. The value is printed through `sanitize`.
+The check tests the form, not that the address receives mail or that GitHub
+links it to an account. A control character other than whitespace, and a `"`, pass in
+the local part.
 
 ### The assignee login
 

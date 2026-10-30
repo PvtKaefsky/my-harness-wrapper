@@ -658,6 +658,37 @@ ident_var_state() {
   elif [ -z "${!1}" ]; then printf 'set but empty'
   else printf 'set'; fi
 }
+email_causes() {
+  local v=$1 ats local_part domain rest label labels=0 why=""
+  local empty=no long=no chars=no hyphen=no
+  ats=${v//[!@]/}
+  if [ "${#ats}" -ne 1 ]; then
+    printf '%s' ", ${#ats} @ signs"
+    return
+  fi
+  local_part=${v%@*}; domain=${v#*@}
+  [ -n "$local_part" ] || why="$why, an empty local part"
+  case "$local_part" in
+    *[$' \t\n\r\v\f<>']*) why="$why, whitespace, < or > in the local part" ;;
+  esac
+  rest="$domain."
+  while [ -n "$rest" ]; do
+    label=${rest%%.*}; rest=${rest#*.}
+    labels=$((labels + 1))
+    [ -n "$label" ] || empty=yes
+    [ "${#label}" -le 63 ] || long=yes
+    case "$label" in
+      *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-]*) chars=yes ;;
+    esac
+    case "$label" in -*|*-) hyphen=yes ;; esac
+  done
+  [ "$labels" -ge 2 ] || why="$why, a domain of a single label"
+  [ "$empty" = no ] || why="$why, an empty domain label"
+  [ "$long" = no ] || why="$why, a domain label longer than 63 characters"
+  [ "$chars" = no ] || why="$why, a domain label carrying a character other than an ASCII letter, digit or hyphen"
+  [ "$hyphen" = no ] || why="$why, a domain label with a leading or trailing hyphen"
+  printf '%s' "$why"
+}
 
 ROLE_IDENT_AUTHOR=""
 ROLE_IDENT_COMMITTER=""
@@ -670,6 +701,16 @@ for IDENT_ROLE in AUTHOR COMMITTER; do
   if [ "$N_STATE" != set ] || [ "$E_STATE" != set ]; then
     echo "FAIL git ${IDENT_ROLE} variables: expected $IDENT_N and $IDENT_E each set and non-empty, actual $N_STATE and $E_STATE"
     fail=1
+  fi
+  if [ "$E_STATE" = set ]; then
+    EMAIL_WHY=$(email_causes "${!IDENT_E}"); EMAIL_RC=$?
+    [ "$EMAIL_RC" -eq 0 ] || EMAIL_WHY=", a check that did not complete (email_causes exit=$EMAIL_RC)"
+    if [ -n "$EMAIL_WHY" ]; then
+      echo "FAIL git ${IDENT_ROLE} email: expected $IDENT_E to hold one @, a non-empty local part without whitespace, < or >, and a domain of two or more dot-separated labels of 1 to 63 ASCII letters, digits or hyphens with no leading or trailing hyphen, actual [$(sanitize "${!IDENT_E}")] with${EMAIL_WHY#,}"
+      fail=1
+    else
+      echo "$IDENT_E address form -> yes"
+    fi
   fi
   IDENT_RAW=$(git -C "$REPO" var "GIT_${IDENT_ROLE}_IDENT" 2>/dev/null); IDENT_RC=$?
   IDENT_PARSED=no
