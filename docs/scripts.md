@@ -217,6 +217,17 @@ value is compared, not the `url.<base>.insteadOf` rewrite `remote get-url`
 prints, so a rewrite in the user's git config does not fail the check. A clone
 URL given as a relative path is stored absolute and fails it.
 
+Git for Windows stores a clone source given as `/d/...` as `D:/...`, and one
+under `/tmp` as the `%TEMP%` path, often in 8.3 short form. Where `cygpath`
+exists, `url_canon` therefore compares a URL beginning with `/`, `X:/` or `X:\`
+in the canonical form `scripts/verify.sh`'s `canon_path` uses: `cygpath -u`,
+`readlink -f`, `cygpath -m -l`, ASCII letters lowercased. Every other URL, and
+every URL where `cygpath` is absent, is compared exactly. The limits of
+`canon_path` under "Comparing paths" apply. A side whose last conversion fails
+is compared unconverted, and so reads `no`. The line prints `yes` or `no` only,
+never either URL. The check confirms the form git stored the clone URL in. It
+does not authenticate the origin: a refresh sets the URL before it fetches.
+
 Where a command fails, or the copy is not ready, the step
 counts one failure, prints `delivery -> stopped`, and the run ends before steps
 4 to 8. `CLAUDE.md`, `settings.json` and the manifest stay as they were. The

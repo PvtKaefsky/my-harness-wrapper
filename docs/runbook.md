@@ -165,6 +165,7 @@ started after the run carries the harness.
 | `command -v git -> none` | `git` does not resolve on `PATH`. | Install Git for Windows, or put `git` on `PATH`. |
 | `git --version -> exit=N value=[V]` | The `git` that resolved ran; it passes where `N` is 0. | Where `N` is not 0, replace the `git` that `command -v git` names. |
 | `prerequisites failing -> <tools>` | The tools that failed the two checks above, or `none`. | Act on each tool's line. |
+| `git -C <copy> config --local --get remote.origin.url equals $HARNESS_REPO_URL -> exit=N yes/no` | Whether the deployed copy's stored origin is the clone URL. A URL beginning with `/`, `X:/` or `X:\` is compared in canonical form where `cygpath` exists, so `/d/...`, `D:/...` and an 8.3 or `/tmp` form of one path read `yes`; any other URL is compared exactly. | Where `no`, read the stored value with `git -C <copy> config --get remote.origin.url`. A relative clone URL is stored absolute and reads `no`: give an absolute one. |
 | `delivery -> stopped, not written: ...` | The run stopped before the deployed copy, `CLAUDE.md`, `settings.json`, the global git config, the plugins and the manifest. | Fix each failing tool, then re-run. |
 
 The plugin step finds the CLI on `PATH`, then at `CLAUDE_CODE_EXECPATH`, then
