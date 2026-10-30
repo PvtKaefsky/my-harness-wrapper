@@ -677,6 +677,41 @@ The checks cannot separate these states from a clean copy:
 The checks report drift in the copy. They do not establish its integrity
 against a change made to defeat them.
 
+### The remote main head
+
+After the deployed copy's state, the script reads the copy's full `HEAD` with
+`rev-parse --verify -q HEAD`, and the head of `refs/heads/main` on its origin
+with `ls-remote -- <URL> refs/heads/main`, the URL read from the copy's
+`remote.origin.url`. `ls-remote` runs from `/`, outside the copy, so the copy's
+own config, such as `remote.origin.uploadpack`, `core.sshCommand` or a proxy,
+does not apply to it; the user's global and system config do. The read runs
+under `timeout -k 2 5`, with `GIT_TERMINAL_PROMPT=0`, stdin from `/dev/null`
+and stderr discarded, so it adds at most 7 seconds to the run and the origin
+URL is never printed. Where `timeout` is absent the read does not run. Both
+reads use the `GIT_*`-stripped `git` the copy's other probes use. A head is
+read only from a line of 40 or 64 hex digits, a tab and `refs/heads/main`.
+
+| `not read` state | What it establishes |
+| --- | --- |
+| `timed out after 5s (exit=124)` | The read ran past its bound. |
+| `timed out after 5s (exit=137)` | The read ran past its bound, or `git` was killed by `SIGKILL` from outside. |
+| `(timeout or env exit=N)`, `N` 125 to 127 | `timeout` or `env` failed to run `git`. |
+| `(git exit=N)` | `git ls-remote` failed. The cause is not captured, stderr being discarded: an unreachable host, refused authentication, a missing repository, a TLS error and a relative origin URL, which resolves from `/`, all read the same. |
+| `no refs/heads/main line (git exit=0)` | No `refs/heads/main` line of the expected shape was returned. An origin without `main` and one that hides the ref read the same. |
+| `git -C <repo> config --get remote.origin.url -> exit=N` | The copy has no readable origin URL; `exit=0 value=empty` where the key holds an empty value. |
+
+The run's other bounded steps, the status probe and `claude plugin list`
+among them, are not bounded together; `scripts/session-check.sh`'s 20-second
+bound reports a run that exceeds it.
+
+Equal values print a `compare` line. Differing values, and a value that was
+not read, print a `NOTE`, which does not set the exit status. The comparison
+separates a copy at `main`'s head from one that is not. It does not separate a
+difference that touches the delivered files from one that does not, nor an
+origin `main` that moved forward from one that was rewound. A `NOTE` line makes
+`scripts/session-check.sh` print the `FAIL` and `NOTE` lines instead of the
+`fail -> N` tally.
+
 ### Git identity
 
 Identity is checked effective from inside the clone, and need not come from git

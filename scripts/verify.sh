@@ -588,6 +588,55 @@ if [ "$STATUS_OK" != yes ]; then
   echo "FAIL deployed copy changes: expected no entries from git -C $REPO status --porcelain --untracked-files=all --ignore-submodules=none and no entry marked skip-worktree or assume-unchanged, actual status $STATUS_SHOW, marked $FLAG_SHOW"
   fail=1
 fi
+REMOTE_TIMEOUT=5
+REMOTE_REF="refs/heads/$HARNESS_REF"
+DEPLOYED=""; REMOTE_HEAD=""
+if [ "$REPO_RC" -ne 0 ]; then
+  DEPLOYED_SHOW="not read, repo unreadable (git rev-parse exit=$REPO_RC)"
+else
+  DEPLOYED_OUT=$("${RGIT[@]}" -C "$REPO" rev-parse --verify -q HEAD 2>/dev/null); DEPLOYED_RC=$?
+  if [ "$DEPLOYED_RC" -eq 0 ] && [[ "$DEPLOYED_OUT" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]; then
+    DEPLOYED=$DEPLOYED_OUT; DEPLOYED_SHOW="[$DEPLOYED]"
+  else
+    DEPLOYED_SHOW="unreadable (git exit=$DEPLOYED_RC) [$(sanitize "$(cap "$DEPLOYED_OUT")")]"
+  fi
+fi
+echo "git -C $REPO rev-parse --verify -q HEAD -> $DEPLOYED_SHOW"
+if [ "$REPO_RC" -ne 0 ]; then
+  REMOTE_SHOW="not read, repo unreadable (git rev-parse exit=$REPO_RC)"
+elif ! command -v timeout >/dev/null 2>&1; then
+  REMOTE_SHOW="not read, command -v timeout -> none"
+else
+  ORIGIN_URL=$("${RGIT[@]}" -C "$REPO" config --get remote.origin.url 2>/dev/null); ORIGIN_RC=$?
+  if [ "$ORIGIN_RC" -ne 0 ] || [ -z "$ORIGIN_URL" ]; then
+    REMOTE_SHOW="not read, git -C $REPO config --get remote.origin.url -> exit=$ORIGIN_RC$([ "$ORIGIN_RC" -ne 0 ] || printf ' value=empty')"
+  else
+    REMOTE_OUT=$(cd / && GIT_TERMINAL_PROMPT=0 timeout -k 2 "$REMOTE_TIMEOUT" "${RGIT[@]}" ls-remote -- "$ORIGIN_URL" "$REMOTE_REF" </dev/null 2>/dev/null); REMOTE_RC=$?
+    REMOTE_OUT=${REMOTE_OUT//$'\r'/}
+    REMOTE_LINE=$(printf '%s\n' "$REMOTE_OUT" | LC_ALL=C grep -a -E "^([0-9a-f]{40}|[0-9a-f]{64})"$'\t'"$REMOTE_REF\$" | head -n 1)
+    if [ "$REMOTE_RC" -eq 124 ] || [ "$REMOTE_RC" -eq 137 ]; then
+      REMOTE_SHOW="not read, timed out after ${REMOTE_TIMEOUT}s (exit=$REMOTE_RC)"
+    elif [ "$REMOTE_RC" -ge 125 ] && [ "$REMOTE_RC" -le 127 ]; then
+      REMOTE_SHOW="not read (timeout or env exit=$REMOTE_RC)"
+    elif [ "$REMOTE_RC" -ne 0 ]; then
+      REMOTE_SHOW="not read (git exit=$REMOTE_RC)"
+    elif [ -z "$REMOTE_LINE" ]; then
+      REMOTE_SHOW="not read, no $REMOTE_REF line (git exit=0)"
+    else
+      REMOTE_HEAD=${REMOTE_LINE%%$'\t'*}; REMOTE_SHOW="[$REMOTE_HEAD]"
+    fi
+  fi
+fi
+echo "git ls-remote -- <origin URL of $REPO> $REMOTE_REF, under timeout ${REMOTE_TIMEOUT}s -> $REMOTE_SHOW"
+if [ -z "$REMOTE_HEAD" ]; then
+  echo "NOTE remote $HARNESS_REF head: expected a head from git ls-remote -- <origin URL of $REPO> $REMOTE_REF, actual $REMOTE_SHOW; not counted into the exit status"
+elif [ -z "$DEPLOYED" ]; then
+  echo "NOTE remote $HARNESS_REF head: expected the deployed commit from git -C $REPO rev-parse --verify -q HEAD to compare against $REMOTE_HEAD, actual $DEPLOYED_SHOW; not counted into the exit status"
+elif [ "$DEPLOYED" != "$REMOTE_HEAD" ]; then
+  echo "NOTE remote $HARNESS_REF head: expected the deployed commit $DEPLOYED to equal the head of $REMOTE_REF on origin, actual $REMOTE_HEAD; not counted into the exit status"
+else
+  echo "compare the deployed commit against the head of $REMOTE_REF on origin -> yes, both $DEPLOYED"
+fi
 CFG_MAIL=$(git -C "$REPO" config --get user.email 2>/dev/null); CFG_RC=$?
 if [ "$REPO_RC" -ne 0 ]; then
   CFG_SHOW="repo unreadable (git rev-parse exit=$REPO_RC); any value here would come from global scope"
