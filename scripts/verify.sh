@@ -807,6 +807,86 @@ for SIGN_KEY in commit.gpgsign tag.gpgsign; do
     fail=1
   fi
 done
+WANT_HOOKS="$REPO/git-hooks"
+WANT_HOOKS_REAL=$(canon_path "$WANT_HOOKS")
+HP_OUT=$("${RGIT[@]}" -C "$REPO" config --get core.hooksPath 2>/dev/null); HP_RC=$?
+HP_OK=no
+if [ "$REPO_RC" -ne 0 ]; then
+  HP_SHOW="repo unreadable (git rev-parse exit=$REPO_RC)"
+elif [ "$HP_RC" -eq 1 ]; then
+  HP_SHOW="unset (git exit=1)"
+elif [ "$HP_RC" -ne 0 ]; then
+  HP_SHOW="unreadable (git exit=$HP_RC)"
+elif [ -z "$HP_OUT" ]; then
+  HP_SHOW="present with empty value (git exit=0)"
+else
+  HP_REAL=$(canon_path "$HP_OUT")
+  HP_SHOW="[$(sanitize "$HP_OUT")] (resolves to $(sanitize "${HP_REAL:-unresolved}"))"
+  [ "${HP_REAL:-unresolved-hooks}" != "${WANT_HOOKS_REAL:-unresolved-want}" ] || HP_OK=yes
+fi
+echo "git -C $REPO config --get core.hooksPath -> $HP_SHOW"
+if [ "$HP_OK" = yes ]; then
+  echo "compare core.hooksPath against $WANT_HOOKS -> yes"
+else
+  echo "FAIL core.hooksPath: expected the effective value in $REPO to name $WANT_HOOKS (resolves to $(sanitize "${WANT_HOOKS_REAL:-unresolved}")), actual $HP_SHOW"
+  fail=1
+fi
+HT_MARK='harness commit-msg: matched line ->'
+HT_ROOT=$(mktemp -d 2>/dev/null)
+ht_git() { (cd "$HT_ROOT/repo" && ${TO[@]+"${TO[@]}"} "${RGIT[@]}" -c user.name=verify.sh -c user.email=verify@example.com -c commit.gpgsign=false "$@"); }
+ht_case() {
+  local label=$1 want=$2 msg=$3 mark=${4:-$HT_MARK} check=${5:-commit-msg hook} err rc shown show ok=no
+  if [ -z "${HT_ROOT:-}" ] || [ ! -d "$HT_ROOT/repo" ]; then
+    show="not run, ${HT_SETUP:-mktemp -d produced no directory}"
+  else
+    printf '%s\n' "$msg" > "$HT_ROOT/message"
+    err=$(ht_git commit -q --allow-empty -F "$HT_ROOT/message" 2>&1 >/dev/null); rc=$?
+    shown=$(printf '%s\n' "$err" | grep -a -m1 -F -- "$mark") \
+      || shown=$(printf '%s\n' "$err" | grep -a -m1 -F -- 'harness ') || shown=$err
+    show="exit=$rc [$(sanitize "$(cap "$shown")")]"
+    if [ "$want" = refused ]; then
+      [ "$rc" -eq 0 ] || ! printf '%s\n' "$err" | grep -a -q -F -- "$mark" || ok=yes
+    else
+      [ "$rc" -ne 0 ] || ok=yes
+    fi
+  fi
+  echo "git commit through the effective core.hooksPath, $label -> $show"
+  if [ "$ok" != yes ]; then
+    if [ "$want" = refused ]; then
+      echo "FAIL $check, $label: expected a non-zero exit carrying $mark, actual $show"
+    else
+      echo "FAIL $check, $label: expected exit=0, actual $show"
+    fi
+    fail=1
+  fi
+}
+HT_SETUP=""
+if [ -n "$HT_ROOT" ]; then
+  HT_OUT=$("${RGIT[@]}" init -q "$HT_ROOT/repo" 2>&1); HT_RC=$?
+  if [ "$HT_RC" -eq 0 ]; then
+    printf 'x\n' > "$HT_ROOT/repo/file" && HT_OUT=$(ht_git add file 2>&1); HT_RC=$?
+  fi
+  [ "$HT_RC" -eq 0 ] || { HT_SETUP="setup exit=$HT_RC [$(sanitize "$(cap "$HT_OUT")")]"; rm -rf "$HT_ROOT/repo"; }
+fi
+ht_case "a message carrying a Co-Authored-By: Claude trailer" refused "verify.sh rejected case
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+ht_case "a clean message" committed "verify.sh clean case"
+HT_OWN='verify.sh: the repository'"'"'s own pre-commit hook ran'
+if [ -d "${HT_ROOT:-}/repo/.git/hooks" ]; then
+  printf '#!/bin/sh\necho "%s" >&2\nexit 1\n' "$HT_OWN" > "$HT_ROOT/repo/.git/hooks/pre-commit" \
+    && chmod +x "$HT_ROOT/repo/.git/hooks/pre-commit" || HT_SETUP="writing .git/hooks/pre-commit failed"
+  [ -z "$HT_SETUP" ] || rm -rf "$HT_ROOT/repo"
+fi
+ht_case "a repository's own pre-commit hook exiting 1" refused "verify.sh forwarding case" "$HT_OWN" "hook forwarding"
+if [ -n "$HT_ROOT" ]; then
+  rm -rf -- "$HT_ROOT"; HT_RC=$?
+  echo "rm -rf <temporary repository> -> exit=$HT_RC"
+  if [ "$HT_RC" -ne 0 ]; then
+    echo "FAIL commit-msg hook cleanup: expected rm -rf of the temporary repository to exit 0, actual exit=$HT_RC"
+    fail=1
+  fi
+fi
 echo "manifest.git_user_email -> $(jq -r '.git_user_email // ""' "$MANIFEST" 2>/dev/null)"
 
 echo "fail -> $fail"

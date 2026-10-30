@@ -26,7 +26,7 @@ The logged `fails` is the true count. The exit status is that count clamped to
 | 2 | Creates `/root/.claude`, and symlinks `/home/user/.claude` to it where that path is absent. |
 | 3 | Copies `config/CLAUDE.md` to `/root/.claude/CLAUDE.md`. |
 | 4 | Merges `config/settings.json` into `/root/.claude/settings.json`. |
-| 5 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally. |
+| 5 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, and the global `core.hooksPath` to `git-hooks/` in the clone. |
 | 6 | Installs each plugin named in `config/plugins.tsv`, then runs `scripts/plugin-dependencies.sh` for it. |
 | 7 | Writes `/root/.claude/.my-harness-wrapper.manifest.json`. |
 
@@ -105,6 +105,25 @@ gives up, wherever nothing above that file supplies it. A repository-local
 `git config --get` never sees a role's environment pair, so it goes on
 reporting whatever config resolves to, step 7's read included.
 
+### Step 5, the hooks path
+
+The step delivers `git-hooks/`, which "git-hooks/" below describes, as the
+global `core.hooksPath`. It runs in this order:
+
+1. Prints `test -x <clone>/git-hooks/commit-msg`.
+2. Prints the prior global and system values, each with its read's exit status.
+   A read exiting above 1 counts one failure.
+3. Writes nothing where `git-hooks/commit-msg` is absent or not executable, or
+   where either prior value holds a path other than the one it would write; it
+   prints which, and counts one failure. A prior value equal to it is written again.
+4. Otherwise runs `git config --global core.hooksPath <clone>/git-hooks` and
+   counts a non-zero exit.
+
+The value is written globally for the reason the signing keys are: later
+sessions clone fresh repositories. A repository whose own config sets
+`core.hooksPath` overrides it. The manifest's `core_hooks_path` records the
+value written, and is empty where the step wrote nothing.
+
 ### Step 6, the plugins
 
 The CLI owns `extraKnownMarketplaces` and `enabledPlugins` at user scope.
@@ -122,6 +141,8 @@ to, and may be nothing at all. It need not be the email git writes, because
 `git var` resolves a role whose email variable is set from that variable
 instead. The field is kept for the record, not as evidence of what took effect.
 `scripts/verify.sh` prints it without asserting it.
+
+`core_hooks_path` is the value step 5 wrote, or empty.
 
 The manifest is written the same way step 4 writes the settings file: to a
 temporary file beside it, set to mode 644, then renamed. A failed write leaves
@@ -162,7 +183,7 @@ before step 3 can rewrite it in a deployed copy the script runs from.
 | 3 | Clones or refreshes the deployed copy, `my-harness-wrapper` in the config directory. A failure ends the run. |
 | 4 | Copies `config/CLAUDE.md` from the deployed copy to `CLAUDE.md` there, first printing `test -f` or `cmp -s` for the file it replaces, and keeping a differing one as `CLAUDE.md.pre-harness` where no such copy exists. |
 | 5 | Merges the deployed copy's `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the deployed copy. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
-| 6 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status. |
+| 6 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status, then the global `core.hooksPath` to the deployed copy's `git-hooks/`. |
 | 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv` and runs the deployed copy's `scripts/plugin-dependencies.sh` for it, then prints how many rows carried a `plugin_id`. |
 | 8 | Writes `.my-harness-wrapper.manifest.json` there. |
 
@@ -280,6 +301,21 @@ environment of every hook and tool process, so the hook commands resolve the
 scripts in the deployed copy. The line after the merge prints the value read
 back.
 
+### Step 6, the hooks path
+
+The step runs as bootstrap's step 5 under "Step 5, the hooks path", with three
+differences. The value written is the deployed copy's `git-hooks/` converted
+with `cygpath -m` where `cygpath` exists, so git for Windows reads a
+`C:/...` path; the `cygpath -m` line prints the conversion, and a failed one
+writes nothing and counts one failure. A prior value is compared with that
+value through `url_canon`, so another spelling of the same directory counts as
+equal. Deleting the deployed copy without unsetting the value leaves it naming a
+deleted directory, which `docs/runbook.md` covers under "Removing a local
+install".
+
+The value applies to every repository on the machine, the user's own commits
+included.
+
 ### Step 7, the plugins
 
 The CLI is taken from the first of three sources that yields one: `command -v
@@ -298,6 +334,7 @@ dependency step is not run and counts one failure of its own.
 ### Step 8, the manifest
 
 The fields are bootstrap's, plus `local_checkout`, the deployed copy's path.
+`core_hooks_path` is the value step 6 wrote, or empty.
 `bootstrap_version` is read from the `export BOOTSTRAP_VERSION=` line of
 `env/setup.sh` in the deployed copy, with the shapes `scripts/verify.sh` rejects
 counted as a failure and written empty. `config_dir` is the converted path from
@@ -347,6 +384,145 @@ reads neither the installed version nor the dependency's own dependencies.
 The step exists because the CLI installs `ecc@ecc` 2.2.3 without its npm
 dependencies; `docs/environment.md` records the observations under "ECC's npm
 dependencies". `docs/runbook.md` carries when the step can be removed.
+
+## git-hooks/
+
+The directory the global `core.hooksPath` names. It holds one file per hook name
+git looks up in that directory, and `lib/`.
+
+| Hook names | Count |
+| --- | --- |
+| `applypatch-msg`, `pre-applypatch`, `post-applypatch`, `pre-commit`, `pre-merge-commit`, `prepare-commit-msg`, `commit-msg`, `post-commit`, `pre-rebase`, `post-checkout`, `post-merge`, `pre-push`, `pre-receive`, `update`, `proc-receive`, `post-receive`, `post-update`, `reference-transaction`, `push-to-checkout`, `pre-auto-gc`, `post-rewrite`, `sendemail-validate`, `p4-changelist`, `p4-prepare-changelist`, `p4-post-changelist`, `p4-pre-submit`, `post-index-change` | 27 |
+
+`fsmonitor-watchman` is absent: git runs it from the path `core.fsmonitor`
+names, not by name from the hooks directory.
+
+Every hook file is the same three lines. It sets `HOOK_DIR` to its own directory,
+taken from `$0`, and sources `lib/dispatch.sh`; where that file cannot be read
+it prints so and exits 1. The hooks read no `HARNESS_DIR` and run no `jq`, so a
+shell the user starts runs them as a session does.
+
+| File | Role |
+| --- | --- |
+| `lib/dispatch.sh` | Runs the message check for `commit-msg`, then forwards every hook to the repository's own hook. |
+| `lib/attribution.ere` | The attribution pattern, one line, read by `lib/dispatch.sh` and by `scripts/attribution-guard.sh`. |
+
+| Hook | What runs |
+| --- | --- |
+| `commit-msg` | The message check; where it passes, forwarding. |
+| `push-to-checkout` | Forwarding; where the repository has no such hook, git's default for a push to a checked-out branch under `receive.denyCurrentBranch=updateInstead`. |
+| `proc-receive` | Forwarding; where the repository has no such hook, exit 1 with a line naming the path looked up. |
+| Every other name | Forwarding; where the repository has no such hook, exit 0. |
+
+The two defaults exist because the presence of those two hooks changes what git
+does. The `push-to-checkout` default runs `update-index -q --ignore-submodules
+--refresh`, `diff-files --quiet --ignore-submodules`, `diff-index --quiet
+--cached --ignore-submodules` against `HEAD`, or the empty tree where `HEAD` is
+unborn, and `read-tree -u -m <new commit>`, refusing with git's own message at
+the first that fails.
+
+### The message check
+
+The pattern is read from `lib/attribution.ere`, one trailing carriage return
+removed. A file that is absent, empty or more than one line refuses the commit
+with a line saying the message was not checked.
+
+| Alternative, matched case-insensitively as an ERE | Matches |
+| --- | --- |
+| `Generated (with\|by) \[?Claude Code` | The Claude Code footer. |
+| `claude\.ai/code/session_` | A session link, the URL of a `Claude-Session` trailer among them. |
+| `^[[:space:]]*Co-Authored-By:([^<]*[^[:alnum:]_<-])?Claude([^[:alnum:]_]\|$)` | A `Co-Authored-By:` line whose name, before any `<`, carries the word `Claude` not preceded by a hyphen. |
+| `^[[:space:]]*Co-Authored-By:.*@([[:alnum:]-]+\.)*anthropic\.com([^[:alnum:].-]\|$)` | A `Co-Authored-By:` line with an `anthropic.com` address. |
+| `^[[:space:]]*Claude-Session:` | Any `Claude-Session:` line. |
+
+A `Co-Authored-By:` line naming anyone else passes, a hyphenated name such as
+`Jean-Claude` among them. The hook runs for the user's
+own commits too.
+
+The message is scanned as git will record it. Comment lines and everything from
+the scissors line on are dropped where git's cleanup would drop them, and kept
+otherwise:
+
+| `commit.cleanup` | `GIT_EDITOR` in the hook | Dropped |
+| --- | --- | --- |
+| `strip` | any | comment lines, and the scissors line and all after it |
+| `whitespace`, `verbatim` | any | nothing |
+| unset, `default`, `scissors` or another value | `:` | nothing |
+| `scissors` | anything else | the scissors line and all after it |
+| unset, `default` or another value | anything else | comment lines, and the scissors line and all after it |
+
+Git sets `GIT_EDITOR=:` in the hook's environment where no editor runs, as for
+`git commit -m` or `-F`. A comment line begins with `core.commentString`, or
+`core.commentChar`, whichever config sets last, `#` by default. The scissors
+line is that string followed by
+` ------------------------ >8 ------------------------`. Where the value is
+`auto`, a line beginning with any of `#;@!$%^&|:` counts as a comment.
+
+| Outcome | Exit | Output on stderr |
+| --- | --- | --- |
+| A line matched | 1 | `harness commit-msg: matched line -> <line>`, the line through the control-byte replacement `scripts/verify.sh` uses, then `harness commit-msg: remove that attribution line from the commit message, then commit again.` |
+| The pattern file unusable, `awk` unable to read the message, or `grep` exiting above 1 | 1 | `harness commit-msg: <cause>` |
+| Nothing matched | the forwarded hook's | the forwarded hook's |
+
+The hook rejects; it never edits the message. A rejected commit does not reach
+the repository's own `commit-msg`.
+
+`git merge` runs `commit-msg` on the merge message, so a merge message carrying
+the pattern is rejected.
+
+### Forwarding
+
+The repository's own hook is `<common dir>/hooks/<name>`. The common dir is
+`git rev-parse --git-common-dir`, run in the hook's working directory and
+environment. Where that fails and `GIT_DIR` is set, it is
+`${GIT_COMMON_DIR:-$GIT_DIR}`: `git init` and `git clone` run
+`reference-transaction` before the new repository answers `rev-parse`. Where it
+fails with `GIT_DIR` unset, the hook exits 1 with a line saying the
+repository's hook was not looked up.
+
+The path is never resolved through `core.hooksPath`, which names this
+directory. In a linked worktree the common dir is the main repository's git
+directory; in a bare repository receiving a push it is the repository itself,
+as git uses for `hooks/` without the harness.
+
+| State of `<common dir>/hooks/<name>` | Result |
+| --- | --- |
+| Absent | The default for that hook name, above. |
+| `<common dir>/hooks` is this directory, or the file is the running hook file, by `test -ef` | Not run; the default. |
+| A file, not executable | Not run; the line `harness <name>: <path> was not run, it is not executable.`, then the default. |
+| An executable file | Run by `exec` with the same arguments, standard input, environment and working directory; its exit status is the hook's. |
+
+Git also skips a non-executable hook. Git for Windows counts a file beginning
+with `#!` as executable.
+
+### File mode and line endings
+
+Every hook file is committed with mode `100755`, set on Windows with
+`git update-index --chmod=+x`. `lib/` is not a hook and stays `100644`.
+
+A checkout under `core.autocrlf=true` writes the hook files with CRLF line
+endings. Git for Windows runs them.
+
+### Accepted gaps
+
+| Path | Effect |
+| --- | --- |
+| A repository whose own config sets `core.hooksPath` | That value overrides the global one, so neither the message check nor forwarding runs there. `scripts/session-check.sh` prints the effective value with its origin. |
+| `git commit --no-verify`, `git merge --no-verify` | Git skips `commit-msg`. |
+| `git rebase`, `git cherry-pick` | Git runs no `commit-msg`, so a message they carry over is not checked. |
+| `git commit --cleanup=<mode>` | The flag does not reach the hook; the table above decides from config and `GIT_EDITOR`. With an editor and no `commit.cleanup`, `--cleanup=whitespace` or `--cleanup=scissors` records comment lines the hook dropped, so an attribution line beginning with the comment character passes. With `commit.cleanup=whitespace` or `verbatim`, a `git commit -v` diff below the scissors line is scanned although git cuts it. |
+| `core.commentChar=auto` | A line beginning with any candidate character is dropped as a comment where cleanup drops comments. |
+| `git am` | Git runs `applypatch-msg`, which only forwards, and no `commit-msg`. |
+| `git commit-tree` and other plumbing | Git runs no hook. |
+| A commit made on GitHub by a tool outside the attribution guard's `PreToolUse` matcher | No local hook runs. |
+| A commit made by a program that does not run git hooks | No hook runs. |
+| A hook name a later git version adds | No file carries it, so git finds none and the repository's own hook of that name does not run. |
+| A tool that installs hooks into the directory `core.hooksPath` names | It finds the harness files there. `git lfs install --local` 3.7.0 printed `Hook already exists: pre-push` and installed nothing, so a repository without its own LFS hooks gets none, and its pushes do not upload LFS objects through `pre-push`. Placing LFS's hooks in `<common dir>/hooks` by hand, from `git lfs update --manual`, restores them through forwarding. |
+| A tool that refuses to install hooks while `core.hooksPath` is set, such as `pre-commit install` | It refuses in every repository. |
+
+Every hook git runs starts bash and, for forwarding, one `git rev-parse`, for
+every repository on the machine. One commit and one checkout ran 13
+`reference-transaction` hooks on Git for Windows 2.51.0.
 
 ## How the hook commands resolve the harness directory
 
@@ -404,7 +580,7 @@ These values pass through it:
 
 | Source | Values |
 | --- | --- |
-| git | the contrast `user.email`, each `git var` ident and the pair it is compared against, each `*.gpgsign` read, the `status --porcelain` entries, git's first stderr line from that status, the top-level path, and the branch |
+| git | the contrast `user.email`, each `git var` ident and the pair it is compared against, each `*.gpgsign` read, the `core.hooksPath` read and its canonical form, each hook-check commit's stderr line, the `status --porcelain` entries, git's first stderr line from that status, the top-level path, and the branch |
 | `env/setup.sh` | the matched `export` lines, and an export value outside `[0-9A-Za-z._-]` |
 | the settings files | the delivered key list, both settings probes, the carrying state, and the live `env.HARNESS_DIR` |
 | the hook commands | each guard check's stderr |
@@ -871,6 +1047,52 @@ not read `<dir>` — not a repository, or dubious ownership — so without that
 gate the check would silently test the global value it exists to bypass, while a
 repository-local `true` went unreported.
 
+### The hooks path
+
+The effective `core.hooksPath` is read inside the repository under test, gated
+on the same `rev-parse` probe, and compared with `<repo>/git-hooks` through
+`canon_path`. A relative value resolves against the directory `verify.sh` runs
+in. The read line prints the value and its canonical form, or `unset (git
+exit=1)`, `unreadable (git exit=N)`, `present with empty value`, or `repo
+unreadable`. Anything but a match is `FAIL core.hooksPath`.
+
+The read is effective, not `--global`, as for the signing keys. It does not
+show what another repository reads: a repository whose own config sets
+`core.hooksPath` overrides the global value there, and
+`scripts/session-check.sh` prints that per repository.
+
+### The commit-msg hook check
+
+`verify.sh` makes a repository in a `mktemp -d` directory and commits through
+whatever `core.hooksPath` git resolves there, with no override. Each git command
+runs with the repository-redirecting `GIT_*` variables unset, under the 10-second
+`timeout` the status read uses where `timeout` exists, and with
+`-c user.name=verify.sh -c user.email=verify@example.com -c commit.gpgsign=false`,
+which a role's environment pair still outranks.
+
+| Case | Message | Passes where |
+| --- | --- | --- |
+| `a message carrying a Co-Authored-By: Claude trailer` | `verify.sh rejected case`, a blank line, and `Co-Authored-By: Claude <noreply@anthropic.com>` | `git commit --allow-empty -F` exits non-zero and its stderr carries `harness commit-msg: matched line ->` |
+| `a clean message` | `verify.sh clean case` | `git commit --allow-empty -F` exits 0 |
+| `a repository's own pre-commit hook exiting 1` | `verify.sh forwarding case`, after `verify.sh` writes an executable `.git/hooks/pre-commit` that prints `verify.sh: the repository's own pre-commit hook ran` and exits 1 | `git commit --allow-empty -F` exits non-zero and its stderr carries that line |
+
+Each case prints `git commit through the effective core.hooksPath, <case> ->
+exit=N [<line>]`, the line being the first stderr line carrying the case's
+marker, else the first carrying `harness `, else the first stderr line, cut to
+120 bytes. A failing case is `FAIL commit-msg hook, <case>` for the first two
+and `FAIL hook forwarding, <case>` for the third. Where `mktemp -d`, `git
+init`, `git add` or the hook write fails, the cases after it print `not run`
+with that cause and fail. The directory is then removed, and
+`rm -rf <temporary repository> -> exit=N` printed; a non-zero exit is
+`FAIL commit-msg hook cleanup`.
+
+The check tests that a commit through the effective configuration is refused
+on the pattern, allowed without it, and stopped by the repository's own
+`pre-commit`. It does not test any other hook name, or the hook files' mode in
+the deployed copy. It adds a `git init`, a `git add` and three commits to the
+run, which `scripts/session-check.sh` bounds at 20 seconds in all; a scratch
+install on Windows ran the whole of `verify.sh` in about 8 seconds.
+
 ## scripts/session-check.sh
 
 Reports what a session starts with. Run by the `SessionStart` hook
@@ -889,8 +1111,8 @@ before the local branch existed. The read prints nothing in the cloud branch.
 
 | Branch | Log | Lines before the `verify.sh` block |
 | --- | --- | --- |
-| Cloud | `/home/user/session-check.log` | The boot-time comparison and one line per directory under `/home/user`, as the table below sets out. |
-| Local | `session-check.log` in the config directory | `jq -r .local_checkout <manifest> -> <path>`, `test -f <install log> -> yes/no`, and, where it exists, `stat -c %y <install log> -> <mtime>` and `tail -n 1 <install log> -> fails -> N`. No line names `/home/user`. The path and the log line pass through the control-byte replacement. |
+| Cloud | `/home/user/session-check.log` | The boot-time comparison and, per directory under `/home/user`, its branch line and its `core.hooksPath` line, as the table below sets out. |
+| Local | `session-check.log` in the config directory | `jq -r .local_checkout <manifest> -> <path>`, `test -f <install log> -> yes/no`, and, where it exists, `stat -c %y <install log> -> <mtime>` and `tail -n 1 <install log> -> fails -> N`, then the working directory's `core.hooksPath` line. No line names `/home/user`. The path and the log line pass through the control-byte replacement. |
 
 Each line goes to stdout and is appended to the log. A
 failed append is discarded, so an unwritable log does not change the output.
@@ -908,6 +1130,7 @@ session was quiet.
 | `snapshot state -> undetermined, log epoch [...] boot epoch [...]` | Either epoch was missing or non-numeric. Both values are printed. |
 | `snapshot state -> undetermined, ... absent` | The boot log is not at the path this script reads, so neither epoch exists. |
 | `git -C <dir> rev-parse --abbrev-ref HEAD, --short HEAD` | One line per directory under `/home/user`, with its branch and short HEAD. |
+| `git -C <dir> config --show-origin --get core.hooksPath -> exit=N value=[<origin> <value>]` | The effective `core.hooksPath` and the file that sets it: in the cloud, after each repository's branch line; locally, for the working directory, after the install log lines. Exit 1 means unset. A value whose origin is the repository's own config overrides the harness's. Tabs and control bytes are replaced. No verdict is printed. |
 | `ls -d /home/user/*/ -> none` | No directory was found under `/home/user`. |
 | `git -C <dir> rev-parse --git-dir -> exit=N` | A directory git would not read. The exit code stands in place of a reason: git also refuses a real repository over dubious ownership. |
 | `verify.sh FAIL ...`, `verify.sh NOTE ...` | Every `FAIL` and `NOTE` line it printed. |
@@ -1041,12 +1264,16 @@ or after whitespace. One run of surrounding quotes is stripped from the
 path. A path that is not a readable regular file is skipped. The first mebibyte
 of the file is scanned.
 
-The match is case-insensitive, against `Generated (with|by) \[?Claude Code` and
-`claude.ai/code/session_`.
+The match is case-insensitive, against the pattern in
+`git-hooks/lib/attribution.ere`, which the `commit-msg` hook also reads; "The
+message check" under "git-hooks/" lists its alternatives. The guard finds the
+file from its own path, `${BASH_SOURCE[0]}`, as
+`../git-hooks/lib/attribution.ere`, and removes one trailing carriage return.
 
 | Outcome | Exit | Output |
 | --- | --- | --- |
 | A line matched | 2 | The matched line and the instruction to remove it, on stderr. |
+| The pattern file absent, empty or more than one line, or `grep` exiting above 1, where a body would be scanned | 2 | `attribution-guard: <cause>, so the body was not checked.` and the instruction to restore the file, on stderr. |
 | Nothing matched | 0 | None. |
 | Input that is not a JSON object, carries no `tool_name`, or arrives with no `jq` on `PATH` | 0 | None. |
 
@@ -1073,6 +1300,7 @@ being scanned. Each is accepted, not handled.
 | A body-file path carrying a space | The path is read up to the first space, and the truncated path is then skipped as unreadable. |
 | A body file past its first mebibyte | Only the first mebibyte is read. |
 | A `--body-file` flag and its path on different lines of a continued command | Each token form is matched within one line. |
+| A `Co-Authored-By:` or `Claude-Session:` trailer written inside a one-line command, as in `--body $'x\n\nCo-Authored-By: ...'` | The trailer alternatives are anchored at a line start, and the command text carries `\n` literally, so the trailer starts no line. |
 | `-F` clustered behind another short flag, as in `-dF <path>` or `-dF<path>` | Only a `-F` token standing alone is recognised. |
 | A body read from standard input, `-F -` or `--body-file -` | The path `-` is not a regular file, so it is skipped. |
 | A body-file path carrying a variable, a `~` or another shell expansion | The hook receives the command before the shell expands it, so the path is read literally and skipped where no such file exists. |
@@ -1208,6 +1436,9 @@ passed, and 1 otherwise.
 | `gh pr create --body-file <file>`, clean | A body file with no footer | 0 |
 | `gh pr create -F <file>`, clean | A body file with no footer | 0 |
 | Pull request tool `body`, clean | A body with no footer | 0 |
+| Pull request tool `body`, `Co-Authored-By` naming Claude, with an `anthropic.com` address, and a `Claude-Session` trailer | A body ending in each trailer | 2 |
+| Pull request tool `body`, `Co-Authored-By` naming a person | A body ending in that trailer | 0 |
+| Pull request tool `body`, pattern file absent | A clean body, scanned by a copy of the guard in a tree with no `git-hooks/`; passes on the marker `so the body was not checked` | 2 |
 | `grep` for the footer | A command carrying the footer that is not a pull request operation | 0 |
 | Input that is not JSON | `not json` | 0 |
 | `gh issue create --body`, three cases | A body ending in each footer form | 2 |

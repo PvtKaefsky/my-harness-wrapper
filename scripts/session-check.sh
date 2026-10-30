@@ -21,6 +21,12 @@ emit() {
   printf '%s\n' "$1" >> "$LOG" 2>/dev/null || true
 }
 
+emit_hooks_path() {
+  local out rc
+  out=$(git -C "$1" config --show-origin --get core.hooksPath 2>/dev/null); rc=$?
+  emit "git -C $1 config --show-origin --get core.hooksPath -> exit=$rc value=[$(printf '%s' "$out" | LC_ALL=C tr '\t\n' '  ' | LC_ALL=C tr '\000-\037\177' '?')]"
+}
+
 if : >> "$LOG" 2>/dev/null; then LOG_STATE=appendable; else LOG_STATE="not appendable"; fi
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null); NOW_RC=$?
 emit "session-check -> exit=$NOW_RC value=${NOW:-empty}"
@@ -34,6 +40,7 @@ if [ -n "$LOCAL_CHECKOUT" ]; then
     INSTALL_LAST=$(tail -n 1 "$INSTALL_LOG" 2>/dev/null)
     emit "tail -n 1 $INSTALL_LOG -> $(printf '%s' "$INSTALL_LAST" | LC_ALL=C tr '\000-\037\177' '?')"
   fi
+  emit_hooks_path "$PWD"
 else
   BOOT_RAW=$(uptime -s 2>/dev/null); BOOT_RC=$?
   emit "uptime -s -> exit=$BOOT_RC value=${BOOT_RAW:-empty}"
@@ -68,6 +75,7 @@ else
       BR=$(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null); BR_RC=$?
       SHA=$(git -C "$d" rev-parse --short HEAD 2>/dev/null); SHA_RC=$?
       emit "git -C $d rev-parse --abbrev-ref HEAD, --short HEAD -> exit=$BR_RC,$SHA_RC branch=${BR:-empty} head=${SHA:-empty}"
+      emit_hooks_path "$d"
     else
       git -C "$d" rev-parse --git-dir >/dev/null 2>&1; GD_RC=$?
       emit "git -C $d rev-parse --git-dir -> exit=$GD_RC"

@@ -23,7 +23,8 @@ into a session's Claude config directory.
 4. `scripts/bootstrap.sh` creates `/root/.claude`, symlinks `/home/user/.claude`
    to it where that path is absent, copies `config/CLAUDE.md` there, merges
    `config/settings.json` there, sets both `*.gpgsign` keys to `false`
-   globally, installs the plugins named in `config/plugins.tsv`, runs
+   globally, sets the global `core.hooksPath` to `git-hooks/` in the clone,
+   installs the plugins named in `config/plugins.tsv`, runs
    `scripts/plugin-dependencies.sh` after each plugin's install, and writes
    `/root/.claude/.my-harness-wrapper.manifest.json`.
 5. Claude Code launches and reads `/root/.claude`, which `/home/user/.claude`
@@ -48,7 +49,8 @@ rebuild an operator controls is a change to the pasted init script text.
 3. From the deployed copy, it copies `config/CLAUDE.md` into
    `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, merges `config/settings.json` into that
    directory's `settings.json` with `env.HARNESS_DIR` set to the deployed copy,
-   sets both `*.gpgsign` keys to `false` globally, installs the plugins named in
+   sets both `*.gpgsign` keys to `false` globally, sets the global
+   `core.hooksPath` to the deployed copy's `git-hooks/`, installs the plugins named in
    `config/plugins.tsv`, runs the deployed copy's
    `scripts/plugin-dependencies.sh` after each plugin's install, and writes the
    manifest with a `local_checkout` field naming the deployed copy.
@@ -86,6 +88,7 @@ every session.
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
 | `scripts/attribution-guard.sh` | Blocks a pull request, issue, comment, review or review reply body carrying a Claude Code attribution line, and tells the session to resend a description the create call returns with one. Run by the `PreToolUse` and `PostToolUse` hooks `config/settings.json` registers. |
 | `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, directly and through the `PreToolUse` hook the tree's `config/settings.json` registers, one line per case. Run by hand only. |
+| `git-hooks/` | The git hooks the global `core.hooksPath` names, one file per hook name git looks up. `commit-msg` rejects a message carrying a Claude Code attribution line; every hook then runs the repository's own hook of that name. `git-hooks/lib/attribution.ere` is the pattern both it and the attribution guard read. |
 | `scripts/check-hook-matchers.sh` | Compares the tool names the attribution guard's hook matchers name with a file of a session's tool names. Run by hand only. |
 | `README.md` | This file. |
 | `docs/` | Documentation. |
