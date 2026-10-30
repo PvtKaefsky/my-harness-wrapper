@@ -21,6 +21,7 @@
 
 ## Code comments
 
+* Code is source and script files in a programming or shell language, Makefiles and Dockerfiles included. Configuration, data, dependency, ignore, environment-template and lock files are outside this rule.
 * Code carries no comments. What a comment would have explained is written into the repository's documentation as a fact under the Documentation rule; the reasoning behind it is not migrated. A comment's claim is checked against the code before it is migrated; one the code contradicts is dropped and reported to the user.
 * Exempt: interpreter and tool directives written in comment syntax — `#!` lines, linter and type-checker directives, build tags, encoding declarations — and headers a license or the project requires.
 * Docstrings are allowed where the language has them. A docstring states what the unit does, its inputs and outputs, and any decision a caller must know, without the reasoning behind it.
