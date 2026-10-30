@@ -1,0 +1,3 @@
+#!/bin/bash
+case "$0" in */*) HOOK_DIR=${0%/*} ;; *) HOOK_DIR=. ;; esac
+. "$HOOK_DIR/lib/dispatch.sh" || { printf 'harness %s: %s/lib/dispatch.sh could not be read; re-run the harness installer.\n' "${0##*/}" "$HOOK_DIR" >&2; exit 1; }

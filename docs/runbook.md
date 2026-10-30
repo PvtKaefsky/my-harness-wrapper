@@ -167,6 +167,13 @@ started after the run carries the harness.
 | `prerequisites failing -> <tools>` | The tools that failed the two checks above, or `none`. | Act on each tool's line. |
 | `git -C <copy> config --local --get remote.origin.url equals $HARNESS_REPO_URL -> exit=N yes/no` | Whether the deployed copy's stored origin is the clone URL. A URL beginning with `/`, `X:/` or `X:\` is compared in canonical form where `cygpath` exists, so `/d/...`, `D:/...` and an 8.3 or `/tmp` form of one path read `yes`; any other URL is compared exactly. | Where `no`, read the stored value with `git -C <copy> config --get remote.origin.url`. A relative clone URL is stored absolute and reads `no`: give an absolute one. |
 | `delivery -> stopped, not written: ...` | The run stopped before the deployed copy, `CLAUDE.md`, `settings.json`, the global git config, the plugins and the manifest. | Fix each failing tool, then re-run. |
+| `cygpath -m <copy>/git-hooks -> exit=N value=...` | Printed only where `cygpath` exists. The value the installer writes, in the `C:/...` form git for Windows reads. | Where `N` is not 0 or the value is `empty`, the hooks path is not written; one failure. Re-run in Git Bash. |
+| `test -x <copy>/git-hooks/commit-msg -> yes/no` | Whether the deployed copy carries an executable `commit-msg`. | Where `no`, the copy predates the hooks, is incomplete, or lost the mode; the hooks path is not written. |
+| `git config --global --get core.hooksPath -> exit=N value=...` / `git config --system --get core.hooksPath -> ...` | The value before this run, at that scope. Exit 1 means unset; above 1 counts one failure. | Nothing, unless the `not written` line follows. |
+| `git config --global core.hooksPath -> not written, another path is set: <scope>=[<path>]` | A global or system value names another directory, so the installer left it; one failure. Every repository's hooks then come from that directory, and the harness hook does not run. | Decide whether that directory is still wanted. To deliver the harness hooks, remove it with `git config --global --unset core.hooksPath`, or `--system` from an elevated shell, then re-run. |
+| `git config --global core.hooksPath -> not written, <copy>/git-hooks/commit-msg absent or not executable` | The deployed copy has no usable hooks; one failure. | Re-run the installer. |
+| `git config --global core.hooksPath -> not written, cygpath -m did not convert <copy>/git-hooks` | The conversion above failed; one failure. | Re-run in Git Bash. |
+| `git config --global core.hooksPath <dir> -> exit=N` | The write. A non-zero `N` is one failure. | Read the global config file's permissions. |
 
 The plugin step finds the CLI on `PATH`, then at `CLAUDE_CODE_EXECPATH`, then
 as the highest-sorting `claude.exe` under
@@ -207,6 +214,35 @@ directory with no copy of the plugin, logs
 plugin. The plugin or the CLI then delivers the dependencies itself. A re-run
 over an existing install logs the same line after an earlier `npm ci`, so only
 a fresh install shows it.
+
+### Removing a local install
+
+Unset the hooks path first. A `core.hooksPath` naming a deleted directory makes
+git find no hooks at all, so every repository's own hooks stop running without
+any message.
+
+1. Read the value:
+
+   ```
+   git config --global --get core.hooksPath
+   ```
+
+2. Where it names `${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper/git-hooks`,
+   in any spelling, unset it:
+
+   ```
+   git config --global --unset core.hooksPath
+   ```
+
+3. In `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, move `CLAUDE.md.pre-harness` and
+   `settings.json.pre-harness` back over `CLAUDE.md` and `settings.json` where
+   they exist; otherwise remove `CLAUDE.md`, and remove from `settings.json` the
+   keys `config/settings.json` carries and `env.HARNESS_DIR`.
+4. Remove `my-harness-wrapper`, `.my-harness-wrapper.manifest.json`,
+   `.my-harness-wrapper.install.log` and `session-check.log` there.
+5. Optionally uninstall the plugins `config/plugins.tsv` names with
+   `claude plugin uninstall <plugin_id>`, and unset `commit.gpgsign` and
+   `tag.gpgsign` globally.
 
 ### Update
 
@@ -274,7 +310,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL deployed copy branch` | The repository under test is not on `refs/heads/main`, is detached, is not the top level of its work tree, or git could not read its branch. | Locally, re-run `scripts/install-local.sh`, which checks the branch out at its remote head. In the cloud, rebuild. Where the repository under test is a working checkout, run against the deployed copy instead. |
 | `git -C <repo> status --porcelain --untracked-files=all --ignore-submodules=none -> ...` | The repository under test's uncommitted and untracked entries against its own `HEAD`: `no entries`, a count with up to five entries of up to 120 bytes each joined by ` \| `, `unreadable` with git's first error line, `unreadable, git wrote to stderr`, `timed out after 10s`, or `not read`. | Nothing, unless `FAIL deployed copy changes` follows it. |
 | `git -C <repo> ls-files -v, entries marked skip-worktree or assume-unchanged -> N` | How many index entries hide their file from `status`, `unreadable (git exit=N)`, or `not read`. | Nothing, unless `FAIL deployed copy changes` follows it. |
-| `FAIL deployed copy changes` | The repository under test has an entry differing from its `HEAD`, an index entry marked skip-worktree or assume-unchanged, or a status git could not read in full. | In the cloud, read the entries: nothing in this repository writes into the clone. Locally, re-run `scripts/install-local.sh`, which discards them. Where the repository under test is a working checkout, run against the deployed copy instead. |
+| `FAIL deployed copy changes` | The repository under test has an entry differing from its `HEAD`, an index entry marked skip-worktree or assume-unchanged, or a status git could not read in full. A forced hook install, such as `git lfs install --force` or `git lfs update --force`, produces entries under `git-hooks/` for the hook names it writes; any other write into `git-hooks/` produces the same entries. A changed hook file that no longer sources `lib/dispatch.sh` forwards to nothing, so every repository's own hook of that name has stopped running. | Entries under `git-hooks/`: read the first lines of each changed file to see what wrote it, then, locally, re-run `bash scripts/install-local.sh`; in the cloud, run `git -C /opt/my-harness-wrapper checkout -- git-hooks`. Other entries: in the cloud, read them, since nothing in this repository writes into the clone; locally, re-run `bash scripts/install-local.sh`, which discards them. Where the repository under test is a working checkout, run against the deployed copy instead. |
 | `git -C <repo> rev-parse --verify -q HEAD -> [<sha>]` | The deployed commit, in full. `unreadable (git exit=N) [...]`, or `not read, repo unreadable`, where git gave no commit. | Nothing; the `NOTE remote main head` or `compare the deployed commit` line below decides. |
 | `git ls-remote -- <origin URL of <repo>> refs/heads/main, under timeout 5s -> [<sha>]` | The head of `main` on the URL the deployed copy's `remote.origin.url` names, read from outside the copy with a 5-second bound and no credential prompt. `not read` states: `timed out after 5s (exit=124)`, `(timeout or env exit=N)`, `(git exit=N)`, `no refs/heads/main line (git exit=0)`, `command -v timeout -> none`, `git ... config --get remote.origin.url -> exit=N` or `-> exit=0 value=empty`, or `repo unreadable`. The origin URL is never printed. | Nothing; the line below decides. |
 | `compare the deployed commit against the head of refs/heads/main on origin -> yes, both <sha>` | The deployed copy is at `main`'s head on its origin. It does not establish that the `env/setup.sh` pasted into the environment dialog matches `main`'s. | Nothing. |
@@ -321,11 +357,23 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL git AUTHOR identity` / `FAIL git COMMITTER identity`, `... expected an identity of the form Name <email>` | `git var` returned nothing usable for that role. | Read the state on the line above. An empty `GIT_*_NAME` exits 128; a repository git will not read is reported as such. |
 | `FAIL git AUTHOR identity` / `FAIL git COMMITTER identity`, `... from that role's GIT_*_NAME and GIT_*_EMAIL` | Git did not resolve that role to the pair the session was given. | Check for a `GIT_CONFIG_KEY_n` overlay or a repository-local `user.*`. |
 | `FAIL git AUTHOR identity` / `FAIL git COMMITTER identity`, `... other than the harness default` | The identity is the harness's own, not the operator's. | The panel pair is absent or holds that address, so `git var` fell through to `/root/.gitconfig`. Set the four variables in the panel. |
+| `GIT_AUTHOR_EMAIL address form -> yes` / `GIT_COMMITTER_EMAIL address form -> yes` | That variable is set and holds the address form. | Nothing. |
+| `FAIL git AUTHOR email` / `FAIL git COMMITTER email` | That role's `GIT_*_EMAIL` is set and is not an address. The line ends with the value and each cause: `<N> @ signs`, an empty local part, whitespace, `<` or `>` in the local part, a domain of a single label, an empty domain label, a label longer than 63 characters, a label carrying a character other than an ASCII letter, digit or hyphen, or a label with a leading or trailing hyphen. | Correct the variable in the environment variables panel. Every commit made before the correction carries the invalid email. |
 | `FAIL git identity agreement` | Author and committer name different identities. | Set all four panel variables to one pair. |
 | `compare GIT_AUTHOR_IDENT ... -> not run` | One role produced no usable identity, so the agreement test did not run. | Act on that role's `FAIL git ... identity` line above it. |
 | `FAIL HARNESS_ASSIGNEE: ... set and non-empty` | `HARNESS_ASSIGNEE` is unset or empty. The `actual` value separates `unset` and `set but empty`. | Set it in the environment variables panel to the GitHub login that issues and pull requests are assigned to. |
 | `FAIL HARNESS_ASSIGNEE: ... a GitHub login of at most 39 ...` | The value is not a login's form. The line ends with each cause: a character other than a letter, digit or hyphen, a leading or trailing hyphen, consecutive hyphens, or its length in bytes. | Correct the value in the panel. |
 | `FAIL git commit.gpgsign` / `FAIL git tag.gpgsign` | The effective value inside the clone is not `false`. | Read as `actual [true]`, something re-enabled signing; `docs/environment.md` records what is known about signing here and what is not. Read as `unset`, bootstrap's write did not reach this session. |
+| `git -C <repo> config --get core.hooksPath -> ...` | The effective value inside the clone and its canonical form, `unset (git exit=1)`, `unreadable (git exit=N)`, `present with empty value`, or `repo unreadable`. | Nothing, unless `FAIL core.hooksPath` follows it. |
+| `compare core.hooksPath against <repo>/git-hooks -> yes` | The effective value names the delivered hook directory. | Nothing. |
+| `FAIL core.hooksPath` | The effective value does not resolve to `<repo>/git-hooks`. | Read as `unset`, the install's write did not happen or did not survive: read the install log's `core.hooksPath` lines, or in the cloud `/home/user/bootstrap.log`; in the cloud the value may also have been lost to a rewrite of `/root/.gitconfig`. Read as another path, a global or system value the installer left, or a repository-local value in the clone, is in force: `git -C <repo> config --show-origin --get core.hooksPath` names the file. |
+| `git commit through the effective core.hooksPath, <case> -> exit=N [<line>]` | The result of one commit in a temporary repository: `<case>` is `a message carrying a Co-Authored-By: Claude trailer` or `a clean message`. `not run, <cause>` where the temporary repository could not be made. | Nothing, unless `FAIL commit-msg hook` follows it. |
+| `FAIL commit-msg hook, a message carrying a Co-Authored-By: Claude trailer` | The commit was not refused with `harness commit-msg: matched line ->`. | Act on `FAIL core.hooksPath` first. With the path correct, read the line: `exit=0` means the hook did not run or did not match, so compare `<repo>/git-hooks/commit-msg`, its mode and `lib/attribution.ere` with the repository; a `harness commit-msg:` line other than the marker names the hook's own failure. |
+| `FAIL commit-msg hook, a clean message` | A commit with a clean message failed. | Read the line. A `harness <name>:` line is the hooks' own refusal; any other is git's, such as an identity or signing failure. |
+| `FAIL commit-msg hook, <case>: ... not run, <cause>` / `FAIL hook forwarding, <case>: ... not run, <cause>` | `mktemp -d`, `git init`, `git add` or the write of `.git/hooks/pre-commit` failed, so the commits after it did not run. | Read the cause. A `harness reference-transaction:` cause is the hooks refusing `git init`. |
+| `FAIL hook forwarding, a repository's own pre-commit hook exiting 1` | A commit in a repository whose own `pre-commit` prints a marker and exits 1 was not stopped with that marker, so repositories' own hooks do not run through the harness hooks. | Act on `FAIL core.hooksPath` first. Then compare `<repo>/git-hooks/pre-commit` and `lib/dispatch.sh` with the repository. |
+| `rm -rf <temporary repository> -> exit=N` | The temporary repository's removal. | Nothing, unless `FAIL commit-msg hook cleanup` follows it. |
+| `FAIL commit-msg hook cleanup` | The temporary repository could not be removed. | Remove the `mktemp -d` directory under the temporary directory by hand. |
 
 In the session that first creates these files, verify fails on the missing
 manifest. That is the correct result.
@@ -352,7 +400,7 @@ names against the matchers:
 | Line | What to do |
 | --- | --- |
 | `MISSING <name>` | The file lacks that name. Where the file holds the tool under a new name, replace the name in `config/settings.json`'s matcher and in `docs/scripts.md`'s tool table under `scripts/attribution-guard.sh`. Where it holds none, change nothing: confirm the session listed every tool, deferred ones included, and that its GitHub MCP server is connected, then re-run. Never remove a name from a matcher on this check alone. |
-| `UNMATCHED <name>` | Decide whether that tool writes a pull request, issue, comment or review body. Where it does, add it to the `PreToolUse` matcher and to that tool table. |
+| `UNMATCHED <name>` | Decide whether that tool writes a pull request, issue, comment or review body, or makes a commit. Where it does, add it to the `PreToolUse` matcher and to that tool table. |
 | `missing -> not run` | Act on the line above it that failed: `tool names file argument -> absent`, a `test -f` or `test -r ... -> no`, `command -v jq -> none`, a `jq ... matchers ... -> exit=N` with its error, `count=0`, `<event> entries -> 0`, or `distinct tool names ... -> 0`. |
 | `uncompared -> N`, `N` above 0 | A matcher alternative is not a literal tool name, so the tools it matches were not checked. Read its `not compared` line and check that matcher by hand. |
 
@@ -360,6 +408,26 @@ The file is the session's own report. A name in it that equals a matcher name
 reads as present whether or not the session has the tool. Only names it omits
 are detected. A renamed tool outside `mcp__github__` produces no `UNMATCHED`
 line.
+
+## Reading a git hook's output
+
+The hooks in `git-hooks/` run in every repository whose effective
+`core.hooksPath` names them, and print on stderr only. A commit a hook rejects
+is made again without the rejected line; no hook is bypassed with
+`--no-verify`.
+
+| Line | What it means | What to do |
+| --- | --- | --- |
+| `harness commit-msg: matched line -> <line>` | The commit message carries that attribution line, and the commit was refused. | Remove the line, then commit again. |
+| `harness commit-msg: <path>/attribution.ere holds no single pattern line, ...` | The pattern file is absent, empty or several lines, so every commit is refused. | Re-run `scripts/install-local.sh`, or rebuild in the cloud. |
+| `harness commit-msg: awk could not read the message file ...` / `... grep could not apply ...` | The check could not run, so the commit was refused. | Read the exit status; report it as a defect in `git-hooks/lib/dispatch.sh`. |
+| `harness <name>: the repository's git directory was not found from <dir>, and git rev-parse --git-common-dir -> exit=N, ...` | The hook could not find the repository, so it refused rather than skip the repository's own hook. | Run the git command from inside the repository. A `.git` file whose first line is not `gitdir: <path>` also leads here. |
+| `harness <name>: <path> was not run, it is not executable.` | The repository's own hook exists without the executable bit, which git also skips. | `chmod +x <path>` where it should run. |
+| `harness <name>: <dir>/lib/dispatch.sh could not be read; ...` | The hook directory is incomplete, so the hook refused. | Re-run `scripts/install-local.sh`, or rebuild in the cloud. |
+| `harness push-to-checkout: Working directory has unstaged changes` and git's other `updateInstead` refusals | The repository has no `push-to-checkout` hook, and git's default refused the push. | As without the harness: clean the target repository's working tree. |
+| `harness proc-receive: the repository has no executable proc-receive hook at <path>.` | `receive.procReceiveRefs` is set and the repository has no hook to serve it. | As without the harness: install the hook, or unset the key. |
+| `Hook already exists: pre-push`, from `git lfs install` or `git lfs update` | git-lfs found the harness hooks in the directory `core.hooksPath` names and installed nothing, so the repository has no LFS hooks unless it already had them. | Take each hook's contents from `git lfs update --manual`, and write them into the repository's own `<common dir>/hooks`, `.git/hooks` in a plain clone, not into the path it names, which is the harness directory; the harness hooks forward to them. Never run the suggested `--force`: it overwrites the harness hooks in the deployed copy for every repository, as `FAIL deployed copy changes` then shows. |
+| `attribution-guard: <path> holds no single pattern line, so the body was not checked.` | The attribution guard found no usable pattern file in the harness tree, so it blocked the write. | Restore the tree: re-run `scripts/install-local.sh`, or rebuild in the cloud. |
 
 ## Reading the session-start check
 
@@ -383,6 +451,7 @@ A `FAIL` line is decoded by the table above.
 | --- | --- | --- |
 | `log mtime >= boot time -> yes` | `/home/user/bootstrap.log` was last written at or after `uptime -s`'s boot time. | That this session built the snapshot: any write to the log after boot, such as a hand-run of the init script, also reads `yes`. |
 | `log mtime >= boot time -> no` | The log was last written before the boot time. | That this session restored a snapshot: any log last written before the boot time reads `no`, whatever wrote it. |
+| `git -C <dir> config --show-origin --get core.hooksPath -> exit=N value=[<origin> <value>]` | The value git uses in that repository and the file that sets it. An origin inside the repository's own `.git/config` means the harness hooks do not run there. | That the directory it names holds the harness hooks, or that they work. `scripts/verify.sh` checks that for the deployed copy only. |
 
 `/home/user/session-check.log` holds every run's output, appended. Locally the
 file is `session-check.log` in the config directory.

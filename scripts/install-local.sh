@@ -284,6 +284,35 @@ main() {
     [ "$rc" -eq 0 ] || fails=$((fails + 1))
   done
 
+  local HOOKS_DIR="$DEPLOY/git-hooks" HOOKS_VALUE HOOKS_SET="" scope other=""
+  HOOKS_VALUE=$HOOKS_DIR
+  if [ "$CYGPATH" != none ]; then
+    out=$(cygpath -m -- "$HOOKS_DIR" 2>/dev/null); rc=$?
+    echo "cygpath -m $HOOKS_DIR -> exit=$rc value=${out:-empty}"
+    if [ "$rc" -eq 0 ] && [ -n "$out" ]; then HOOKS_VALUE=$out; else HOOKS_VALUE=""; fi
+  fi
+  echo "test -x $HOOKS_DIR/commit-msg -> $([ -x "$HOOKS_DIR/commit-msg" ] && echo yes || echo no)"
+  for scope in global system; do
+    prior=$(git config "--$scope" --get core.hooksPath 2>/dev/null); rc=$?
+    echo "git config --$scope --get core.hooksPath -> exit=$rc value=${prior:-}"
+    [ "$rc" -le 1 ] || fails=$((fails + 1))
+    [ -z "$prior" ] || [ "$(url_canon "$prior")" = "$(url_canon "$HOOKS_VALUE")" ] || other="$other $scope=[$prior]"
+  done
+  if [ -z "$HOOKS_VALUE" ]; then
+    echo "git config --global core.hooksPath -> not written, cygpath -m did not convert $HOOKS_DIR"
+    fails=$((fails + 1))
+  elif [ ! -x "$HOOKS_DIR/commit-msg" ]; then
+    echo "git config --global core.hooksPath -> not written, $HOOKS_DIR/commit-msg absent or not executable"
+    fails=$((fails + 1))
+  elif [ -n "$other" ]; then
+    echo "git config --global core.hooksPath -> not written, another path is set:$other"
+    fails=$((fails + 1))
+  else
+    git config --global core.hooksPath "$HOOKS_VALUE"; rc=$?
+    echo "git config --global core.hooksPath $HOOKS_VALUE -> exit=$rc"
+    if [ "$rc" -eq 0 ]; then HOOKS_SET=$HOOKS_VALUE; else fails=$((fails + 1)); fi
+  fi
+
   local CLI CLI_FROM mp_source plugin_id _rest rows=0
   local PLUGINS="$DEPLOY/config/plugins.tsv"
   resolve_cli
@@ -350,10 +379,11 @@ main() {
       --arg bootstrap_version "$VERSION" \
       --arg commit "${COMMIT:-}" \
       --arg config_dir "$CONFIG_DIR" \
+      --arg core_hooks_path "$HOOKS_SET" \
       --arg git_user_email "${GIT_EMAIL:-}" \
       --arg installed_at "${INSTALLED_AT:-}" \
       --arg local_checkout "$DEPLOY" \
-      '{bootstrap_version: $bootstrap_version, commit: $commit, config_dir: $config_dir, git_user_email: $git_user_email, installed_at: $installed_at, local_checkout: $local_checkout}' \
+      '{bootstrap_version: $bootstrap_version, commit: $commit, config_dir: $config_dir, core_hooks_path: $core_hooks_path, git_user_email: $git_user_email, installed_at: $installed_at, local_checkout: $local_checkout}' \
       > "$MTMP"; rc=$?
     echo "jq -n > $MTMP -> exit=$rc"
     if [ "$rc" -eq 0 ]; then

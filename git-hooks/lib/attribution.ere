@@ -1,0 +1,1 @@
+Generated (with|by) \[?Claude Code|claude\.ai/code/session_|^[[:space:]]*Co-Authored-By:([^<]*[^[:alnum:]_<-])?Claude([^[:alnum:]_]|$)|^[[:space:]]*Co-Authored-By:.*@([[:alnum:]-]+\.)*anthropic\.com([^[:alnum:].-]|$)|^[[:space:]]*Claude-Session:

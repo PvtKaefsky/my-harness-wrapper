@@ -93,6 +93,28 @@ for kv in "commit.gpgsign=false" "tag.gpgsign=false"; do
   [ "$rc" -eq 0 ] || fails=$((fails + 1))
 done
 
+HOOKS_DIR="$SRC/git-hooks"
+HOOKS_SET=""
+echo "test -x $HOOKS_DIR/commit-msg -> $([ -x "$HOOKS_DIR/commit-msg" ] && echo yes || echo no)"
+OTHER=""
+for scope in global system; do
+  prior=$(git config "--$scope" --get core.hooksPath 2>/dev/null); rc=$?
+  echo "git config --$scope --get core.hooksPath -> exit=$rc value=${prior:-}"
+  [ "$rc" -le 1 ] || fails=$((fails + 1))
+  [ -z "$prior" ] || [ "$prior" = "$HOOKS_DIR" ] || OTHER="$OTHER $scope=[$prior]"
+done
+if [ ! -x "$HOOKS_DIR/commit-msg" ]; then
+  echo "git config --global core.hooksPath -> not written, $HOOKS_DIR/commit-msg absent or not executable"
+  fails=$((fails + 1))
+elif [ -n "$OTHER" ]; then
+  echo "git config --global core.hooksPath -> not written, another path is set:$OTHER"
+  fails=$((fails + 1))
+else
+  git config --global core.hooksPath "$HOOKS_DIR"; rc=$?
+  echo "git config --global core.hooksPath $HOOKS_DIR -> exit=$rc"
+  if [ "$rc" -eq 0 ]; then HOOKS_SET=$HOOKS_DIR; else fails=$((fails + 1)); fi
+fi
+
 PLUGINS="$SRC/config/plugins.tsv"
 echo "command -v claude -> $(command -v claude || echo none)"
 echo "test -f $PLUGINS -> $([ -f "$PLUGINS" ] && echo yes || echo no)"
@@ -134,9 +156,10 @@ else
     --arg bootstrap_version "${BOOTSTRAP_VERSION:-}" \
     --arg commit "${COMMIT:-}" \
     --arg config_dir "$CONFIG_DIR" \
+    --arg core_hooks_path "$HOOKS_SET" \
     --arg git_user_email "${GIT_EMAIL:-}" \
     --arg installed_at "${INSTALLED_AT:-}" \
-    '{bootstrap_version: $bootstrap_version, commit: $commit, config_dir: $config_dir, git_user_email: $git_user_email, installed_at: $installed_at}' \
+    '{bootstrap_version: $bootstrap_version, commit: $commit, config_dir: $config_dir, core_hooks_path: $core_hooks_path, git_user_email: $git_user_email, installed_at: $installed_at}' \
     > "$MTMP"; rc=$?
   echo "jq -n > $MTMP -> exit=$rc"
   if [ "$rc" -eq 0 ]; then

@@ -1,9 +1,24 @@
 #!/bin/bash
 set -uo pipefail
 
-RE='Generated (with|by) \[?Claude Code|claude\.ai/code/session_'
+case "${BASH_SOURCE[0]}" in */*) GUARD_DIR=${BASH_SOURCE[0]%/*} ;; *) GUARD_DIR=. ;; esac
+RE_FILE="$GUARD_DIR/../git-hooks/lib/attribution.ere"
+{ RE=$(< "$RE_FILE"); } 2>/dev/null
+RE=${RE%$'\r'}
 
 sanitize() { printf '%s' "$1" | LC_ALL=C tr '\n' ' ' | LC_ALL=C tr '\000-\037\177' '?'; }
+
+unchecked() {
+  printf 'attribution-guard: %s, so the body was not checked.\n' "$1" >&2
+  printf 'attribution-guard: restore %s from the harness repository, then retry.\n' "$(sanitize "$RE_FILE")" >&2
+  exit 2
+}
+
+need_re() {
+  if [ -z "$RE" ] || [ "$RE" != "${RE%%$'\n'*}" ]; then
+    unchecked "$(sanitize "$RE_FILE") holds no single pattern line"
+  fi
+}
 
 block() {
   printf 'attribution-guard: matched line -> %s\n' "$(sanitize "$1")" >&2
@@ -18,8 +33,10 @@ resend() {
 }
 
 scan() {
-  local hit
-  hit=$(printf '%s\n' "$1" | grep -a -i -E -m1 -- "$RE" 2>/dev/null)
+  local hit rc
+  need_re
+  hit=$(printf '%s\n' "$1" | grep -a -i -E -m1 -- "$RE" 2>/dev/null); rc=$?
+  if [ "$rc" -gt 1 ]; then unchecked "grep could not apply the pattern (exit=$rc)"; fi
   if [ -n "$hit" ]; then block "$hit"; fi
 }
 
@@ -37,6 +54,7 @@ if [ "$EVENT" = PostToolUse ]; then
     resend 'the hook input exceeds 1 MiB, so the description was not checked.'
   fi
   BODIES='[.tool_response | ., (.. | strings | try fromjson catch empty)] | [.[] | .. | objects | select(has("body")) | .body | strings]'
+  need_re
   hit=$(printf '%s' "$INPUT" | jq -r "$BODIES | .[]" 2>/dev/null | grep -a -i -o -E -m1 -- ".{0,80}($RE).{0,80}" 2>/dev/null | head -n 1)
   if [ -n "$hit" ]; then resend "matched line in the response body -> $(sanitize "$hit")"; fi
   COUNT=$(printf '%s' "$INPUT" | jq -r "$BODIES | length" 2>/dev/null)
@@ -72,6 +90,11 @@ if [ "$TOOL" = Bash ]; then
       fi
     } | sed -E 's/^["'"'"']+//; s/["'"'"']+$//')
 else
-  scan "$(printf '%s' "$INPUT" | jq -r 'if (.tool_input | type) == "object" or (.tool_input | type) == "array" then ([.tool_input | .. | strings] | .[]) else empty end' 2>/dev/null)"
+  case "$TOOL" in
+    mcp__github__push_files|mcp__github__create_or_update_file|mcp__github__delete_file|mcp__github__merge_pull_request|mcp__github__enable_pr_auto_merge)
+      KEEP='if type == "object" then del(.content) | (if (.files | type) == "array" then .files |= map(if type == "object" then del(.content) else . end) else . end) else . end' ;;
+    *) KEEP='.' ;;
+  esac
+  scan "$(printf '%s' "$INPUT" | jq -r "if (.tool_input | type) == \"object\" or (.tool_input | type) == \"array\" then ([.tool_input | $KEEP | .. | strings] | .[]) else empty end" 2>/dev/null)"
 fi
 exit 0
