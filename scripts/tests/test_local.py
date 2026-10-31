@@ -725,8 +725,8 @@ class LocalHarnessTests(unittest.TestCase):
         directory.mkdir()
         sys.modules["harness_local.storage"].owner_check(directory)
 
-    @unittest.skipUnless(os.name == "nt", "Windows SYSTEM-owned profile")
-    def test_system_profile_owner_exception_is_limited_to_profile_ancestor(self) -> None:
+    @unittest.skipUnless(os.name == "nt", "Windows trusted profile owner")
+    def test_trusted_profile_owner_exception_is_limited_to_profile_ancestor(self) -> None:
         import runpy
         runpy.run_path(str(CLI))
         storage = sys.modules["harness_local.storage"]

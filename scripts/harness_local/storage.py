@@ -11,7 +11,7 @@ from pathlib import Path
 from .pack import safe
 
 
-def owner_check(path: str | Path, allow_system_owner: bool = False) -> None:
+def owner_check(path: str | Path, allow_profile_owner: bool = False) -> None:
     path = safe(path)
     if os.name != "nt":
         info = path.stat()
@@ -52,12 +52,12 @@ def owner_check(path: str | Path, allow_system_owner: bool = False) -> None:
             raise ValueError("STATE_OWNER_UNREADABLE")
         user = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_void_p))[0]
         trusted_owner = bool(advapi.EqualSid(owner, user))
-        if not trusted_owner and allow_system_owner and path.is_dir():
+        if not trusted_owner and allow_profile_owner and path.is_dir():
             owner_sid = wintypes.LPWSTR()
             if not advapi.ConvertSidToStringSidW(owner, ctypes.byref(owner_sid)):
                 raise ValueError("STATE_OWNER_UNREADABLE")
             try:
-                trusted_owner = owner_sid.value == "S-1-5-18"
+                trusted_owner = owner_sid.value in {"S-1-5-18", "S-1-5-32-544"}
             finally:
                 kernel.LocalFree(owner_sid)
         if not trusted_owner:
