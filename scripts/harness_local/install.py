@@ -53,7 +53,7 @@ def trusted_chain(path: Path, boundary: Path, profile: Path | None = None) -> No
         raise ValueError("INSTALL_TRUST_BOUNDARY_INVALID")
     for directory in [path, *path.parents]:
         if directory.exists():
-            owner_check(directory, allow_system_owner=(directory == profile))
+            owner_check(directory, allow_profile_owner=(directory == profile))
         if directory == boundary:
             return
     raise ValueError("INSTALL_TRUST_BOUNDARY_INVALID")
@@ -96,7 +96,7 @@ def registration_check(path: Path, profile: Path, home: Path) -> None:
     while directory.is_relative_to(boundary):
         safe(directory)
         if directory.exists():
-            owner_check(directory, allow_system_owner=(directory == profile))
+            owner_check(directory, allow_profile_owner=(directory == profile))
         if directory == boundary:
             break
         directory = directory.parent
