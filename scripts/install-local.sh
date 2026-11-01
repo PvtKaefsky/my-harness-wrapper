@@ -69,6 +69,69 @@ url_canon() {
   printf '%s' "$m" | LC_ALL=C tr 'A-Z' 'a-z'
 }
 
+same_dir() {
+  case "$1" in
+    /*|[A-Za-z]:/*|[A-Za-z]:\\*) ;;
+    *) return 1 ;;
+  esac
+  [ "$1" -ef "$2" ] || [ "$(url_canon "$1")" = "$(url_canon "$2")" ]
+}
+
+hooks_triple() {
+  local out rc name value foreign="" live
+  HOOKS_VALUE=$HOOKS_DIR
+  if [ "$CYGPATH" != none ]; then
+    out=$(cygpath -m -- "$HOOKS_DIR" 2>/dev/null); rc=$?
+    echo "cygpath -m $HOOKS_DIR -> exit=$rc value=${out:-empty}"
+    if [ "$rc" -eq 0 ] && [ -n "$out" ]; then HOOKS_VALUE=$out; else HOOKS_VALUE=""; fi
+  fi
+  echo "test -x $HOOKS_DIR/commit-msg -> $([ -x "$HOOKS_DIR/commit-msg" ] && echo yes || echo no)"
+  while IFS= read -r name; do
+    case "$name" in
+      GIT_CONFIG_COUNT) [ "${!name}" = 1 ] ;;
+      GIT_CONFIG_KEY_0) [ "${!name}" = core.hooksPath ] ;;
+      GIT_CONFIG_VALUE_0) same_dir "${!name}" "$HOOKS_DIR" ;;
+      *) false ;;
+    esac || foreign="$foreign environment:$name=[$(first_line "${!name}")]"
+  done < <(compgen -e | LC_ALL=C grep -a -E '^GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+)$')
+  if [ -s "$DST_SETTINGS" ]; then
+    live=$(jq -r 'if type == "object" and (.env | type) == "object" then .env | to_entries[] | select(.key | test("^GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+)$")) | "\(.key)\t\(.value | tostring)" else empty end' "$DST_SETTINGS" 2>/dev/null); rc=$?
+    live=${live//$'\r'/}
+    echo "jq GIT_CONFIG_* keys of .env in $DST_SETTINGS -> exit=$rc count=$(printf '%s' "$live" | grep -a -c '')"
+    [ "$rc" -eq 0 ] || foreign="$foreign settings:unreadable"
+    while IFS=$'\t' read -r name value; do
+      [ -n "$name" ] || continue
+      case "$name" in
+        GIT_CONFIG_COUNT) [ "$value" = 1 ] ;;
+        GIT_CONFIG_KEY_0) [ "$value" = core.hooksPath ] ;;
+        GIT_CONFIG_VALUE_0) same_dir "$value" "$HOOKS_DIR" ;;
+        *) false ;;
+      esac || foreign="$foreign settings:$(first_line "$name")=[$(first_line "$value")]"
+    done <<< "$live"
+  fi
+  echo "GIT_CONFIG_* the installer did not write ->${foreign:- none}"
+  if [ -z "$HOOKS_VALUE" ]; then
+    echo "env.GIT_CONFIG_COUNT, env.GIT_CONFIG_KEY_0, env.GIT_CONFIG_VALUE_0 -> not written, cygpath -m did not convert $HOOKS_DIR"
+    return 1
+  fi
+  if [ ! -x "$HOOKS_DIR/commit-msg" ]; then
+    echo "env.GIT_CONFIG_COUNT, env.GIT_CONFIG_KEY_0, env.GIT_CONFIG_VALUE_0 -> not written, $HOOKS_DIR/commit-msg absent or not executable"
+    return 1
+  fi
+  if [ -n "$foreign" ]; then
+    echo "env.GIT_CONFIG_COUNT, env.GIT_CONFIG_KEY_0, env.GIT_CONFIG_VALUE_0 -> not written, another GIT_CONFIG_* is set:$foreign"
+    return 1
+  fi
+  out=$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$HOOKS_VALUE" git -C "$DEPLOY" config --get core.hooksPath 2>&1); rc=$?
+  out=${out%$'\r'}
+  echo "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=$HOOKS_VALUE git -C $DEPLOY config --get core.hooksPath -> exit=$rc value=[$(first_line "$out")]"
+  if [ "$rc" -ne 0 ] || [ "$out" != "$HOOKS_VALUE" ]; then
+    echo "env.GIT_CONFIG_COUNT, env.GIT_CONFIG_KEY_0, env.GIT_CONFIG_VALUE_0 -> not written, git did not read core.hooksPath from the GIT_CONFIG_* variables"
+    return 1
+  fi
+  return 0
+}
+
 first_line() {
   printf '%s' "${1%%$'\n'*}" | LC_ALL=C tr '\000-\037\177' '?'
 }
@@ -216,11 +279,14 @@ main() {
 
   local SRC_SETTINGS="$DEPLOY/config/settings.json"
   local DST_SETTINGS="$CONFIG_DIR/settings.json"
-  local MERGE='if length != 2 then error("expected one JSON document in each file, read \(length) in all") else .[0] * .[1] * {env: {HARNESS_DIR: $h}} end'
+  local MERGE='if length != 2 then error("expected one JSON document in each file, read \(length) in all") else .[0] * .[1] * {env: ({HARNESS_DIR: $h} + (if $w == "yes" then {GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.hooksPath", GIT_CONFIG_VALUE_0: $v} else {} end))} end'
   local DIFFERS='if length == 2 and (.[0] | type) == "object" and (.[1] | type) == "object" then .[0] as $l | [.[1] | to_entries[] | .key as $k | select(($l | has($k)) and $l[$k] != .value) | $k] | join(" ") else "not compared" end'
   local MODE="" REPLACED
+  local HOOKS_DIR="$DEPLOY/git-hooks" HOOKS_VALUE="" HOOKS_SET="" TRIPLE=no
   echo "test -f $SRC_SETTINGS -> $([ -f "$SRC_SETTINGS" ] && echo yes || echo no)"
   echo "test -s $DST_SETTINGS -> $([ -s "$DST_SETTINGS" ] && echo yes || echo no)"
+  if hooks_triple; then TRIPLE=yes; else fails=$((fails + 1)); fi
+  echo "write env.GIT_CONFIG_COUNT, env.GIT_CONFIG_KEY_0, env.GIT_CONFIG_VALUE_0 -> $TRIPLE"
   if [ -s "$DST_SETTINGS" ]; then
     REPLACED=$(jq -s -r "$DIFFERS" "$DST_SETTINGS" "$SRC_SETTINGS" 2>/dev/null); rc=$?
     echo "delivered top-level keys whose live value differs -> exit=$rc value=[${REPLACED:-}]"
@@ -243,11 +309,11 @@ main() {
       fails=$((fails + 1))
     else
       if [ -s "$DST_SETTINGS" ]; then
-        jq -s --arg h "$DEPLOY" "$MERGE" "$DST_SETTINGS" "$SRC_SETTINGS" > "$TMP"; rc=$?
-        echo "jq -s --arg h $DEPLOY '$MERGE' $DST_SETTINGS $SRC_SETTINGS -> exit=$rc"
+        jq -s --arg h "$DEPLOY" --arg w "$TRIPLE" --arg v "${HOOKS_VALUE:-}" "$MERGE" "$DST_SETTINGS" "$SRC_SETTINGS" > "$TMP"; rc=$?
+        echo "jq -s --arg h $DEPLOY --arg w $TRIPLE --arg v ${HOOKS_VALUE:-} '$MERGE' $DST_SETTINGS $SRC_SETTINGS -> exit=$rc"
       else
-        jq -s --arg h "$DEPLOY" "[{}] + . | $MERGE" "$SRC_SETTINGS" > "$TMP"; rc=$?
-        echo "jq -s --arg h $DEPLOY '[{}] + . | $MERGE' $SRC_SETTINGS -> exit=$rc"
+        jq -s --arg h "$DEPLOY" --arg w "$TRIPLE" --arg v "${HOOKS_VALUE:-}" "[{}] + . | $MERGE" "$SRC_SETTINGS" > "$TMP"; rc=$?
+        echo "jq -s --arg h $DEPLOY --arg w $TRIPLE --arg v ${HOOKS_VALUE:-} '[{}] + . | $MERGE' $SRC_SETTINGS -> exit=$rc"
       fi
       if [ "$rc" -eq 0 ]; then
         chmod "$MODE" "$TMP"; ch_rc=$?
@@ -273,6 +339,17 @@ main() {
     fails=$((fails + 1))
   fi
   echo "jq -r .env.HARNESS_DIR $DST_SETTINGS -> $(jq -r 'if type == "object" and (.env | type) == "object" then (.env.HARNESS_DIR // "absent") else "absent" end' "$DST_SETTINGS" 2>/dev/null || echo unreadable)"
+  local TRIPLE_BACK
+  TRIPLE_BACK=$(jq -r 'if type == "object" and (.env | type) == "object" then [.env.GIT_CONFIG_COUNT, .env.GIT_CONFIG_KEY_0, .env.GIT_CONFIG_VALUE_0] | map(. // "absent" | tostring) | join("\t") else "absent\tabsent\tabsent" end' "$DST_SETTINGS" 2>/dev/null); rc=$?
+  TRIPLE_BACK=${TRIPLE_BACK%$'\r'}
+  echo "jq -r .env.GIT_CONFIG_COUNT, .env.GIT_CONFIG_KEY_0, .env.GIT_CONFIG_VALUE_0 $DST_SETTINGS -> exit=$rc value=[$(first_line "$TRIPLE_BACK")]"
+  if [ "$TRIPLE" = yes ]; then
+    if [ "$rc" -eq 0 ] && [ "$TRIPLE_BACK" = "1"$'\t'"core.hooksPath"$'\t'"$HOOKS_VALUE" ]; then
+      HOOKS_SET=$HOOKS_VALUE
+    else
+      fails=$((fails + 1))
+    fi
+  fi
 
   local kv key val prior
   for kv in "commit.gpgsign=false" "tag.gpgsign=false"; do
@@ -284,33 +361,42 @@ main() {
     [ "$rc" -eq 0 ] || fails=$((fails + 1))
   done
 
-  local HOOKS_DIR="$DEPLOY/git-hooks" HOOKS_VALUE HOOKS_SET="" scope other=""
-  HOOKS_VALUE=$HOOKS_DIR
-  if [ "$CYGPATH" != none ]; then
-    out=$(cygpath -m -- "$HOOKS_DIR" 2>/dev/null); rc=$?
-    echo "cygpath -m $HOOKS_DIR -> exit=$rc value=${out:-empty}"
-    if [ "$rc" -eq 0 ] && [ -n "$out" ]; then HOOKS_VALUE=$out; else HOOKS_VALUE=""; fi
+  local global_hp line ours=0 others=0
+  global_hp=$(git config --global --get-all core.hooksPath 2>/dev/null); rc=$?
+  global_hp=${global_hp//$'\r'/}
+  echo "git config --global --get-all core.hooksPath, before -> exit=$rc value=[$(printf '%s' "$global_hp" | LC_ALL=C tr '\n' ' ' | LC_ALL=C tr '\000-\037\177' '?')]"
+  [ "$rc" -le 1 ] || fails=$((fails + 1))
+  if [ "$rc" -eq 0 ]; then
+    while IFS= read -r line; do
+      if same_dir "$line" "$HOOKS_DIR"; then ours=$((ours + 1)); else others=$((others + 1)); fi
+    done <<< "$global_hp"
   fi
-  echo "test -x $HOOKS_DIR/commit-msg -> $([ -x "$HOOKS_DIR/commit-msg" ] && echo yes || echo no)"
-  for scope in global system; do
-    prior=$(git config "--$scope" --get core.hooksPath 2>/dev/null); rc=$?
-    echo "git config --$scope --get core.hooksPath -> exit=$rc value=${prior:-}"
-    [ "$rc" -le 1 ] || fails=$((fails + 1))
-    [ -z "$prior" ] || [ "$(url_canon "$prior")" = "$(url_canon "$HOOKS_VALUE")" ] || other="$other $scope=[$prior]"
-  done
-  if [ -z "$HOOKS_VALUE" ]; then
-    echo "git config --global core.hooksPath -> not written, cygpath -m did not convert $HOOKS_DIR"
-    fails=$((fails + 1))
-  elif [ ! -x "$HOOKS_DIR/commit-msg" ]; then
-    echo "git config --global core.hooksPath -> not written, $HOOKS_DIR/commit-msg absent or not executable"
-    fails=$((fails + 1))
-  elif [ -n "$other" ]; then
-    echo "git config --global core.hooksPath -> not written, another path is set:$other"
+  echo "global core.hooksPath values naming $HOOKS_DIR -> $ours, other values -> $others"
+  if [ "$rc" -gt 1 ]; then
+    echo "git config --global --unset-all core.hooksPath -> not run, the global read failed (exit=$rc)"
+  elif [ "$ours" -gt 0 ] && [ "$others" -eq 0 ]; then
+    git config --global --unset-all core.hooksPath; rc=$?
+    echo "git config --global --unset-all core.hooksPath -> exit=$rc"
+    [ "$rc" -eq 0 ] || fails=$((fails + 1))
+  elif [ "$ours" -gt 0 ]; then
+    echo "git config --global --unset-all core.hooksPath -> not run, the global values also name another path"
     fails=$((fails + 1))
   else
-    git config --global core.hooksPath "$HOOKS_VALUE"; rc=$?
-    echo "git config --global core.hooksPath $HOOKS_VALUE -> exit=$rc"
-    if [ "$rc" -eq 0 ]; then HOOKS_SET=$HOOKS_VALUE; else fails=$((fails + 1)); fi
+    echo "git config --global --unset-all core.hooksPath -> not run, no global value names $HOOKS_DIR"
+  fi
+  global_hp=$(git config --global --get-all core.hooksPath 2>/dev/null); rc=$?
+  global_hp=${global_hp//$'\r'/}
+  echo "git config --global --get-all core.hooksPath, after -> exit=$rc value=[$(printf '%s' "$global_hp" | LC_ALL=C tr '\n' ' ' | LC_ALL=C tr '\000-\037\177' '?')]"
+  [ "$rc" -le 1 ] || fails=$((fails + 1))
+  if [ "$rc" -eq 0 ]; then
+    ours=0
+    while IFS= read -r line; do
+      ! same_dir "$line" "$HOOKS_DIR" || ours=$((ours + 1))
+    done <<< "$global_hp"
+    if [ "$ours" -gt 0 ]; then
+      echo "global core.hooksPath values naming $HOOKS_DIR, after -> $ours"
+      [ "$others" -gt 0 ] || fails=$((fails + 1))
+    fi
   fi
 
   local CLI CLI_FROM mp_source plugin_id _rest rows=0

@@ -167,13 +167,21 @@ started after the run carries the harness.
 | `prerequisites failing -> <tools>` | The tools that failed the two checks above, or `none`. | Act on each tool's line. |
 | `git -C <copy> config --local --get remote.origin.url equals $HARNESS_REPO_URL -> exit=N yes/no` | Whether the deployed copy's stored origin is the clone URL. A URL beginning with `/`, `X:/` or `X:\` is compared in canonical form where `cygpath` exists, so `/d/...`, `D:/...` and an 8.3 or `/tmp` form of one path read `yes`; any other URL is compared exactly. | Where `no`, read the stored value with `git -C <copy> config --get remote.origin.url`. A relative clone URL is stored absolute and reads `no`: give an absolute one. |
 | `delivery -> stopped, not written: ...` | The run stopped before the deployed copy, `CLAUDE.md`, `settings.json`, the global git config, the plugins and the manifest. | Fix each failing tool, then re-run. |
-| `cygpath -m <copy>/git-hooks -> exit=N value=...` | Printed only where `cygpath` exists. The value the installer writes, in the `C:/...` form git for Windows reads. | Where `N` is not 0 or the value is `empty`, the hooks path is not written; one failure. Re-run in Git Bash. |
-| `test -x <copy>/git-hooks/commit-msg -> yes/no` | Whether the deployed copy carries an executable `commit-msg`. | Where `no`, the copy predates the hooks, is incomplete, or lost the mode; the hooks path is not written. |
-| `git config --global --get core.hooksPath -> exit=N value=...` / `git config --system --get core.hooksPath -> ...` | The value before this run, at that scope. Exit 1 means unset; above 1 counts one failure. | Nothing, unless the `not written` line follows. |
-| `git config --global core.hooksPath -> not written, another path is set: <scope>=[<path>]` | A global or system value names another directory, so the installer left it; one failure. Every repository's hooks then come from that directory, and the harness hook does not run. | Decide whether that directory is still wanted. To deliver the harness hooks, remove it with `git config --global --unset core.hooksPath`, or `--system` from an elevated shell, then re-run. |
-| `git config --global core.hooksPath -> not written, <copy>/git-hooks/commit-msg absent or not executable` | The deployed copy has no usable hooks; one failure. | Re-run the installer. |
-| `git config --global core.hooksPath -> not written, cygpath -m did not convert <copy>/git-hooks` | The conversion above failed; one failure. | Re-run in Git Bash. |
-| `git config --global core.hooksPath <dir> -> exit=N` | The write. A non-zero `N` is one failure. | Read the global config file's permissions. |
+| `cygpath -m <copy>/git-hooks -> exit=N value=...` | Printed only where `cygpath` exists. The value the installer writes into `env.GIT_CONFIG_VALUE_0`, in the `C:/...` form git for Windows reads. | Where `N` is not 0 or the value is `empty`, the triple is not written; one failure. Re-run in Git Bash. |
+| `test -x <copy>/git-hooks/commit-msg -> yes/no` | Whether the deployed copy carries an executable `commit-msg`. | Where `no`, the copy predates the hooks, is incomplete, or lost the mode; the triple is not written. |
+| `jq GIT_CONFIG_* keys of .env in <dir>/settings.json -> exit=N count=C` | The `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_<n>` and `GIT_CONFIG_VALUE_<n>` keys the live file's `env` holds before the merge. A non-zero `N` counts the file as foreign. | Nothing, unless the next line names something. |
+| `GIT_CONFIG_* the installer did not write -> <list>` / `-> none` | Each such variable in the installer's environment, as `environment:<name>=[<value>]`, or in the live file, as `settings:<name>=[<value>]`, that is not the triple the installer writes. | Nothing where `none`. Otherwise find what set it: a value in the shell's profile, or a key another tool or a hand edit put in `settings.json`'s `env`. Remove it, or fold it into a triple that also carries `core.hooksPath` by hand, then re-run. |
+| `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=<dir> git -C <copy> config --get core.hooksPath -> exit=N value=[V]` | Whether this git reads `core.hooksPath` from the variables. It passes where `N` is 0 and `V` is `<dir>`. | Where it fails, the `not written` line follows; update Git. |
+| `env.GIT_CONFIG_COUNT, env.GIT_CONFIG_KEY_0, env.GIT_CONFIG_VALUE_0 -> not written, <cause>` | The triple was not written, for the cause named: the conversion failed, `commit-msg` is absent or not executable, another `GIT_CONFIG_*` is set, or git did not read the value; one failure. The merge still writes `env.HARNESS_DIR`, and no harness hook runs in sessions. | Act on the cause, then re-run. |
+| `write env.GIT_CONFIG_COUNT, env.GIT_CONFIG_KEY_0, env.GIT_CONFIG_VALUE_0 -> yes/no` | Whether the merge writes the triple. | Nothing; the lines above decide. |
+| `jq -r .env.GIT_CONFIG_COUNT, .env.GIT_CONFIG_KEY_0, .env.GIT_CONFIG_VALUE_0 <dir>/settings.json -> exit=N value=[...]` | The three keys read back after the merge, separated by `?`, each `absent` where missing. Where the triple was to be written and they do not read `1`, `core.hooksPath` and the value, one failure. | Read the merge's lines above it. |
+| `git config --global --get-all core.hooksPath, before -> exit=N value=[...]` / `, after -> ...` | The global values before and after the migration. Exit 1 means unset; above 1 counts one failure. | Nothing, unless a `not run` line with a failure sits between them. |
+| `global core.hooksPath values naming <copy>/git-hooks -> N, other values -> M` | How many global values name the deployed copy's hooks in any spelling, and how many name another directory. | Nothing. |
+| `git config --global --unset-all core.hooksPath -> exit=N` | The removal of the value an earlier install wrote. A non-zero `N` is one failure. | Read the global config file's permissions. |
+| `git config --global --unset-all core.hooksPath -> not run, no global value names <copy>/git-hooks` | Nothing to migrate. A value naming another directory stays: git commands outside sessions use it, and inside sessions forwarding runs the hooks it names. | Nothing. |
+| `git config --global --unset-all core.hooksPath -> not run, the global read failed (exit=N)` | The `before` read exited above 1, already counted as one failure. | Read the global config file's permissions and syntax, then re-run. |
+| `global core.hooksPath values naming <copy>/git-hooks, after -> N` | `N` values still name the deployed copy after the unset, such as one an `[include]` file carries; one failure where no other value was found. | Run `git config --global --show-origin --get-all core.hooksPath`, remove the value from the file it names, then re-run. |
+| `git config --global --unset-all core.hooksPath -> not run, the global values also name another path` | The global config holds several values, one of them the deployed copy's; one failure. | Remove the deployed copy's value by hand with `git config --global --unset core.hooksPath <value>`, then re-run. |
 
 The plugin step finds the CLI on `PATH`, then at `CLAUDE_CODE_EXECPATH`, then
 as the highest-sorting `claude.exe` under
@@ -217,30 +225,33 @@ a fresh install shows it.
 
 ### Removing a local install
 
-Unset the hooks path first. A `core.hooksPath` naming a deleted directory makes
+Remove the hooks path first. A `core.hooksPath` naming a deleted directory makes
 git find no hooks at all, so every repository's own hooks stop running without
 any message.
 
-1. Read the value:
+1. Remove `env.GIT_CONFIG_COUNT`, `env.GIT_CONFIG_KEY_0` and
+   `env.GIT_CONFIG_VALUE_0` from `${CLAUDE_CONFIG_DIR-$HOME/.claude}/settings.json`,
+   with no session running.
+2. Read the global value an install before the triple left:
 
    ```
    git config --global --get core.hooksPath
    ```
 
-2. Where it names `${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper/git-hooks`,
+3. Where it names `${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper/git-hooks`,
    in any spelling, unset it:
 
    ```
    git config --global --unset core.hooksPath
    ```
 
-3. In `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, move `CLAUDE.md.pre-harness` and
+4. In `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, move `CLAUDE.md.pre-harness` and
    `settings.json.pre-harness` back over `CLAUDE.md` and `settings.json` where
    they exist; otherwise remove `CLAUDE.md`, and remove from `settings.json` the
    keys `config/settings.json` carries and `env.HARNESS_DIR`.
-4. Remove `my-harness-wrapper`, `.my-harness-wrapper.manifest.json`,
+5. Remove `my-harness-wrapper`, `.my-harness-wrapper.manifest.json`,
    `.my-harness-wrapper.install.log` and `session-check.log` there.
-5. Optionally uninstall the plugins `config/plugins.tsv` names with
+6. Optionally uninstall the plugins `config/plugins.tsv` names with
    `claude plugin uninstall <plugin_id>`, and unset `commit.gpgsign` and
    `tag.gpgsign` globally.
 
@@ -364,14 +375,21 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL HARNESS_ASSIGNEE: ... set and non-empty` | `HARNESS_ASSIGNEE` is unset or empty. The `actual` value separates `unset` and `set but empty`. | Set it in the environment variables panel to the GitHub login that issues and pull requests are assigned to. |
 | `FAIL HARNESS_ASSIGNEE: ... a GitHub login of at most 39 ...` | The value is not a login's form. The line ends with each cause: a character other than a letter, digit or hyphen, a leading or trailing hyphen, consecutive hyphens, or its length in bytes. | Correct the value in the panel. |
 | `FAIL git commit.gpgsign` / `FAIL git tag.gpgsign` | The effective value inside the clone is not `false`. | Read as `actual [true]`, something re-enabled signing; `docs/environment.md` records what is known about signing here and what is not. Read as `unset`, bootstrap's write did not reach this session. |
-| `git -C <repo> config --get core.hooksPath -> ...` | The effective value inside the clone and its canonical form, `unset (git exit=1)`, `unreadable (git exit=N)`, `present with empty value`, or `repo unreadable`. | Nothing, unless `FAIL core.hooksPath` follows it. |
+| `git hooks delivery -> local` / `-> cloud` | Local where the manifest's `local_checkout` is non-empty. Local runs the three rows below and the commit checks under the live file's triple. | Nothing. |
+| `FAIL manifest.local_checkout` | `jq` could not read the manifest to take the delivery from, so the run took cloud delivery. | Read `cat <manifest>` above; re-run the installer to rewrite it. |
+| `git config --global --get-all core.hooksPath -> ...` | Printed under local delivery only. The global values, or `unset (git exit=1)`, or `unreadable (git exit=N)`. | Nothing, unless `FAIL global core.hooksPath` follows it. |
+| `FAIL global core.hooksPath` | Under local delivery, a global value still names the deployed copy's hooks, so the harness hooks run for every git command on the machine; or the global config could not be read. | Re-run `scripts/install-local.sh` and read its migration lines, or unset the value as "Removing a local install" step 3 does. |
+| `jq .env.GIT_CONFIG_COUNT, .env.GIT_CONFIG_KEY_0, .env.GIT_CONFIG_VALUE_0 <dir>/settings.json -> exit=N value=[...] [...] [...] (resolves to ...)` | Printed under local delivery only. The live file's three keys, `absent` where missing, and the value's canonical form. | Nothing, unless `FAIL settings git hooks triple` follows it. |
+| `FAIL settings git hooks triple` | The live file does not carry `GIT_CONFIG_COUNT` `1`, `GIT_CONFIG_KEY_0` `core.hooksPath`, and a `GIT_CONFIG_VALUE_0` naming `<repo>/git-hooks`, so a session started now runs no harness hook. | Re-run `scripts/install-local.sh` and read its `GIT_CONFIG_*` lines. |
+| `git -C <repo> config --get core.hooksPath -> ...` | The effective value inside the clone and its canonical form, `unset (git exit=1)`, `unreadable (git exit=N)`, `present with empty value`, or `repo unreadable`. Under local delivery the line names the live file's triple it ran under, or `with no GIT_CONFIG_* triple`. | Nothing, unless `FAIL core.hooksPath` follows it. |
 | `compare core.hooksPath against <repo>/git-hooks -> yes` | The effective value names the delivered hook directory. | Nothing. |
-| `FAIL core.hooksPath` | The effective value does not resolve to `<repo>/git-hooks`. | Read as `unset`, the install's write did not happen or did not survive: read the install log's `core.hooksPath` lines, or in the cloud `/home/user/bootstrap.log`; in the cloud the value may also have been lost to a rewrite of `/root/.gitconfig`. Read as another path, a global or system value the installer left, or a repository-local value in the clone, is in force: `git -C <repo> config --show-origin --get core.hooksPath` names the file. |
-| `git commit through the effective core.hooksPath, <case> -> exit=N [<line>]` | The result of one commit in a temporary repository: `<case>` is `a message carrying a Co-Authored-By: Claude trailer` or `a clean message`. `not run, <cause>` where the temporary repository could not be made. | Nothing, unless `FAIL commit-msg hook` follows it. |
+| `FAIL core.hooksPath` | The effective value does not resolve to `<repo>/git-hooks`. | Under local delivery, act on `FAIL settings git hooks triple` first. Read as `unset`, the install's write did not happen or did not survive: read the install log's `GIT_CONFIG_*` lines, or in the cloud `/home/user/bootstrap.log`'s `core.hooksPath` lines; in the cloud the value may also have been lost to a rewrite of `/root/.gitconfig`. Read as another path, a global or system value the installer left, or a repository-local value in the clone, is in force: `git -C <repo> config --show-origin --get core.hooksPath` names the file. |
+| `git commit through the effective core.hooksPath, <case> -> exit=N [<line>]` | The result of one commit in a temporary repository: `<case>` is `a message carrying a Co-Authored-By: Claude trailer`, `a clean message`, or one of the two `hook forwarding` cases below. `not run, <cause>` where the temporary repository could not be made. | Nothing, unless `FAIL commit-msg hook` follows it. |
 | `FAIL commit-msg hook, a message carrying a Co-Authored-By: Claude trailer` | The commit was not refused with `harness commit-msg: matched line ->`. | Act on `FAIL core.hooksPath` first. With the path correct, read the line: `exit=0` means the hook did not run or did not match, so compare `<repo>/git-hooks/commit-msg`, its mode and `lib/attribution.ere` with the repository; a `harness commit-msg:` line other than the marker names the hook's own failure. |
 | `FAIL commit-msg hook, a clean message` | A commit with a clean message failed. | Read the line. A `harness <name>:` line is the hooks' own refusal; any other is git's, such as an identity or signing failure. |
-| `FAIL commit-msg hook, <case>: ... not run, <cause>` / `FAIL hook forwarding, <case>: ... not run, <cause>` | `mktemp -d`, `git init`, `git add` or the write of `.git/hooks/pre-commit` failed, so the commits after it did not run. | Read the cause. A `harness reference-transaction:` cause is the hooks refusing `git init`. |
+| `FAIL commit-msg hook, <case>: ... not run, <cause>` / `FAIL hook forwarding, <case>: ... not run, <cause>` | `mktemp -d`, `git init`, `git add`, the write of `.git/hooks/pre-commit` or `.githooks/pre-commit`, or the `git config core.hooksPath .githooks` write failed, so the commits after it did not run. | Read the cause. A `harness reference-transaction:` cause is the hooks refusing `git init`. |
 | `FAIL hook forwarding, a repository's own pre-commit hook exiting 1` | A commit in a repository whose own `pre-commit` prints a marker and exits 1 was not stopped with that marker, so repositories' own hooks do not run through the harness hooks. | Act on `FAIL core.hooksPath` first. Then compare `<repo>/git-hooks/pre-commit` and `lib/dispatch.sh` with the repository. |
+| `FAIL hook forwarding, a repository whose own core.hooksPath names its pre-commit hook exiting 1` | A commit in a repository whose local `core.hooksPath` is `.githooks` was not stopped by `.githooks/pre-commit`'s marker. An `actual` line carrying the previous case's marker means forwarding ran `.git/hooks/pre-commit` instead. | Act on `FAIL core.hooksPath` first. Then compare `lib/dispatch.sh`'s `hook_configured_dir` with the repository. |
 | `rm -rf <temporary repository> -> exit=N` | The temporary repository's removal. | Nothing, unless `FAIL commit-msg hook cleanup` follows it. |
 | `FAIL commit-msg hook cleanup` | The temporary repository could not be removed. | Remove the `mktemp -d` directory under the temporary directory by hand. |
 
@@ -412,7 +430,9 @@ line.
 ## Reading a git hook's output
 
 The hooks in `git-hooks/` run in every repository whose effective
-`core.hooksPath` names them, and print on stderr only. A commit a hook rejects
+`core.hooksPath` names them, and print on stderr only. In the cloud that is
+every git command; locally it is only the git commands Claude Code sessions
+start, so these lines appear only inside a session. A commit a hook rejects
 is made again without the rejected line; no hook is bypassed with
 `--no-verify`.
 
@@ -422,11 +442,12 @@ is made again without the rejected line; no hook is bypassed with
 | `harness commit-msg: <path>/attribution.ere holds no single pattern line, ...` | The pattern file is absent, empty or several lines, so every commit is refused. | Re-run `scripts/install-local.sh`, or rebuild in the cloud. |
 | `harness commit-msg: awk could not read the message file ...` / `... grep could not apply ...` | The check could not run, so the commit was refused. | Read the exit status; report it as a defect in `git-hooks/lib/dispatch.sh`. |
 | `harness <name>: the repository's git directory was not found from <dir>, and git rev-parse --git-common-dir -> exit=N, ...` | The hook could not find the repository, so it refused rather than skip the repository's own hook. | Run the git command from inside the repository. A `.git` file whose first line is not `gitdir: <path>` also leads here. |
+| `harness <name>: git config --show-scope --type=path --get-all core.hooksPath -> exit=N, ...` | The lookup of the hooks directory git would use without the harness failed, so the hook refused rather than skip the repository's own hook. | Run `git config --show-scope --get-all core.hooksPath` in the repository for git's error, such as an unreadable config file or a `~user` path naming no user, and correct it. |
 | `harness <name>: <path> was not run, it is not executable.` | The repository's own hook exists without the executable bit, which git also skips. | `chmod +x <path>` where it should run. |
 | `harness <name>: <dir>/lib/dispatch.sh could not be read; ...` | The hook directory is incomplete, so the hook refused. | Re-run `scripts/install-local.sh`, or rebuild in the cloud. |
 | `harness push-to-checkout: Working directory has unstaged changes` and git's other `updateInstead` refusals | The repository has no `push-to-checkout` hook, and git's default refused the push. | As without the harness: clean the target repository's working tree. |
 | `harness proc-receive: the repository has no executable proc-receive hook at <path>.` | `receive.procReceiveRefs` is set and the repository has no hook to serve it. | As without the harness: install the hook, or unset the key. |
-| `Hook already exists: pre-push`, from `git lfs install` or `git lfs update` | git-lfs found the harness hooks in the directory `core.hooksPath` names and installed nothing, so the repository has no LFS hooks unless it already had them. | Take each hook's contents from `git lfs update --manual`, and write them into the repository's own `<common dir>/hooks`, `.git/hooks` in a plain clone, not into the path it names, which is the harness directory; the harness hooks forward to them. Never run the suggested `--force`: it overwrites the harness hooks in the deployed copy for every repository, as `FAIL deployed copy changes` then shows. |
+| `Hook already exists: pre-push`, from `git lfs install` or `git lfs update`, in the cloud or locally inside a Claude Code session | git-lfs found the harness hooks in the directory `core.hooksPath` names and installed nothing, so the repository has no LFS hooks unless it already had them. | Locally, run `git lfs install` in a terminal outside the session: it reads no triple and installs into the repository's own hooks, which the harness hooks forward to inside sessions. In the cloud, take each hook's contents from `git lfs update --manual`, and write them into the repository's own `<common dir>/hooks`, `.git/hooks` in a plain clone, not into the path it names, which is the harness directory; the harness hooks forward to them. Never run the suggested `--force`: it overwrites the harness hooks in the deployed copy for every repository, as `FAIL deployed copy changes` then shows. |
 | `attribution-guard: <path> holds no single pattern line, so the body was not checked.` | The attribution guard found no usable pattern file in the harness tree, so it blocked the write. | Restore the tree: re-run `scripts/install-local.sh`, or rebuild in the cloud. |
 
 ## Reading the session-start check
@@ -451,7 +472,7 @@ A `FAIL` line is decoded by the table above.
 | --- | --- | --- |
 | `log mtime >= boot time -> yes` | `/home/user/bootstrap.log` was last written at or after `uptime -s`'s boot time. | That this session built the snapshot: any write to the log after boot, such as a hand-run of the init script, also reads `yes`. |
 | `log mtime >= boot time -> no` | The log was last written before the boot time. | That this session restored a snapshot: any log last written before the boot time reads `no`, whatever wrote it. |
-| `git -C <dir> config --show-origin --get core.hooksPath -> exit=N value=[<origin> <value>]` | The value git uses in that repository and the file that sets it. An origin inside the repository's own `.git/config` means the harness hooks do not run there. | That the directory it names holds the harness hooks, or that they work. `scripts/verify.sh` checks that for the deployed copy only. |
+| `git -C <dir> config --show-origin --get core.hooksPath -> exit=N value=[<origin> <value>]` | The value git uses in that repository and the file that sets it. In the cloud, an origin inside the repository's own `.git/config` means the harness hooks do not run there. Locally, the origin `command line:` is the session's `GIT_CONFIG_*` triple, which outranks the repository's own value. | That the directory it names holds the harness hooks, or that they work. `scripts/verify.sh` checks that for the deployed copy only. |
 
 `/home/user/session-check.log` holds every run's output, appended. Locally the
 file is `session-check.log` in the config directory.

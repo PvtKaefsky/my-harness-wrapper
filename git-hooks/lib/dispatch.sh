@@ -100,16 +100,46 @@ hook_common_dir() {
   fi
 }
 
+hook_configured_dir() {
+  local out rc line scope value s name v_worktree="" v_local="" v_global="" v_system=""
+  out=$(git config --show-scope --type=path --get-all core.hooksPath 2>/dev/null); rc=$?
+  [ "$rc" -ne 1 ] || return 1
+  if [ "$rc" -ne 0 ]; then
+    hook_refuse "git config --show-scope --type=path --get-all core.hooksPath -> exit=$rc, so the repository's own $hook_name hook was not looked up."
+  fi
+  while IFS= read -r line; do
+    line=${line%$'\r'}
+    scope=${line%%$'\t'*}
+    [ "$scope" != "$line" ] || continue
+    value=${line#*$'\t'}
+    case "$scope" in
+      worktree|local|global|system) printf -v "v_$scope" '%s' "$value" ;;
+    esac
+  done <<< "$out"
+  for s in worktree local global system; do
+    name="v_$s"
+    value=${!name}
+    [ -n "$value" ] || continue
+    hook_relative "$PWD" "$value" hooks
+    [ "$hooks" -ef "$HOOK_DIR" ] || return 0
+  done
+  hooks=""
+  return 1
+}
+
 hook_forward() {
-  local common="" rc target
-  if ! hook_common_dir; then
+  local common="" rc target hooks=""
+  if hook_configured_dir; then
+    :
+  elif ! hook_common_dir; then
     common=$(git rev-parse --git-common-dir 2>/dev/null); rc=$?
     if [ "$rc" -ne 0 ] || [ -z "$common" ]; then
       hook_refuse "the repository's git directory was not found from $PWD, and git rev-parse --git-common-dir -> exit=$rc, so the repository's own $hook_name hook was not looked up."
     fi
   fi
-  target="$common/hooks/$hook_name"
-  if [ -f "$target" ] && ! [ "$common/hooks" -ef "$HOOK_DIR" ] && ! [ "$target" -ef "$0" ]; then
+  [ -n "$hooks" ] || hooks="$common/hooks"
+  target="$hooks/$hook_name"
+  if [ -f "$target" ] && ! [ "$hooks" -ef "$HOOK_DIR" ] && ! [ "$target" -ef "$0" ]; then
     if [ -x "$target" ]; then exec "$target" "$@"; fi
     printf 'harness %s: %s was not run, it is not executable.\n' "$hook_name" "$(hook_sanitize "$target")" >&2
   fi

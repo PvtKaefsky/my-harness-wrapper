@@ -208,6 +208,16 @@ run cat "$MANIFEST"
 
 fail=0
 
+MAN_LOCAL=$(jq -r 'if type == "object" then (.local_checkout // empty | strings) else empty end' "$MANIFEST" 2>/dev/null); MAN_LOCAL_RC=$?
+MAN_LOCAL=${MAN_LOCAL%$'\r'}
+if [ -n "$MAN_LOCAL" ]; then DELIVERY=local; else DELIVERY=cloud; fi
+echo "jq -r .local_checkout $MANIFEST -> exit=$MAN_LOCAL_RC value=$(sanitize "${MAN_LOCAL:-empty}")"
+echo "git hooks delivery -> $DELIVERY"
+if [ "$MAN_LOCAL_RC" -ne 0 ]; then
+  echo "FAIL manifest.local_checkout: expected a readable manifest to take the delivery from, actual jq exit=$MAN_LOCAL_RC"
+  fail=1
+fi
+
 want_commit=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null)
 have_commit=$(jq -r '.commit // ""' "$MANIFEST" 2>/dev/null)
 if [ "${have_commit:-unresolved-manifest}" != "${want_commit:-unresolved-repo}" ]; then
@@ -809,7 +819,46 @@ for SIGN_KEY in commit.gpgsign tag.gpgsign; do
 done
 WANT_HOOKS="$REPO/git-hooks"
 WANT_HOOKS_REAL=$(canon_path "$WANT_HOOKS")
-HP_OUT=$("${RGIT[@]}" -C "$REPO" config --get core.hooksPath 2>/dev/null); HP_RC=$?
+HGIT=("${RGIT[@]}")
+HP_UNDER=""
+if [ "$DELIVERY" = local ]; then
+  GHP_OUT=$("${RGIT[@]}" config --global --get-all core.hooksPath 2>/dev/null); GHP_RC=$?
+  GHP_OUT=${GHP_OUT//$'\r'/}
+  GHP_HIT=""
+  if [ "$GHP_RC" -eq 0 ]; then
+    while IFS= read -r GHP_LINE; do
+      [ -n "$GHP_LINE" ] || continue
+      [ "$(canon_path "$GHP_LINE")" != "${WANT_HOOKS_REAL:-unresolved-want}" ] || GHP_HIT=yes
+    done <<< "$GHP_OUT"
+    GHP_SHOW="[$(sanitize "$GHP_OUT")] (git exit=0)"
+  elif [ "$GHP_RC" -eq 1 ]; then
+    GHP_SHOW="unset (git exit=1)"
+  else
+    GHP_SHOW="unreadable (git exit=$GHP_RC)"
+  fi
+  echo "git config --global --get-all core.hooksPath -> $GHP_SHOW"
+  if [ "$GHP_RC" -gt 1 ] || [ -n "$GHP_HIT" ]; then
+    echo "FAIL global core.hooksPath: expected no global core.hooksPath naming $WANT_HOOKS under local delivery, actual $GHP_SHOW"
+    fail=1
+  fi
+  TRIPLE_RAW=$(jq -r 'if type == "object" and (.env | type) == "object" then [.env.GIT_CONFIG_COUNT, .env.GIT_CONFIG_KEY_0, .env.GIT_CONFIG_VALUE_0] | map(if . == null then "" else tostring end) | join("\u001f") else "\u001f\u001f" end' "$LIVE_SETTINGS" 2>/dev/null); TRIPLE_RC=$?
+  TRIPLE_RAW=${TRIPLE_RAW%$'\r'}
+  IFS=$'\x1f' read -r T_COUNT T_KEY T_VALUE <<< "$TRIPLE_RAW"
+  T_REAL=$([ -n "$T_VALUE" ] && canon_path "$T_VALUE")
+  echo "jq .env.GIT_CONFIG_COUNT, .env.GIT_CONFIG_KEY_0, .env.GIT_CONFIG_VALUE_0 $LIVE_SETTINGS -> exit=$TRIPLE_RC value=[$(sanitize "${T_COUNT:-absent}")] [$(sanitize "${T_KEY:-absent}")] [$(sanitize "${T_VALUE:-absent}")] (resolves to $(sanitize "${T_REAL:-unresolved}"))"
+  if [ "$TRIPLE_RC" -ne 0 ] || [ "$T_COUNT" != 1 ] || [ "$T_KEY" != core.hooksPath ] || [ "${T_REAL:-unresolved-value}" != "${WANT_HOOKS_REAL:-unresolved-want}" ]; then
+    echo "FAIL settings git hooks triple: expected env.GIT_CONFIG_COUNT [1], env.GIT_CONFIG_KEY_0 [core.hooksPath] and env.GIT_CONFIG_VALUE_0 naming $WANT_HOOKS in $LIVE_SETTINGS, actual [$(sanitize "${T_COUNT:-absent}")] [$(sanitize "${T_KEY:-absent}")] [$(sanitize "${T_VALUE:-absent}")] (jq exit=$TRIPLE_RC)"
+    fail=1
+  fi
+  if [ -n "$T_COUNT" ] && [ -n "$T_KEY" ] && [ -n "$T_VALUE" ]; then
+    HGIT=(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_OBJECT_DIRECTORY -u GIT_COMMON_DIR -u GIT_ALTERNATE_OBJECT_DIRECTORIES "GIT_CONFIG_COUNT=$T_COUNT" "GIT_CONFIG_KEY_0=$T_KEY" "GIT_CONFIG_VALUE_0=$T_VALUE" git)
+    HP_UNDER=", under the GIT_CONFIG_* triple of $LIVE_SETTINGS"
+  else
+    HGIT=(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_OBJECT_DIRECTORY -u GIT_COMMON_DIR -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_CONFIG_COUNT -u GIT_CONFIG_KEY_0 -u GIT_CONFIG_VALUE_0 git)
+    HP_UNDER=", with no GIT_CONFIG_* triple, $LIVE_SETTINGS carrying none"
+  fi
+fi
+HP_OUT=$("${HGIT[@]}" -C "$REPO" config --get core.hooksPath 2>/dev/null); HP_RC=$?
 HP_OK=no
 if [ "$REPO_RC" -ne 0 ]; then
   HP_SHOW="repo unreadable (git rev-parse exit=$REPO_RC)"
@@ -824,7 +873,7 @@ else
   HP_SHOW="[$(sanitize "$HP_OUT")] (resolves to $(sanitize "${HP_REAL:-unresolved}"))"
   [ "${HP_REAL:-unresolved-hooks}" != "${WANT_HOOKS_REAL:-unresolved-want}" ] || HP_OK=yes
 fi
-echo "git -C $REPO config --get core.hooksPath -> $HP_SHOW"
+echo "git -C $REPO config --get core.hooksPath$HP_UNDER -> $HP_SHOW"
 if [ "$HP_OK" = yes ]; then
   echo "compare core.hooksPath against $WANT_HOOKS -> yes"
 else
@@ -833,7 +882,7 @@ else
 fi
 HT_MARK='harness commit-msg: matched line ->'
 HT_ROOT=$(mktemp -d 2>/dev/null)
-ht_git() { (cd "$HT_ROOT/repo" && ${TO[@]+"${TO[@]}"} "${RGIT[@]}" -c user.name=verify.sh -c user.email=verify@example.com -c commit.gpgsign=false "$@"); }
+ht_git() { (cd "$HT_ROOT/repo" && ${TO[@]+"${TO[@]}"} "${HGIT[@]}" -c user.name=verify.sh -c user.email=verify@example.com -c commit.gpgsign=false "$@"); }
 ht_case() {
   local label=$1 want=$2 msg=$3 mark=${4:-$HT_MARK} check=${5:-commit-msg hook} err rc shown show ok=no
   if [ -z "${HT_ROOT:-}" ] || [ ! -d "$HT_ROOT/repo" ]; then
@@ -862,7 +911,7 @@ ht_case() {
 }
 HT_SETUP=""
 if [ -n "$HT_ROOT" ]; then
-  HT_OUT=$("${RGIT[@]}" init -q "$HT_ROOT/repo" 2>&1); HT_RC=$?
+  HT_OUT=$("${HGIT[@]}" init -q "$HT_ROOT/repo" 2>&1); HT_RC=$?
   if [ "$HT_RC" -eq 0 ]; then
     printf 'x\n' > "$HT_ROOT/repo/file" && HT_OUT=$(ht_git add file 2>&1); HT_RC=$?
   fi
@@ -879,6 +928,15 @@ if [ -d "${HT_ROOT:-}/repo/.git/hooks" ]; then
   [ -z "$HT_SETUP" ] || rm -rf "$HT_ROOT/repo"
 fi
 ht_case "a repository's own pre-commit hook exiting 1" refused "verify.sh forwarding case" "$HT_OWN" "hook forwarding"
+HT_LOCAL='verify.sh: the pre-commit hook in the repository'"'"'s own core.hooksPath ran'
+if [ -d "${HT_ROOT:-}/repo/.git/hooks" ]; then
+  { mkdir -p "$HT_ROOT/repo/.githooks" \
+    && printf '#!/bin/sh\necho "%s" >&2\nexit 1\n' "$HT_LOCAL" > "$HT_ROOT/repo/.githooks/pre-commit" \
+    && chmod +x "$HT_ROOT/repo/.githooks/pre-commit" \
+    && ht_git config core.hooksPath .githooks; } || HT_SETUP="writing .githooks/pre-commit or setting core.hooksPath .githooks failed"
+  [ -z "$HT_SETUP" ] || rm -rf "$HT_ROOT/repo"
+fi
+ht_case "a repository whose own core.hooksPath names its pre-commit hook exiting 1" refused "verify.sh local hooks path case" "$HT_LOCAL" "hook forwarding"
 if [ -n "$HT_ROOT" ]; then
   rm -rf -- "$HT_ROOT"; HT_RC=$?
   echo "rm -rf <temporary repository> -> exit=$HT_RC"
