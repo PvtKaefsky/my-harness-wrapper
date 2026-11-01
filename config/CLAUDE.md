@@ -83,6 +83,15 @@
 * The session creates no ruleset or branch protection.
 * Where `HEAD` does not read `refs/heads/main`, the forge refuses the create, the default branch reads back as anything other than `main`, or the first push is refused, the session stops and asks. It never renames a default branch or changes repository settings.
 
+## Repository layout
+
+* A repository the session creates that holds application or library source takes a layout from `docs/repository-layouts.md` in the deployed copy: `/opt/my-harness-wrapper/docs/repository-layouts.md` in a cloud session, or that path under the directory `env.HARNESS_DIR` names in a local one. The session reads it once per repository, before it writes the scaffold, the first change after the `README.md` commit. A repository without application or library source, such as a documentation, infrastructure or configuration repository, takes no layout.
+* One module takes the single-application layout; more than one takes the grouped layout. A module is a unit with its own manifest that is built, tested or deployed on its own. Where the task does not make clear whether there is one module or several, the session asks.
+* Inside a module, the toolchain's documented convention decides where source and tests go. The top level always follows the layout. In a single-module repository the module is the repository root, so where the layout document's toolchain table places source at the module root, as for Go, that table decides.
+* `LICENSE` is added only where the user names a license.
+* In an existing repository the session keeps the layout the repository has. In one that holds application or library source, a top-level directory the session must add takes the layout's name for that role, unless the repository already has one serving it; the session reads the layout document before adding it. A repository is restructured only when the user asks.
+* Where the layout document cannot be read, the session stops and asks.
+
 ## Issues
 
 * An issue is a defect or a missing capability the session has verified, as the Claims rule requires. A suspicion the session has not checked is stated in the reply, not filed.
