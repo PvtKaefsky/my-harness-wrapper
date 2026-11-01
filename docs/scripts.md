@@ -472,9 +472,26 @@ the pattern is rejected.
 
 ### Forwarding
 
-The repository's own hook is `<common dir>/hooks/<name>`. `hook_common_dir`
-finds the git dir in the shell, starting no process, by the first row that
-applies; it looks only at the working directory, never a parent:
+The repository's own hook is `<hooks dir>/<name>`, where `<hooks dir>` is the
+directory git would run hooks from without the harness. `hook_configured_dir`
+reads every `core.hooksPath` value with one git process,
+`git config --show-scope --type=path --get-all core.hooksPath`, and takes the
+last value of the worktree, local, global and system scopes, in that order. It
+skips an empty value and a value naming this directory by `test -ef`, and
+returns the first other value, resolved against the hook's working directory
+where it is relative. Git resolves a relative `core.hooksPath` against the
+directory it starts the hook in, and `--type=path` expands a leading `~`. The
+command scope is never taken: it holds a `GIT_CONFIG_KEY_n` overlay or a
+`git -c` value. Exit 1 from that command means no scope sets a value; any other
+non-zero exit refuses with a line naming it.
+
+| Lookup result | `<hooks dir>` |
+| --- | --- |
+| A worktree, local, global or system value naming another directory | That value |
+| No such value | `<common dir>/hooks` |
+
+`hook_common_dir` finds the git dir in the shell, starting no process, by the
+first row that applies; it looks only at the working directory, never a parent:
 
 | Row | Git dir |
 | --- | --- |
@@ -498,15 +515,16 @@ the git dir of a bare repository. `git init` and `git clone` run
 `rev-parse`, so the `GIT_DIR` row decides there. A hook run by hand from a
 subdirectory finds no row and takes the `rev-parse` fallback.
 
-The path is never resolved through `core.hooksPath`, which names this
-directory. In a linked worktree the common dir is the main repository's git
-directory; in a bare repository receiving a push it is the repository itself,
-as git uses for `hooks/` without the harness.
+A global value naming this directory, as the cloud's is, is skipped, so the
+lookup reaches the next scope or `<common dir>/hooks`. In a linked worktree the
+common dir is the main repository's git directory; in a bare repository
+receiving a push it is the repository itself, as git uses for `hooks/` without
+the harness.
 
-| State of `<common dir>/hooks/<name>` | Result |
+| State of `<hooks dir>/<name>` | Result |
 | --- | --- |
 | Absent | The default for that hook name, above. |
-| `<common dir>/hooks` is this directory, or the file is the running hook file, by `test -ef` | Not run; the default. |
+| `<hooks dir>` is this directory, or the file is the running hook file, by `test -ef` | Not run; the default. |
 | A file, not executable | Not run; the line `harness <name>: <path> was not run, it is not executable.`, then the default. |
 | An executable file | Run by `exec` with the same arguments, standard input, environment and working directory; its exit status is the hook's. |
 
@@ -539,9 +557,10 @@ endings. Git for Windows runs them.
 | A forced hook install, such as `git lfs install --force` or `git lfs update --force` | It overwrites the harness files of those hook names in the deployed copy, so in every repository those names run the tool's hooks and forward to none, and each repository's own hooks of those names stop running. `git lfs install --local --force` 3.7.0 replaced `pre-push`, `post-checkout`, `post-commit` and `post-merge`, and left `commit-msg`, so the attribution check kept working. `scripts/verify.sh` then reports `FAIL deployed copy changes` naming the files. Locally, re-running `scripts/install-local.sh` restores them; in the cloud, `git -C /opt/my-harness-wrapper checkout -- git-hooks` does. |
 | A tool that refuses to install hooks while `core.hooksPath` is set, such as `pre-commit install` | It refuses in every repository. |
 
-Every hook git runs starts bash, for every repository on the machine; forwarding
-starts no further process unless the fallback above runs. One commit and one
-checkout ran 13 `reference-transaction` hooks on Git for Windows 2.51.0.
+Every hook git runs starts bash. Forwarding starts one git process, the
+`core.hooksPath` lookup, and a second where the `rev-parse` fallback above runs.
+One commit and one checkout ran 13 `reference-transaction` hooks on Git for
+Windows 2.51.0.
 
 | Git for Windows 2.51.0, one repository | `git commit --allow-empty` | `git checkout` of another branch |
 | --- | --- | --- |
@@ -550,7 +569,25 @@ checkout ran 13 `reference-transaction` hooks on Git for Windows 2.51.0.
 | `git-hooks/`, the common dir from `hook_common_dir` | about 450 ms | about 320 ms |
 
 One hook run alone took about 47 ms with `hook_common_dir` and about 83 ms with
-`git rev-parse`; `bash -c :` alone took about 41 ms.
+`git rev-parse`; `bash -c :` alone took about 41 ms. Those runs predate the
+`core.hooksPath` lookup.
+
+With the lookup, measured on Git for Windows 2.56.0 on one Windows 11 machine,
+each value the mean of 20 runs for a single command and of 10 runs for a commit
+or checkout:
+
+| Command | Time |
+| --- | --- |
+| `bash -c :` | about 146 ms |
+| `git config --show-scope --type=path --get-all core.hooksPath` | about 156 ms |
+| `reference-transaction prepared`, the hooks before the lookup | about 158 ms |
+| `reference-transaction prepared`, the hooks with the lookup | about 337 ms |
+| `git commit --allow-empty`: no hooks, the hooks before the lookup, the hooks with the lookup | about 534 ms, 2295 ms, 3473 ms |
+| `git checkout` of another branch: no hooks, the hooks before the lookup, the hooks with the lookup | about 412 ms, 2162 ms, 3519 ms |
+
+That machine ran `bash -c :` in about 146 ms against about 41 ms in the runs
+above, so each table compares only within itself. The lookup adds about one git
+process to each hook run.
 
 ## How the hook commands resolve the harness directory
 
