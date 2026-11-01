@@ -120,8 +120,8 @@ global `core.hooksPath`. It runs in this order:
    counts a non-zero exit.
 
 The value is written globally for the reason the signing keys are: later
-sessions clone fresh repositories. A repository whose own config sets
-`core.hooksPath` overrides it. The manifest's `core_hooks_path` records the
+sessions clone fresh repositories. A repository whose own config sets `core.hooksPath` overrides it.
+Forwarding skips this value, which names `git-hooks/` itself. The manifest's `core_hooks_path` records the
 value written, and is empty where the step wrote nothing.
 
 ### Step 6, the plugins
@@ -182,8 +182,8 @@ before step 3 can rewrite it in a deployed copy the script runs from.
 | 2 | Creates the config directory, then checks `jq` and `git`. A failing tool ends the run before step 3. |
 | 3 | Clones or refreshes the deployed copy, `my-harness-wrapper` in the config directory. A failure ends the run. |
 | 4 | Copies `config/CLAUDE.md` from the deployed copy to `CLAUDE.md` there, first printing `test -f` or `cmp -s` for the file it replaces, and keeping a differing one as `CLAUDE.md.pre-harness` where no such copy exists. |
-| 5 | Merges the deployed copy's `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the deployed copy. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
-| 6 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status, then the global `core.hooksPath` to the deployed copy's `git-hooks/`. |
+| 5 | Merges the deployed copy's `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the deployed copy, and `env.GIT_CONFIG_COUNT`, `env.GIT_CONFIG_KEY_0` and `env.GIT_CONFIG_VALUE_0` to deliver `core.hooksPath` naming the deployed copy's `git-hooks/`. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
+| 6 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status, then unsets a global `core.hooksPath` naming the deployed copy's `git-hooks/`. |
 | 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv` and runs the deployed copy's `scripts/plugin-dependencies.sh` for it, then prints how many rows carried a `plugin_id`. |
 | 8 | Writes `.my-harness-wrapper.manifest.json` there. |
 
@@ -295,26 +295,77 @@ starts the native `jq.exe`, so `env.HARNESS_DIR`, `config_dir` and
 path. `jq.exe` also writes CRLF line endings, which every JSON reader here
 accepts.
 
-`env.HARNESS_DIR` is the only key the installer writes that
-`config/settings.json` does not carry. The CLI sets each `env` key in the
-environment of every hook and tool process, so the hook commands resolve the
-scripts in the deployed copy. The line after the merge prints the value read
-back.
+`env.HARNESS_DIR` and the three `GIT_CONFIG_*` keys are the only keys the
+installer writes that `config/settings.json` does not carry. The CLI sets each
+`env` key in the environment of every hook and tool process, so the hook
+commands resolve the scripts in the deployed copy. The lines after the merge
+print the values read back.
 
-### Step 6, the hooks path
+### Step 5, the hooks path triple
 
-The step runs as bootstrap's step 5 under "Step 5, the hooks path", with three
-differences. The value written is the deployed copy's `git-hooks/` converted
-with `cygpath -m` where `cygpath` exists, so git for Windows reads a
-`C:/...` path; the `cygpath -m` line prints the conversion, and a failed one
-writes nothing and counts one failure. A prior value is compared with that
-value through `url_canon`, so another spelling of the same directory counts as
-equal. Deleting the deployed copy without unsetting the value leaves it naming a
-deleted directory, which `docs/runbook.md` covers under "Removing a local
-install".
+Git reads `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_<n>` and `GIT_CONFIG_VALUE_<n>`
+from its environment at command scope, which outranks every config file. The
+installer writes `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0=core.hooksPath` and
+`GIT_CONFIG_VALUE_0=<deployed copy>/git-hooks` into `env`, so `core.hooksPath`
+names the harness hooks only in the processes Claude Code starts and those they
+start. A git command started elsewhere, such as in a terminal the user opens,
+reads no such value. Whether the desktop app's own terminal panel carries the
+`env` keys is not established.
 
-The value applies to every repository on the machine, the user's own commits
-included.
+Before the merge, `hooks_triple` runs in this order, printing each line:
+
+1. Converts `<deployed copy>/git-hooks` with `cygpath -m` where `cygpath`
+   exists, so git for Windows reads a `C:/...` path.
+2. Prints `test -x <deployed copy>/git-hooks/commit-msg`.
+3. Collects every `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_<n>` and
+   `GIT_CONFIG_VALUE_<n>` in the installer's own environment and in the live
+   file's `env`. A variable the installer did not write is foreign: any
+   `GIT_CONFIG_COUNT` other than `1`, any `GIT_CONFIG_KEY_0` other than
+   `core.hooksPath`, any `GIT_CONFIG_VALUE_0` not naming the deployed copy's
+   `git-hooks/` by `same_dir`, and any other index. A live file `jq` cannot
+   read counts as foreign. The line `GIT_CONFIG_* the installer did not write ->`
+   names each, or `none`.
+4. Runs `git -C <deployed copy> config --get core.hooksPath` with the triple in
+   its environment, and requires the printed value to equal the value to be
+   written.
+
+The triple is written where the conversion succeeded, `commit-msg` is
+executable, nothing is foreign and git read the value; otherwise the step
+prints `-> not written` with the cause, counts one failure, and merges
+`env.HARNESS_DIR` alone. A foreign key in the live file is kept by the merge.
+After the merge, the step reads the three keys back and counts one failure
+where the triple was to be written and they do not read `1`, `core.hooksPath`
+and the value.
+
+`same_dir` counts two paths as one directory where the first is absolute,
+beginning with `/`, `X:/` or `X:\`, and `test -ef` holds or their `url_canon`
+forms are equal, so a deleted directory still compares by spelling. A relative
+value never matches, git resolving it per repository.
+
+A broken triple breaks every git command in a session: a scratch
+`settings.json` carrying `GIT_CONFIG_COUNT=2` alone made the CLI's own
+marketplace clone fail with `error: missing config key GIT_CONFIG_KEY_0`. The
+foreign check exists so the installer never adds to a triple it did not write.
+
+### Step 6, the global hooks path
+
+An install before the triple wrote the global `core.hooksPath`. The step reads
+`git config --global --get-all core.hooksPath` and prints it, then:
+
+| Global values | What runs |
+| --- | --- |
+| None | Nothing |
+| Every value naming the deployed copy's `git-hooks/` by `same_dir` | `git config --global --unset-all core.hooksPath` |
+| One naming it and one naming another directory | Nothing; one failure |
+| Only values naming another directory | Nothing |
+
+A `before` read exiting above 1 runs nothing. The step then prints the values
+read again, and counts one failure where a value still names the deployed copy
+and none names another directory. A read exiting above 1 counts one failure.
+The step does not depend on step 5: it unsets the old value where the triple was
+not written. A global value naming another directory stays, and every git
+command outside a session uses it; inside a session the triple outranks it, and
+forwarding runs the hooks it names.
 
 ### Step 7, the plugins
 
@@ -334,7 +385,9 @@ dependency step is not run and counts one failure of its own.
 ### Step 8, the manifest
 
 The fields are bootstrap's, plus `local_checkout`, the deployed copy's path.
-`core_hooks_path` is the value step 6 wrote, or empty.
+`core_hooks_path` is the value step 5 wrote into `env.GIT_CONFIG_VALUE_0` and
+read back, or empty. `scripts/verify.sh` takes local delivery from a non-empty
+`local_checkout`.
 `bootstrap_version` is read from the `export BOOTSTRAP_VERSION=` line of
 `env/setup.sh` in the deployed copy, with the shapes `scripts/verify.sh` rejects
 counted as a failure and written empty. `config_dir` is the converted path from
@@ -387,8 +440,13 @@ dependencies". `docs/runbook.md` carries when the step can be removed.
 
 ## git-hooks/
 
-The directory the global `core.hooksPath` names. It holds one file per hook name
-git looks up in that directory, and `lib/`.
+The directory `core.hooksPath` names. It holds one file per hook name git looks
+up in that directory, and `lib/`.
+
+| Delivery | How `core.hooksPath` names it | Where the hooks run |
+| --- | --- | --- |
+| Cloud | The global config, written by `scripts/bootstrap.sh` | Every git command in the container |
+| Local | The `GIT_CONFIG_*` triple in `settings.json`'s `env`, written by `scripts/install-local.sh` | Git commands Claude Code sessions start, and the processes they start |
 
 | Hook names | Count |
 | --- | --- |
@@ -543,7 +601,10 @@ endings. Git for Windows runs them.
 
 | Path | Effect |
 | --- | --- |
-| A repository whose own config sets `core.hooksPath` | That value overrides the global one, so neither the message check nor forwarding runs there. `scripts/session-check.sh` prints the effective value with its origin. |
+| A repository whose own config sets `core.hooksPath`, in the cloud | That value overrides the global one, so neither the message check nor forwarding runs there. `scripts/session-check.sh` prints the effective value with its origin. Locally, inside Claude Code sessions, the triple outranks it, the message check runs, and forwarding runs the hooks that value names. |
+| A git command started outside Claude Code, locally | It reads no triple, so no harness hook runs for it. |
+| `git -c core.hooksPath=<dir>`, locally | A `-c` value outranks the triple, so no harness hook runs for that command. |
+| A push over git's local transport, locally | Git removes the `GIT_CONFIG_*` variables from the environment of the git it starts in the receiving repository, so that repository runs its own hooks directly and no harness hook runs there. |
 | `git commit --no-verify`, `git merge --no-verify` | Git skips `commit-msg`. |
 | `git rebase`, `git cherry-pick` | Git runs no `commit-msg`, so a message they carry over is not checked. |
 | `git commit --cleanup=<mode>` | The flag does not reach the hook; the table above decides from config and `GIT_EDITOR`. With an editor and no `commit.cleanup`, `--cleanup=whitespace` or `--cleanup=scissors` records comment lines the hook dropped, so an attribution line beginning with the comment character passes. With `commit.cleanup=whitespace` or `verbatim`, a `git commit -v` diff below the scissors line is scanned although git cuts it. |
@@ -553,9 +614,9 @@ endings. Git for Windows runs them.
 | A commit made on GitHub by a tool outside the attribution guard's `PreToolUse` matcher | No local hook runs. |
 | A commit made by a program that does not run git hooks | No hook runs. |
 | A hook name a later git version adds | No file carries it, so git finds none and the repository's own hook of that name does not run. |
-| A tool that installs hooks into the directory `core.hooksPath` names | It finds the harness files there. `git lfs install --local` 3.7.0 printed `Hook already exists: pre-push` and installed nothing, so a repository without its own LFS hooks gets none, and its pushes do not upload LFS objects through `pre-push`. Placing LFS's hooks in `<common dir>/hooks` by hand restores them through forwarding; `git lfs update --manual` 3.7.0 prints their contents, and names the directory `core.hooksPath` names as the place to add them, which is the deployed copy. `--force`, which git-lfs suggests, is the step to avoid: the forced hook install row sets out its effect. |
-| A forced hook install, such as `git lfs install --force` or `git lfs update --force` | It overwrites the harness files of those hook names in the deployed copy, so in every repository those names run the tool's hooks and forward to none, and each repository's own hooks of those names stop running. `git lfs install --local --force` 3.7.0 replaced `pre-push`, `post-checkout`, `post-commit` and `post-merge`, and left `commit-msg`, so the attribution check kept working. `scripts/verify.sh` then reports `FAIL deployed copy changes` naming the files. Locally, re-running `scripts/install-local.sh` restores them; in the cloud, `git -C /opt/my-harness-wrapper checkout -- git-hooks` does. |
-| A tool that refuses to install hooks while `core.hooksPath` is set, such as `pre-commit install` | It refuses in every repository. |
+| A tool that installs hooks into the directory `core.hooksPath` names, in the cloud, and locally inside Claude Code sessions only | It finds the harness files there. Locally, run outside a session, it reads no triple and installs into the repository's own hooks directory, which forwarding runs inside sessions. `git lfs install --local` 3.7.0 printed `Hook already exists: pre-push` and installed nothing, so a repository without its own LFS hooks gets none, and its pushes do not upload LFS objects through `pre-push`. Placing LFS's hooks in `<common dir>/hooks` by hand restores them through forwarding; `git lfs update --manual` 3.7.0 prints their contents, and names the directory `core.hooksPath` names as the place to add them, which is the deployed copy. `--force`, which git-lfs suggests, is the step to avoid: the forced hook install row sets out its effect. |
+| A forced hook install, such as `git lfs install --force` or `git lfs update --force`, in the cloud, and locally inside Claude Code sessions only | It overwrites the harness files of those hook names in the deployed copy, so in every repository those names run the tool's hooks and forward to none, in the cloud for every git command and locally for those sessions start, and each repository's own hooks of those names stop running. `git lfs install --local --force` 3.7.0 replaced `pre-push`, `post-checkout`, `post-commit` and `post-merge`, and left `commit-msg`, so the attribution check kept working. `scripts/verify.sh` then reports `FAIL deployed copy changes` naming the files. Locally, re-running `scripts/install-local.sh` restores them; in the cloud, `git -C /opt/my-harness-wrapper checkout -- git-hooks` does. |
+| A tool that refuses to install hooks while `core.hooksPath` is set, such as `pre-commit install`, in the cloud, and locally inside Claude Code sessions only | It refuses in every repository. Locally, run outside a session, it reads no triple and installs into the repository's own hooks directory, which forwarding runs inside sessions. |
 
 Every hook git runs starts bash. Forwarding starts one git process, the
 `core.hooksPath` lookup, and a second where the `rev-parse` fallback above runs.
@@ -645,9 +706,10 @@ These values pass through it:
 
 | Source | Values |
 | --- | --- |
-| git | the contrast `user.email`, each `git var` ident and the pair it is compared against, each `*.gpgsign` read, the `core.hooksPath` read and its canonical form, each hook-check commit's stderr line, the `status --porcelain` entries, git's first stderr line from that status, the top-level path, and the branch |
+| git | the contrast `user.email`, each `git var` ident and the pair it is compared against, each `*.gpgsign` read, the global `core.hooksPath` values, the `core.hooksPath` read and its canonical form, each hook-check commit's stderr line, the `status --porcelain` entries, git's first stderr line from that status, the top-level path, and the branch |
 | `env/setup.sh` | the matched `export` lines, and an export value outside `[0-9A-Za-z._-]` |
-| the settings files | the delivered key list, both settings probes, the carrying state, and the live `env.HARNESS_DIR` |
+| the settings files | the delivered key list, both settings probes, the carrying state, the live `env.HARNESS_DIR`, and the live `env.GIT_CONFIG_*` triple and its canonical form |
+| the manifest | `local_checkout` |
 | the hook commands | each guard check's stderr |
 | the CLI | the plugin id list, and each `installPath` and the path converted from it |
 | a plugin's `package.json` | a dependency name outside the npm name form |
@@ -1114,22 +1176,46 @@ repository-local `true` went unreported.
 
 ### The hooks path
 
+The delivery is local where the manifest's `local_checkout` is a non-empty
+string, and cloud otherwise; the `git hooks delivery ->` line prints which. A
+manifest `jq` cannot read is `FAIL manifest.local_checkout`, and the run takes
+cloud delivery.
+`scripts/bootstrap.sh` writes no `local_checkout`, and every
+`scripts/install-local.sh` run writes one, so the field does not separate a
+local install made before the triple from one made after it. Both read as local.
+
+Under local delivery, two checks run first:
+
+| Check | Passes where | Otherwise |
+| --- | --- | --- |
+| `git config --global --get-all core.hooksPath` | No value resolves through `canon_path` to `<repo>/git-hooks`, and the read exits 0 or 1 | `FAIL global core.hooksPath` |
+| `env.GIT_CONFIG_COUNT`, `env.GIT_CONFIG_KEY_0` and `env.GIT_CONFIG_VALUE_0` in the live `settings.json` | They read `1`, `core.hooksPath`, and a value resolving through `canon_path` to `<repo>/git-hooks` | `FAIL settings git hooks triple` |
+
+Every git command after them, the commit checks included, runs with the
+triple's three values from the live file in its environment where all three are
+present, and with the three variables unset otherwise. The values come from the
+file, not from `verify.sh`'s own environment, so the checks show what a session
+started now reads. Under cloud delivery the git commands run with the
+environment `verify.sh` has.
+
 The effective `core.hooksPath` is read inside the repository under test, gated
 on the same `rev-parse` probe, and compared with `<repo>/git-hooks` through
 `canon_path`. A relative value resolves against the directory `verify.sh` runs
 in. The read line prints the value and its canonical form, or `unset (git
 exit=1)`, `unreadable (git exit=N)`, `present with empty value`, or `repo
-unreadable`. Anything but a match is `FAIL core.hooksPath`.
+unreadable`; under local delivery it names the triple it ran under, or that the
+live file carries none. Anything but a match is `FAIL core.hooksPath`.
 
 The read is effective, not `--global`, as for the signing keys. It does not
-show what another repository reads: a repository whose own config sets
-`core.hooksPath` overrides the global value there, and
+show what another repository reads: in the cloud, a repository whose own config
+sets `core.hooksPath` overrides the global value there, and
 `scripts/session-check.sh` prints that per repository.
 
 ### The commit-msg hook check
 
 `verify.sh` makes a repository in a `mktemp -d` directory and commits through
-whatever `core.hooksPath` git resolves there, with no override. Each git command
+whatever `core.hooksPath` git resolves there, with no override beyond the
+triple "The hooks path" sets out. Each git command
 runs with the repository-redirecting `GIT_*` variables unset, under the 10-second
 `timeout` the status read uses where `timeout` exists, and with
 `-c user.name=verify.sh -c user.email=verify@example.com -c commit.gpgsign=false`,
@@ -1140,23 +1226,32 @@ which a role's environment pair still outranks.
 | `a message carrying a Co-Authored-By: Claude trailer` | `verify.sh rejected case`, a blank line, and `Co-Authored-By: Claude <noreply@anthropic.com>` | `git commit --allow-empty -F` exits non-zero and its stderr carries `harness commit-msg: matched line ->` |
 | `a clean message` | `verify.sh clean case` | `git commit --allow-empty -F` exits 0 |
 | `a repository's own pre-commit hook exiting 1` | `verify.sh forwarding case`, after `verify.sh` writes an executable `.git/hooks/pre-commit` that prints `verify.sh: the repository's own pre-commit hook ran` and exits 1 | `git commit --allow-empty -F` exits non-zero and its stderr carries that line |
+| `a repository whose own core.hooksPath names its pre-commit hook exiting 1` | `verify.sh local hooks path case`, after `verify.sh` writes an executable `.githooks/pre-commit` that prints `verify.sh: the pre-commit hook in the repository's own core.hooksPath ran` and exits 1, and sets the repository's local `core.hooksPath` to `.githooks` | `git commit --allow-empty -F` exits non-zero and its stderr carries that line, not the previous case's |
 
 Each case prints `git commit through the effective core.hooksPath, <case> ->
 exit=N [<line>]`, the line being the first stderr line carrying the case's
 marker, else the first carrying `harness `, else the first stderr line, cut to
 120 bytes. A failing case is `FAIL commit-msg hook, <case>` for the first two
-and `FAIL hook forwarding, <case>` for the third. Where `mktemp -d`, `git
-init`, `git add` or the hook write fails, the cases after it print `not run`
-with that cause and fail. The directory is then removed, and
+and `FAIL hook forwarding, <case>` for the last two. The fourth case's value is
+relative, so it also tests that forwarding resolves it against the hook's
+working directory. In the cloud the repository's value overrides the global one
+and git runs `.githooks/pre-commit` directly, so the case passes without
+forwarding. Where `mktemp -d`, `git
+init`, `git add`, a hook write or the `git config` write fails, the cases after
+it print `not run` with that cause and fail. The directory is then removed, and
 `rm -rf <temporary repository> -> exit=N` printed; a non-zero exit is
 `FAIL commit-msg hook cleanup`.
 
 The check tests that a commit through the effective configuration is refused
 on the pattern, allowed without it, and stopped by the repository's own
-`pre-commit`. It does not test any other hook name, or the hook files' mode in
-the deployed copy. It adds a `git init`, a `git add` and three commits to the
-run, which `scripts/session-check.sh` bounds at 20 seconds in all; a scratch
-install on Windows ran the whole of `verify.sh` in about 8 seconds.
+`pre-commit`, from its common dir and from its own `core.hooksPath`. It does
+not test any other hook name, or the hook files' mode in the deployed copy. It
+adds a `git init`, a `git add`, a `git config` and four commits to the run,
+which `scripts/session-check.sh` bounds at 20 seconds in all. An earlier
+scratch install on Windows ran the whole of `verify.sh` in about 8 seconds. On
+the machine the `core.hooksPath` lookup timings above come from, a scratch
+install ran it in about 40 seconds, against about 35 seconds for the tree
+before the lookup and the fourth case.
 
 ## scripts/session-check.sh
 
@@ -1195,7 +1290,7 @@ session was quiet.
 | `snapshot state -> undetermined, log epoch [...] boot epoch [...]` | Either epoch was missing or non-numeric. Both values are printed. |
 | `snapshot state -> undetermined, ... absent` | The boot log is not at the path this script reads, so neither epoch exists. |
 | `git -C <dir> rev-parse --abbrev-ref HEAD, --short HEAD` | One line per directory under `/home/user`, with its branch and short HEAD. |
-| `git -C <dir> config --show-origin --get core.hooksPath -> exit=N value=[<origin> <value>]` | The effective `core.hooksPath` and the file that sets it: in the cloud, after each repository's branch line; locally, for the working directory, after the install log lines. Exit 1 means unset. A value whose origin is the repository's own config overrides the harness's. Tabs and control bytes are replaced. No verdict is printed. |
+| `git -C <dir> config --show-origin --get core.hooksPath -> exit=N value=[<origin> <value>]` | The effective `core.hooksPath` and the file that sets it: in the cloud, after each repository's branch line; locally, for the working directory, after the install log lines. Exit 1 means unset. In the cloud, a value whose origin is the repository's own config overrides the harness's. Locally, the origin `command line:` is the triple, which outranks the repository's own value; a run outside a session reads no triple. Tabs and control bytes are replaced. No verdict is printed. |
 | `ls -d /home/user/*/ -> none` | No directory was found under `/home/user`. |
 | `git -C <dir> rev-parse --git-dir -> exit=N` | A directory git would not read. The exit code stands in place of a reason: git also refuses a real repository over dubious ownership. |
 | `verify.sh FAIL ...`, `verify.sh NOTE ...` | Every `FAIL` and `NOTE` line it printed. |

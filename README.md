@@ -48,9 +48,12 @@ rebuild an operator controls is a change to the pasted init script text.
    before anything else is written.
 3. From the deployed copy, it copies `config/CLAUDE.md` into
    `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, merges `config/settings.json` into that
-   directory's `settings.json` with `env.HARNESS_DIR` set to the deployed copy,
-   sets both `*.gpgsign` keys to `false` globally, sets the global
-   `core.hooksPath` to the deployed copy's `git-hooks/`, installs the plugins named in
+   directory's `settings.json` with `env.HARNESS_DIR` set to the deployed copy
+   and `env.GIT_CONFIG_COUNT`, `env.GIT_CONFIG_KEY_0` and `env.GIT_CONFIG_VALUE_0`
+   setting `core.hooksPath` to the deployed copy's `git-hooks/` for the git
+   commands Claude Code sessions start, sets both `*.gpgsign` keys to `false`
+   globally, unsets a global `core.hooksPath` naming the deployed copy's
+   `git-hooks/`, installs the plugins named in
    `config/plugins.tsv`, runs the deployed copy's
    `scripts/plugin-dependencies.sh` after each plugin's install, and writes the
    manifest with a `local_checkout` field naming the deployed copy.
@@ -82,13 +85,13 @@ every session.
 | `config/plugins.tsv` | The plugins bootstrap installs. |
 | `env/setup.sh` | The init script pasted into the environment dialog. It clones this repository and is the only version source. |
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
-| `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config. |
+| `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config's signing keys. |
 | `scripts/plugin-dependencies.sh` | Installs a delivered plugin's npm dependencies where any is unresolved, and runs nothing otherwise. Run by both delivery scripts after each plugin's install. Needs `npm` only where it installs. |
 | `scripts/session-check.sh` | Reports what a session starts with. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
 | `scripts/attribution-guard.sh` | Blocks a pull request, issue, comment, review or review reply body, or a commit a GitHub tool makes, carrying a Claude Code attribution line, and tells the session to resend a description the create call returns with one. Run by the `PreToolUse` and `PostToolUse` hooks `config/settings.json` registers. |
 | `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, directly and through the `PreToolUse` hook the tree's `config/settings.json` registers, one line per case. Run by hand only. |
-| `git-hooks/` | The git hooks the global `core.hooksPath` names, one file per hook name git looks up. `commit-msg` rejects a message carrying a Claude Code attribution line; every hook then runs the hook of that name git would run without the harness. `git-hooks/lib/attribution.ere` is the pattern both it and the attribution guard read. |
+| `git-hooks/` | The git hooks `core.hooksPath` names: globally in the cloud, and locally only for the git commands Claude Code sessions start. One file per hook name git looks up. `commit-msg` rejects a message carrying a Claude Code attribution line; every hook then runs the hook of that name git would run without the harness. `git-hooks/lib/attribution.ere` is the pattern both it and the attribution guard read. |
 | `scripts/check-hook-matchers.sh` | Compares the tool names the attribution guard's hook matchers name with a file of a session's tool names. Run by hand only. |
 | `README.md` | This file. |
 | `docs/` | Documentation. |
