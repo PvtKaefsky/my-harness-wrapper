@@ -5,7 +5,8 @@ an application. It has no build, no package manifest and no CI. Its one test
 script, `scripts/test-attribution-guard.sh`, is run by hand.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
-into a session's Claude config directory.
+into a session's Claude config directory. It also holds one plugin,
+`plugins/my-harness/`.
 
 ## How delivery works
 
@@ -83,6 +84,8 @@ every session.
 | `config/CLAUDE.md` | The instruction payload, delivered as `CLAUDE.md` in the config directory: `/root/.claude` in the cloud, `${CLAUDE_CONFIG_DIR-$HOME/.claude}` locally. |
 | `config/settings.json` | Settings merged into the config directory's `settings.json`. Its hook commands run the scripts under `${HARNESS_DIR:-/opt/my-harness-wrapper}`. |
 | `config/plugins.tsv` | The plugins bootstrap installs. |
+| `.claude-plugin/marketplace.json` | The plugin marketplace `my-harness-wrapper`. It lists the one plugin under `plugins/`. `claude plugin marketplace add` reads it. |
+| `plugins/my-harness/` | The `my-harness` plugin: the `task-delegation` skill, the `executor` and `analyst` agents, and a `UserPromptSubmit` hook. `plugins/my-harness/README.md` describes it. |
 | `env/setup.sh` | The init script pasted into the environment dialog. It clones this repository and is the only version source. |
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config's signing keys. |
