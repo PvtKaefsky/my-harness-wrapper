@@ -292,6 +292,24 @@ claude plugin marketplace update my-harness-wrapper
 claude plugin update my-harness@my-harness-wrapper
 ```
 
+### Renormalizing a Windows checkout
+
+A checkout of this repository made before `.gitattributes` was committed keeps
+CRLF line endings, and its `git ls-files --eol` reads `w/crlf`. Run these steps
+once, from that checkout, after its `HEAD` holds `.gitattributes`. Without that
+file in `HEAD`, the reset writes CRLF again under `core.autocrlf=true`.
+
+1. Commit or stash every local change. `git reset --hard` discards uncommitted
+   changes.
+2. Run:
+
+   ```
+   git rm -r --cached -q .
+   git reset --hard HEAD
+   ```
+
+3. Run `git ls-files --eol`. Every text file reads `w/lf`.
+
 ### Verify
 
 ```

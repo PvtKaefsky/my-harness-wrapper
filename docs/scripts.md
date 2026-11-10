@@ -594,8 +594,11 @@ with `#!` as executable.
 Every hook file is committed with mode `100755`, set on Windows with
 `git update-index --chmod=+x`. `lib/` is not a hook and stays `100644`.
 
-A checkout under `core.autocrlf=true` writes the hook files with CRLF line
-endings. Git for Windows runs them.
+The repository's `.gitattributes` sets `* text=auto eol=lf`, so a checkout writes
+LF line endings to every text file, whatever `core.autocrlf` says. A checkout
+made before that file was committed keeps CRLF line endings until the step under
+"Renormalizing a Windows checkout" in `docs/runbook.md` is run. Git for Windows
+runs hook files with either line ending.
 
 ### Accepted gaps
 
