@@ -144,6 +144,20 @@ class LocalHarnessTests(unittest.TestCase):
         self.assertFalse((self.target / ".agents").exists())
         self.assertFalse((self.target / ".codex").exists())
 
+    def test_install_repository_layouts_and_rendered_policy(self) -> None:
+        self.install()
+        pointer = json.loads((self.state / "active.json").read_bytes())
+        release = self.state / "releases" / pointer["release"]
+        layout = release / "docs/repository-layouts.md"
+        self.assertTrue(layout.is_file(), str(layout))
+        self.assertEqual(layout.read_bytes(), (ROOT / "docs/repository-layouts.md").read_bytes())
+        policy = (self.profile / ".codex/AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn(str(release) + "/docs/repository-layouts.md", policy)
+        self.assertIn("## Creating a repository", policy)
+        self.assertIn("## Repository layout", policy)
+        self.assertIn(str(release) + "/scripts/codex-local.py --state " + str(self.state) + " commit", policy)
+        self.assertNotIn("{{", policy)
+
     def test_preserve_policy_hooks_and_configuration(self) -> None:
         home = self.profile / ".codex"
         home.mkdir(parents=True)
@@ -550,7 +564,7 @@ class LocalHarnessTests(unittest.TestCase):
         pointer = json.loads((self.state / "active.json").read_bytes())
         manifest = json.loads((self.state / "releases" / pointer["release"] / "manifest.json").read_bytes())
         self.assertEqual(manifest["source_commit"], expected)
-        self.assertEqual(manifest["adapter_version"], "2.0.0")
+        self.assertEqual(manifest["adapter_version"], "2.1.0")
         self.assertTrue((self.state / "releases" / pointer["release"] / "docs/native-review.md").exists())
 
 
