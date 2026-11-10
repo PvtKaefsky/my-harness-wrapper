@@ -41,6 +41,15 @@ decomposition -> whole: <reason>
 A task that splits has at most five subtasks. Where more seem needed, stop and
 ask the user.
 
+For a task that splits, record for each subtask the subtasks it depends on.
+
+| Session | A subtask depends on another where |
+| --- | --- |
+| Coding | its goal documents, tests, configures or calls what that subtask changes |
+| Analysis | its question takes that subtask's findings as input |
+
+Two subtasks that depend on each other are one subtask.
+
 ## 2. Give each subtask what it owns
 
 | Session | A subtask owns | It may |
@@ -79,11 +88,14 @@ One brief per subtask. Each brief states, in this order:
 2. The owned files, or the owned question.
 3. The acceptance check.
 4. The task's constraints. Text the user supplied verbatim is marked as theirs.
-5. What the subtask must not touch.
-6. The subagent's limits, in full: commit, push and post nothing; register no
+5. For each subtask it depends on: the diff of that subtask's owned files, or,
+   in an analysis session, that subtask's findings after the session has
+   checked them against their evidence.
+6. What the subtask must not touch.
+7. The subagent's limits, in full: commit, push and post nothing; register no
    issue; do not decompose the subtask or delegate any part of it; invoke no
    reviewer.
-7. The report shape:
+8. The report shape:
    - the files changed, or the findings;
    - for each, its evidence: the file, the commit, or the command and its
      output;
@@ -97,16 +109,21 @@ subagent receives a chat session's project instructions is not established.
 
 | Subtasks | Run |
 | --- | --- |
-| With disjoint files, or separate questions, and no shared build or test step | in one parallel batch |
+| With disjoint files, or separate questions, no shared build or test step, and neither depends on the other | in one parallel batch |
 | All others | in order |
 
+- A subtask that depends on another is briefed only after each subtask it
+  depends on has been integrated under section 6: its refs compared, its
+  edits outside its owned files restored, and its acceptance check run by the
+  session. In an analysis session, it is briefed only after the findings it
+  takes as input have been checked against their evidence.
 - In a coding session, record the repository's state before the first
   executor runs: `HEAD`, the branch, `git for-each-ref`, `git stash list`,
   `git diff --cached` and `git status --porcelain --untracked-files=all`.
   Where that status lists any path, also save a copy of each listed file
   outside the repository, as the snapshot. A path the status lists as deleted
   has no copy, and is recorded as deleted. Retake the record before each
-  second brief.
+  second brief, and before each subtask that depends on another runs.
 - Use no worktree isolation.
 - Run each executor on the model its definition sets. Pass no model override.
 - Wait for each executor on its completion notice, never on a timer.
@@ -114,6 +131,11 @@ subagent receives a chat session's project instructions is not established.
   line naming the subtasks still running.
 
 ## 6. Integrate
+
+Integration runs after each parallel batch and after each subtask run on its
+own. A coding subtask is integrated once steps 1 to 6 are done for it, and an
+analysis subtask once its findings are checked against their evidence. Step 7
+follows once every subtask is integrated.
 
 Coding, in this order:
 
@@ -165,7 +187,10 @@ A subtask fails where any of these holds:
 Brief a failed subtask again once, naming what failed. A subtask whose
 executor could not run draws the next row that matches for its second brief.
 A subtask that failed in a parallel batch runs its second brief after the
-batch, on its own. Where the second brief also fails, stop and ask the user.
+batch, on its own. A failed subtask goes through its second brief before any
+subtask that depends on it is briefed. Where the second brief also fails, stop
+and ask the user. A subtask that depends on one that ends failed is not
+briefed.
 
 ## 8. Report
 
@@ -177,7 +202,7 @@ description never does.
 | Subtask | its goal in a few words |
 | Owned files or question | as briefed |
 | Executor | the agent it drew, and each executor passed over as unavailable |
-| Batch | the parallel batch it ran in, or its place in the order |
+| Batch | its place in the order, the parallel batch it ran in where it ran in one, and the subtasks it depends on |
 | Attempts | 1 or 2, with what failed in the first where there were 2 |
 | Result | `passed` or `failed`, each restored path, and each open question with its answer |
 

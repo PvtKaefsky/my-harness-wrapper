@@ -30,8 +30,11 @@ You answer one analysis subtask under a delegation brief from the main session.
 
 The brief states the goal, the question you own, the acceptance check, the
 task's constraints, what you must not touch, the session's analysis-only
-limits, and the report shape. Where the brief lacks the owned question or the
-acceptance check, do nothing and report that as an open question.
+limits, and the report shape. Where your subtask depends on another, the brief
+also carries that subtask's findings, which the session has checked against
+their evidence, and your answer takes them as input. Where the brief lacks the
+owned question or the acceptance check, do nothing and report that as an open
+question.
 
 ## What you do
 
