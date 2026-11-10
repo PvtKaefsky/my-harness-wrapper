@@ -16,6 +16,13 @@ Its bootstrap delivers CLAUDE.md, merges settings and installs affaan-m/ECC.
 | Environment identity | Approved effective local Git identity | Preserve existing Git settings. |
 | Bootstrap manifest | Immutable local release/manifest | No snapshot/republish boundary. |
 
+Repository creation and layout comparison source: main's PR #68 merge at 32a3506e5b2f710a0ddc1c1e2c9407b29d0bcec7.
+
+| Claude behavior | Local Codex equivalent | Necessary adaptation |
+| --- | --- | --- |
+| Repository creation | User-requested local initialization on main, README.md first, empty private GitHub repository and later pull requests | The first commit uses the guarded commit and native unborn review; refusal stops the session. No hooks, Git configuration, protection or repository settings are changed. |
+| Repository layout | Shared repository-layouts.md, single-application or grouped apps/ and libs/, existing layouts preserved | The installer delivers the unchanged document in each release; AGENTS.md renders its path from {{HARNESS_ROOT}}. |
+
 The obsolete upstream installer/config template is not run or copied.
 It selects old models/config fields and unrelated MCP defaults.
 Automatic learning, tmux-only execution, external services and upstream executable hooks are not silently enabled.

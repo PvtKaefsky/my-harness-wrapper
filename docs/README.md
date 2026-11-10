@@ -11,3 +11,4 @@
 | workflows.md | Shared workflows. |
 | environment-changes.md | Shared policy changes. |
 | native-review.md | Bounded staged review and actual provider evidence. |
+| repository-layouts.md | New source repository layouts and module toolchain conventions. |
