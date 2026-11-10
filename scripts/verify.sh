@@ -136,6 +136,68 @@ plugin_deps_check() {
     fi
   done <<< "$names"
 }
+plugin_enabled_check() {
+  local id=$1 id_show raw rc
+  id_show=$(sanitize "$id")
+  raw=$(printf '%s' "$PLUGIN_JSON" | jq -r --arg id "$id" 'if type == "array" then [.[] | select(.id == $id) | .enabled | tojson] | unique | join(" ") else error("top level is " + type) end' 2>/dev/null); rc=$?
+  raw=${raw//$'\r'/}
+  echo "jq enabled of $id_show from claude plugin list --json -> exit=$rc value=[$(sanitize "$raw")]"
+  if [ "$rc" -ne 0 ] || [ "$raw" != true ]; then
+    echo "FAIL plugin enabled: expected every entry for $id_show in claude plugin list --json to carry enabled true, actual jq exit=$rc value=[$(sanitize "$raw")]"
+    fail=1
+  fi
+}
+plugin_version_check() {
+  local id=$1 id_show name dir dir_show manifest man_show want want_rc have have_rc count
+  local name_re='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+  id_show=$(sanitize "$id")
+  name=${id%%@*}
+  if ! [[ "$name" =~ $name_re ]]; then
+    echo "FAIL plugin version: expected the name of $id_show before its @ to match $name_re, actual [$(sanitize "$name")]"
+    fail=1
+    return
+  fi
+  dir="$REPO/plugins/$name"
+  dir_show=$(sanitize "$dir")
+  manifest="$dir/.claude-plugin/plugin.json"
+  man_show=$(sanitize "$manifest")
+  echo "test -d $dir_show -> $([ -d "$dir" ] && echo yes || echo no)"
+  [ -d "$dir" ] || return
+  echo "test -f $man_show -> $([ -f "$manifest" ] && echo yes || echo no)"
+  if [ ! -f "$manifest" ]; then
+    echo "FAIL plugin version: expected a manifest at $man_show for the plugin directory $dir_show, actual absent"
+    fail=1
+    return
+  fi
+  want=$(jq -r 'if type != "object" then error("top level is " + type)
+    elif (.version | type) != "string" then error("version is " + (.version | type))
+    else .version end' "$manifest" 2>/dev/null); want_rc=$?
+  want=${want//$'\r'/}
+  echo "jq .version $man_show -> exit=$want_rc value=[$(sanitize "$want")]"
+  if [ "$want_rc" -ne 0 ] || [ -z "$want" ] || [ "$want" != "${want%%$'\n'*}" ]; then
+    echo "FAIL plugin version: expected one non-empty string version in $man_show, actual jq exit=$want_rc value=[$(sanitize "$want")]"
+    fail=1
+    return
+  fi
+  have=$(printf '%s' "$PLUGIN_JSON" | jq -r --arg id "$id" 'if type != "array" then error("top level is " + type)
+    else [.[] | select(.id == $id) | .version]
+      | if all(.[]; type == "string") then unique | .[] else error("an entry carries a version that is not a string") end
+    end' 2>/dev/null); have_rc=$?
+  have=${have//$'\r'/}
+  count=$(printf '%s' "$have" | grep -a -c '')
+  echo "jq version of $id_show from claude plugin list --json -> exit=$have_rc count=$count value=[$(sanitize "$have")]"
+  if [ "$have_rc" -ne 0 ] || [ "$count" != 1 ]; then
+    echo "FAIL plugin version: expected one installed version for $id_show from claude plugin list --json, actual jq exit=$have_rc count=$count"
+    fail=1
+    return
+  fi
+  if [ "$have" != "$want" ]; then
+    echo "FAIL plugin version: expected $id_show installed at version [$(sanitize "$want")] from $man_show, actual [$(sanitize "$have")]"
+    fail=1
+  else
+    echo "compare the installed version of $id_show against $man_show -> yes, both $(sanitize "$want")"
+  fi
+}
 
 run id
 echo "HOME -> ${HOME:-}"
@@ -501,7 +563,9 @@ $PLUGIN_IDS
 IDS_EOF
     if [ "$FOUND" = yes ]; then
       echo "plugin_id $plugin_id in claude plugin list --json -> yes"
+      plugin_enabled_check "$plugin_id"
       plugin_deps_check "$plugin_id"
+      plugin_version_check "$plugin_id"
     else
       echo "FAIL plugin: expected $plugin_id from $REPO/config/plugins.tsv among the installed ids, actual $(sanitize "${PLUGIN_IDS:-none}")"
       fail=1

@@ -31,6 +31,7 @@
 
 * ECC — the `ecc@ecc` plugin — is the default harness. Use its hooks, gates and reviewer agents in every repository.
 * When the session-start check reports a `FAIL`, the first reply names it.
+* Every task a main session takes follows the `my-harness:task-delegation` skill. A subagent follows its brief instead. Where the main session lists no such skill, it does each task whole and names the missing skill in its first reply.
 * A Markdown or JSON file draws `ecc:code-reviewer` alone. Any other changed file draws every reviewer whose subject it matches: the general code reviewer, the language reviewer for its language, and any domain reviewer it touches. A commit draws the union across its files. Name the reviewers judged applicable and those ruled out.
 * Before every commit, stage the change and invoke every applicable reviewer on the staged diff, in one parallel batch when several apply. Each brief names the reviewer as the one being invoked, and marks the hunks that carry text the user supplied verbatim. Run each reviewer on the model its agent definition sets. Decline any path that sends the diff to a provider outside this session, and name it.
 * A reviewer that has approved the commit is not invoked again for it; its approval stands through later fixes. After a fix, re-stage and invoke only the reviewers that have not yet approved. Approval is a stated verdict, not an empty findings list; a verdict of approval that carries a finding other than LOW is not one, and that reviewer has not yet approved.

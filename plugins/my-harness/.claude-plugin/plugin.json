@@ -1,0 +1,9 @@
+{
+  "name": "my-harness",
+  "version": "0.1.1",
+  "description": "Task decomposition and delegation: one skill, two executor agents and a per-prompt reminder.",
+  "author": {
+    "name": "PvtKaefsky"
+  },
+  "repository": "https://github.com/PvtKaefsky/my-harness-wrapper"
+}

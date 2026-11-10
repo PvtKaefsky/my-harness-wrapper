@@ -711,7 +711,9 @@ These values pass through it:
 | the settings files | the delivered key list, both settings probes, the carrying state, the live `env.HARNESS_DIR`, and the live `env.GIT_CONFIG_*` triple and its canonical form |
 | the manifest | `local_checkout` |
 | the hook commands | each guard check's stderr |
-| the CLI | the plugin id list, and each `installPath` and the path converted from it |
+| the CLI | the plugin id list, each `installPath` and the path converted from it, and each plugin's `enabled` values and installed version |
+| a delivered plugin's `plugin.json` | its `version` |
+| `config/plugins.tsv` | each plugin id on the lines `plugin_enabled_check` and `plugin_version_check` print, and the plugin directory and manifest paths built from it |
 | a plugin's `package.json` | a dependency name outside the npm name form |
 | the environment | `HARNESS_ASSIGNEE`, and a `GIT_*_EMAIL` value that fails the address form |
 
@@ -818,6 +820,33 @@ other than one, a path that is not absolute or not a directory, an unreadable
 `package.json` and a name outside the npm name form are each a `FAIL` too. An
 absent `package.json` declares no dependencies and is not one. The predicate is
 the one `scripts/plugin-dependencies.sh` tests, with the same limits.
+
+For each `config/plugins.tsv` plugin found in the list, two further checks run.
+
+| Function | Reads | `FAIL` where |
+| --- | --- | --- |
+| `plugin_enabled_check` | the `enabled` field of every list entry carrying the id | the distinct values are anything but the one value `true` |
+| `plugin_version_check` | `version` in `plugins/<name>/.claude-plugin/plugin.json` of the repository under test, `<name>` being the id before its `@`, and the `version` field of every list entry carrying the id | the two differ, the directory `plugins/<name>` exists without that manifest, the manifest holds no single non-empty string version, a list entry for the id carries a version that is not a string, the entries carry several different versions, or `<name>` falls outside `[A-Za-z0-9][A-Za-z0-9._-]*` |
+
+A list entry of a disabled plugin stays in the list with `enabled` false, so
+the id test alone passes for it.
+
+Where the repository under test holds no `plugins/<name>` directory, as for
+`ecc@ecc`, `plugin_version_check` prints the `test -d` line and compares
+nothing.
+
+Equal versions do not establish equal contents. A plugin file changed without
+a bump to `version` in its `plugin.json` reads as a match, and so does a
+default branch of the marketplace repository that differs from the repository
+under test while carrying the same version. A mismatch does not separate an
+installed plugin older than the repository under test from a newer one.
+
+Neither installer updates a plugin that is already installed: neither runs
+`claude plugin update`. With Claude Code 2.1.317, `claude plugin install`
+exits 0 for an installed plugin and leaves its version, so after a version
+bump a re-run of `scripts/install-local.sh` still ends `fails -> 0` and
+`plugin_version_check` is the check that reports it. Issue #73 carries the
+observed lines.
 
 An absent `config/plugins.tsv` is a `FAIL`, not a skipped check. Reading no
 rows and having no file to read produce different output, so the check's
@@ -1692,6 +1721,16 @@ skipped.
 ## config/plugins.tsv
 
 `README.md` carries the format.
+
+| `marketplace_source` | `plugin_id` | Plugin |
+| --- | --- | --- |
+| `affaan-m/ECC` | `ecc@ecc` | ECC, the default harness. |
+| `PvtKaefsky/my-harness-wrapper` | `my-harness@my-harness-wrapper` | This repository's own plugin, `plugins/my-harness/`, listed by `.claude-plugin/marketplace.json`. |
+
+`claude plugin marketplace add PvtKaefsky/my-harness-wrapper` clones
+`https://github.com/PvtKaefsky/my-harness-wrapper.git` under the config
+directory's `plugins/`. The CLI installs the `my-harness` plugin from that
+clone, not from the deployed copy or the invoking checkout.
 
 Bootstrap, the local installer and verify read the file on descriptor 3, so the
 loop body — `claude plugin install` in the first two, `grep` in verify — cannot
