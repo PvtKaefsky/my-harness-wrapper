@@ -47,7 +47,7 @@
           {
             "type": "command",
             "command": "h=${HARNESS_DIR:-/opt/my-harness-wrapper}; if [ -f \"$h/scripts/session-check.sh\" ]; then bash \"$h/scripts/session-check.sh\"; else echo \"test -f $h/scripts/session-check.sh -> no\"; fi",
-            "timeout": 30
+            "timeout": 90
           }
         ]
       }

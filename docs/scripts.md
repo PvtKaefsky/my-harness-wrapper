@@ -1141,7 +1141,7 @@ read only from a line of 40 or 64 hex digits, a tab and `refs/heads/main`.
 | `git -C <repo> config --get remote.origin.url -> exit=N` | The copy has no readable origin URL; `exit=0 value=empty` where the key holds an empty value. |
 
 The run's other bounded steps, the status probe and `claude plugin list`
-among them, are not bounded together; `scripts/session-check.sh`'s 20-second
+among them, are not bounded together; `scripts/session-check.sh`'s 75-second
 bound reports a run that exceeds it.
 
 Equal values print a `compare` line. Differing values, and a value that was
@@ -1373,7 +1373,7 @@ on the pattern, allowed without it, and stopped by the repository's own
 `pre-commit`, from its common dir and from its own `core.hooksPath`. It does
 not test any other hook name, or the hook files' mode in the deployed copy. It
 adds a `git init`, a `git add`, a `git config` and four commits to the run,
-which `scripts/session-check.sh` bounds at 20 seconds in all. An earlier
+which `scripts/session-check.sh` bounds at 75 seconds in all. An earlier
 scratch install on Windows ran the whole of `verify.sh` in about 8 seconds. On
 the machine the `core.hooksPath` lookup timings above come from, a scratch
 install ran it in about 40 seconds, against about 35 seconds for the tree
@@ -1467,9 +1467,12 @@ visibly does not reach that byte.
 ### The verify.sh bound
 
 The inner bound is strictly shorter than the hook's timeout, so the script
-reports a timeout rather than being killed mid-report.
-`SESSION_CHECK_VERIFY_TIMEOUT` defaults to 20 seconds and
-`SESSION_CHECK_VERIFY_KILL_AFTER` to 5, against the hook's 30.
+reports a timeout rather than being killed mid-report, provided the steps before
+`verify.sh` take under 10 seconds. The steps before `verify.sh` are not bounded.
+Where they take longer, Claude Code ends the hook before the timeout line, and
+the output stops at the last line printed.
+`SESSION_CHECK_VERIFY_TIMEOUT` defaults to 75 seconds and
+`SESSION_CHECK_VERIFY_KILL_AFTER` to 5, against the hook's 90.
 
 `timeout` runs without `--foreground`, so it places the child in its own process
 group and signals that group.

@@ -590,8 +590,14 @@ both it names `verify.sh`'s result: every `FAIL` and `NOTE` line, or the
 output lines prefixed `verify.sh |` up to `SESSION_CHECK_OUT_LINE_CAP` of them.
 A `FAIL` line is decoded by the table above.
 
+The `verify.sh` run is stopped at `SESSION_CHECK_VERIFY_TIMEOUT`, 75 seconds by
+default, and killed `SESSION_CHECK_VERIFY_KILL_AFTER`, 5 seconds by default,
+later, inside the `SessionStart` hook timeout of 90 seconds that
+`config/settings.json` sets.
+
 | Line | What it establishes | What it does not establish |
 | --- | --- | --- |
+| `verify.sh -> timed out after <N>s, process group killed (exit=124)`, or `(exit=137)` | `verify.sh` ran past `SESSION_CHECK_VERIFY_TIMEOUT`, default 75 seconds, and its process group was killed after `SESSION_CHECK_VERIFY_KILL_AFTER`, default 5 seconds. | Which check was slow. |
 | `log mtime >= boot time -> yes` | `/home/user/bootstrap.log` was last written at or after `uptime -s`'s boot time. | That this session built the snapshot: any write to the log after boot, such as a hand-run of the init script, also reads `yes`. |
 | `log mtime >= boot time -> no` | The log was last written before the boot time. | That this session restored a snapshot: any log last written before the boot time reads `no`, whatever wrote it. |
 | `git -C <dir> config --show-origin --get core.hooksPath -> exit=N value=[<origin> <value>]` | The value git uses in that repository and the file that sets it. In the cloud, an origin inside the repository's own `.git/config` means the harness hooks do not run there. Locally, the origin `command line:` is the session's `GIT_CONFIG_*` triple, which outranks the repository's own value. | That the directory it names holds the harness hooks, or that they work. `scripts/verify.sh` checks that for the deployed copy only. |
