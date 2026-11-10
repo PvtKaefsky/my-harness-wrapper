@@ -88,9 +88,10 @@ One brief per subtask. Each brief states, in this order:
 2. The owned files, or the owned question.
 3. The acceptance check.
 4. The task's constraints. Text the user supplied verbatim is marked as theirs.
-5. For each subtask it depends on: the diff of that subtask's owned files, or,
-   in an analysis session, that subtask's findings after the session has
-   checked them against their evidence.
+5. For each subtask it depends on: the diff of each file that subtask
+   modified and each file it created in full, read from the repository and
+   not from its report, or, in an analysis session, that subtask's findings
+   after the session has checked them against their evidence.
 6. What the subtask must not touch.
 7. The subagent's limits, in full: commit, push and post nothing; register no
    issue; do not decompose the subtask or delegate any part of it; invoke no
@@ -143,7 +144,8 @@ Coding, in this order:
    the values recorded before the run. Where any differs, a subtask
    committed, created or moved a ref, stashed, fetched or pushed: stop and
    ask the user.
-2. Read each subtask's report and its diff of its owned files.
+2. Read each subtask's report. From the repository, read the diff of each
+   owned file it modified and each owned file it created in full.
 3. Compare `git diff --cached` with the recorded one. Where it differs and
    the recorded one was empty, unstage every staged path. Where it differs
    and the recorded one was not empty, stop and ask the user.

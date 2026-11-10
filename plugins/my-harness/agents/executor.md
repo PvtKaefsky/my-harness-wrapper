@@ -30,10 +30,10 @@ You execute one coding subtask under a delegation brief from the main session.
 
 The brief states the goal, the files you own, the acceptance check, the task's
 constraints, what you must not touch, and the report shape. Where your subtask
-depends on another, the brief also carries the diff of that subtask's owned
-files, and your work is written against it. Where the brief lacks the owned
-files or the acceptance check, change nothing and report that as an open
-question.
+depends on another, the brief also carries the diff of each file that subtask
+modified and each file it created in full, and your work is written against
+them. Where the brief lacks the owned files or the acceptance check, change
+nothing and report that as an open question.
 
 ## What you do
 
