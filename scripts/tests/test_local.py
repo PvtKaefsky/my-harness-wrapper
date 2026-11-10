@@ -8,10 +8,8 @@ import tempfile
 import tomllib
 import unittest
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[2]
 CLI = ROOT / "scripts" / "codex-local.py"
-
 
 
 def private_fixture(path: Path, allow_world_write: bool = False, inherit_only: bool = False, delete_child: bool = False) -> None:
@@ -158,6 +156,18 @@ class LocalHarnessTests(unittest.TestCase):
         self.assertIn(str(release) + "/scripts/codex-local.py --state " + str(self.state) + " commit", policy)
         self.assertNotIn("{{", policy)
 
+    def test_install_native_delegation_and_rendered_policy(self) -> None:
+        self.install()
+        pointer = json.loads((self.state / "active.json").read_bytes())
+        release = self.state / "releases" / pointer["release"]
+        delegation = release / "docs/native-delegation.md"
+        self.assertTrue(delegation.is_file(), str(delegation))
+        self.assertEqual(delegation.read_bytes(), (ROOT / "docs/native-delegation.md").read_bytes())
+        self.assertIn("## Harness executor brief", delegation.read_text(encoding="utf-8"))
+        policy = (self.profile / ".codex/AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn(str(release) + "/docs/native-delegation.md", policy)
+        self.assertNotIn("{{", policy)
+
     def test_preserve_policy_hooks_and_configuration(self) -> None:
         home = self.profile / ".codex"
         home.mkdir(parents=True)
@@ -247,7 +257,6 @@ class LocalHarnessTests(unittest.TestCase):
         self.assertTrue(artifact.is_file(), "Native pack missing")
         artifact.write_text("tampered\n", encoding="utf-8")
         self.run_cli("verify-source", source=copy, expected=1)
-
 
     def source_copy(self) -> Path:
         copy = self.base / "copy"
@@ -463,7 +472,6 @@ class LocalHarnessTests(unittest.TestCase):
             if path.name != "README.md":
                 self.assertIn(path.name, index)
 
-
     def test_prepared_body_both_allowed_and_denied(self) -> None:
         path = self.base / "body.md"
         path.write_text("A normal factual issue body.\n", encoding="utf-8")
@@ -520,7 +528,6 @@ class LocalHarnessTests(unittest.TestCase):
                       self.run_cli("recover", "--apply", expected=1))
         self.assertEqual(unrelated.read_bytes(), b"keep")
 
-
     def test_registered_runtime_mutation_rejected(self) -> None:
         self.install()
         pointer = json.loads((self.state / "active.json").read_bytes())
@@ -564,9 +571,8 @@ class LocalHarnessTests(unittest.TestCase):
         pointer = json.loads((self.state / "active.json").read_bytes())
         manifest = json.loads((self.state / "releases" / pointer["release"] / "manifest.json").read_bytes())
         self.assertEqual(manifest["source_commit"], expected)
-        self.assertEqual(manifest["adapter_version"], "2.1.0")
+        self.assertEqual(manifest["adapter_version"], "2.2.0")
         self.assertTrue((self.state / "releases" / pointer["release"] / "docs/native-review.md").exists())
-
 
     def test_world_writable_state_rejected(self) -> None:
         self.install()
@@ -688,7 +694,6 @@ class LocalHarnessTests(unittest.TestCase):
         self.assertEqual((self.state / "active.json").read_bytes(), active)
         self.assertTrue((self.profile / ".agents/skills/harness-api-design-extra/SKILL.md").exists())
         self.run_cli("doctor")
-
 
     @unittest.skipUnless(os.name == "nt", "Windows inheritable ACLs")
     def test_inherit_only_unsafe_destination_blocks_before_writes(self) -> None:
