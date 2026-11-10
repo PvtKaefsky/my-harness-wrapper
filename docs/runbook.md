@@ -133,11 +133,15 @@ exists, it brings it to the branch's remote head instead and removes every
 change and untracked file in it. It refuses a deployed copy path that is a
 symlink, a linked worktree, or a repository it did not mark; move such a path
 aside to install. A failed clone or refresh, or a deployed copy not at that head
-and clean afterwards, prints `delivery -> stopped` and ends the run before
+and clean afterwards, or with a tracked file still differing from its blob, prints `delivery -> stopped` and ends the run before
 `CLAUDE.md` or `settings.json` is written. A refresh that failed after its
 fetch can leave the deployed copy moved. Every later step reads the deployed
 copy, not the invoking checkout. Use a credential helper rather than a token in
 `HARNESS_REPO_URL`: the URL is stored in the deployed copy's `.git/config`.
+
+After a clone or refresh, the installer re-checks out the tracked files from `HEAD`
+where any of them differs from its blob. The lines that report it are in the
+table below.
 
 It writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, the
 global git config and the plugin install directories, and nothing else. It
@@ -182,23 +186,35 @@ started after the run carries the harness.
 | `git config --global --unset-all core.hooksPath -> not run, the global read failed (exit=N)` | The `before` read exited above 1, already counted as one failure. | Read the global config file's permissions and syntax, then re-run. |
 | `global core.hooksPath values naming <copy>/git-hooks, after -> N` | `N` values still name the deployed copy after the unset, such as one an `[include]` file carries; one failure where no other value was found. | Run `git config --global --show-origin --get-all core.hooksPath`, remove the value from the file it names, then re-run. |
 | `git config --global --unset-all core.hooksPath -> not run, the global values also name another path` | The global config holds several values, one of them the deployed copy's; one failure. | Remove the deployed copy's value by hand with `git config --global --unset core.hooksPath <value>`, then re-run. |
+| `tracked files in <copy> whose bytes differ from their blob, before the renormalize -> exit=0 count=N of M regular files, the first up to 5 [<paths>]` | After the clone or refresh, `N` of the `M` regular tracked files differ from their blobs. `count=0` means nothing is re-checked out. | Nothing where `N` is 0. Otherwise the `git` lines below run. |
+| `tracked files in <copy> whose bytes differ from their blob, before the renormalize -> exit=N count=unread, <cause>` | The measurement failed, and the run stops with one failure. The causes are `git ls-files -s failed`, `git hash-object --no-filters --stdin-paths failed`, and a hash count other than the file count. A tracked file missing from the copy gives the `hash-object` failure. | Run `git -C <copy> ls-files -s` and `git -C <copy> status` by hand for the error. |
+| `git -C <copy> rm -q -r --cached -- . -> exit=N` | The index entries are removed and the files are left in place. A non-zero `N` is one failure. | Read git's message above the line. |
+| `git -C <copy> reset -q --hard HEAD -> exit=N` | The tracked files are written from `HEAD`. A non-zero `N` is one failure. | Read git's message above the line. |
+| `tracked files in <copy> whose bytes differ from their blob, after the renormalize -> exit=0 count=C of M regular files, ...` | The second measurement. `count=0` passes. A count above zero, or a failed measurement, is one failure and the run stops. | Run `git -C <copy> show HEAD:.gitattributes`. Where it fails, the deployed copy's `HEAD` does not hold `.gitattributes`: `main` must carry that file, then re-run the installer. |
+| `git -C <copy> rm -q -r --cached -- . and git -C <copy> reset -q --hard HEAD -> not run, no tracked file differs from its blob` | Nothing was re-checked out. | Nothing. |
 
 The plugin step finds the CLI on `PATH`, then at `CLAUDE_CODE_EXECPATH`, then
-as the highest-sorting `claude.exe` under
-`$LOCALAPPDATA/Claude-Data/claude_*/claude-code/*/*/`. The `claude CLI ->` line
-names the one used. Where none is found, each plugin's line names the two
-commands to run instead, and each counts as a failure.
+as the `claude.exe` with the highest `<version>` among
+`$LOCALAPPDATA/Claude-Data/*/claude-code/<version>/<build>/claude.exe`. The app
+data directory name is any name, such as `claude_<id>` or `anthropicpbc.claude_<id>`.
+The `desktop app CLIs under ... -> count=N` line counts the candidates, and the
+`claude CLI ->` line names the one used. Where none is found, each plugin's line
+names the two commands to run instead, and each counts as a failure.
 
-After each plugin's install the plugin step runs the dependency step,
+After each plugin's install or update the plugin step runs the dependency step,
 `scripts/plugin-dependencies.sh`. Its lines appear in the install log and, in
 the cloud, in `/home/user/bootstrap.log`.
+
+Bootstrap prints the list, `installed before this run`, marketplace update and
+plugin update lines for its rows too, in `/home/user/bootstrap.log`. It prints no
+desktop app line and no content comparison.
 
 | Line | What it means | What to do |
 | --- | --- | --- |
 | `plugin dependencies of <id> -> claude CLI <cli>` | The dependency step started for that plugin with that CLI. | Nothing. |
 | `plugin dependencies -> not run, plugin_id or CLI empty` | An argument was empty; one failure. | Report it as a defect in the calling script. |
 | `claude plugin list --json -> exit=N` | The CLI's plugin list exit status. A non-zero `N` stops the step with one failure. | Run `claude plugin list --json` by hand for the error. |
-| `jq installPath of <id> from claude plugin list --json -> exit=N count=C value=[...]` | The distinct `installPath` values listed for that id. It passes where `N` is 0 and `C` is 1. | `C` 0: the plugin is not installed; read its `claude plugin install` line above. `C` above 1: the id is listed with different paths; read `claude plugin list --json`. |
+| `jq installPath of <id> from claude plugin list --json -> exit=N count=C value=[...]` | The distinct `installPath` values listed for that id. It passes where `N` is 0 and `C` is 1. The content comparison of a shipped plugin prints the same line. | `C` 0: the plugin is not installed; read its `claude plugin install` line above. `C` above 1: the id is listed with different paths; read `claude plugin list --json`. |
 | `cygpath -u <path> -> exit=N value=[...]` | Printed only where `cygpath` exists. The `installPath` converted to the `/c/...` form. | Nothing. |
 | `installPath <path> is an absolute path -> no` | The path, converted where possible, is relative; one failure. | Read the `jq installPath` line above. |
 | `test -d <path> -> no` | No directory at the `installPath`; one failure. | Reinstall the plugin. |
@@ -213,6 +229,30 @@ the cloud, in `/home/user/bootstrap.log`.
 | `unresolved dependencies of <id> after npm ci -> <names>` | The names still unresolved after `npm ci`. Any name is one failure. | Read npm's output above it. |
 | `bash <dir>/scripts/plugin-dependencies.sh <cli> <id> -> exit=N` | The step's result as the installer counts it: 0 passes, 1 is one failure. | Read the step's lines above it. |
 | `bash <dir>/scripts/plugin-dependencies.sh <CLI> <id> -> not run, no CLI` | No CLI was found, so the step did not run; one failure. | Act on the `claude CLI -> none` line. |
+| `desktop app CLIs under <pattern> -> count=N` / `desktop app CLIs under <pattern> -> not searched, <reason>` | The `claude.exe` candidates under `$LOCALAPPDATA/Claude-Data`, which `scripts/verify.sh` also prints. `not searched` gives the reason: an earlier rule found the CLI, or `LOCALAPPDATA` is unset or empty, or `cygpath` is absent. | Nothing, unless `claude CLI -> none` follows. Then `count=0` means no `claude.exe` matched. |
+| `claude plugin list --json, before the plugins.tsv rows -> exit=N` / `claude plugin list --json, before the plugins.tsv rows -> not run, no CLI` | The installed ids, read once before the rows. A non-zero `N` is not counted itself. | Where `N` is not 0, each row takes the add and install path, and its own exits count. Run `claude plugin list --json` by hand for the error. |
+| `jq .[].id of that output -> exit=N value=[...]` | The ids read from that list, space-separated. | Where `N` is not 0, read the list line above it. |
+| `plugin_id <id> installed before this run -> yes` / `... -> no` / `... -> unknown, claude plugin list --json was not read, treated as not installed` | `yes` takes the update path, and `no` the add and install path. `unknown` means the list was not read. | Nothing where `yes` or `no`. With `unknown`, read the list line above. |
+| `claude plugin marketplace update <marketplace> -> exit=N` | The update of an installed plugin's marketplace, which re-clones it. A non-zero `N` is one failure. | Run `claude plugin marketplace update <marketplace>` by hand for the error. |
+| `claude plugin marketplace update <marketplace> -> not run, plugin_id <id> names no marketplace after an @` | An installed row whose id names no marketplace. One failure, and no update runs. | Fix the row in `config/plugins.tsv`. |
+| `claude plugin update <id> -> exit=N` | The update of an installed plugin. The CLI prints `already at the latest version` where the version is unchanged. A non-zero `N` is one failure. | Run `claude plugin update <id>` by hand for the error. Where it printed `already at the latest version`, the comparison below decides whether the files changed. |
+| `test -d <copy>/plugins/<name> -> yes, a shipped plugin` / `test -d <copy>/plugins/<name> -> no, not a shipped plugin` | Whether the deployed copy ships the plugin. `no` skips the comparison and the marketplace measurement. | Nothing. |
+| `claude plugin list --json, after the update or install of <id> -> exit=N` | The list read for the comparison. A list that yields no single `installPath` reads `not measured` in the comparison, and the plugin is not reinstalled. | Where `N` is not 0, run `claude plugin list --json` by hand. |
+| `git -C <copy> ls-tree -r --full-name HEAD -- plugins/<name>/ -> exit=N entries=M` | The committed entries under the plugin's directory in the deployed copy. A non-zero `N` is a failed measurement. `scripts/verify.sh` prints the same line. | Run `git -C <copy> ls-tree -r --full-name HEAD -- plugins/<name>/` by hand for the error. |
+| `find <installPath> -type f, .in_use excluded -> exit=N files=M` | The files under the installed plugin, with `.in_use` directories pruned. A non-zero `N` is a failed measurement. `scripts/verify.sh` prints the same line. | Read the message `find` printed above the line. |
+| `git -C <installPath> hash-object --no-filters --stdin-paths over those files -> exit=N hashes=M` | The hashes of the files the `find` line counts. A non-zero `N`, or `M` other than that count, is a failed measurement. `scripts/verify.sh` prints the same line. | Reproduce the hashing by hand over the files `find` lists. |
+| `compare the files under the installPath of <id> against <copy> HEAD:plugins/<name> -> yes, N files` | The installed files equal the blobs at the deployed copy's `HEAD`. `N` is the number of those blobs. | Nothing. |
+| `compare the files under the installPath of <id> against <copy> HEAD:plugins/<name> -> no, <detail>` | The installed files differ. The `<detail>` is `differing=N [<paths>] missing=N [<paths>] extra=N [<paths>], up to 5 named each`. | Nothing here. The uninstall and install lines follow, and the comparison after them decides. |
+| `compare the files under the installPath of <id> against <copy> HEAD:plugins/<name> -> not measured, <detail>; no reinstall` | A measurement failed. One failure, and the plugin is left as installed. The `<detail>` is one of `jq exit=N read M installPath values for <id>`, `the installPath of <id> is not an absolute path`, `the installPath <path> of <id> is not a directory`, `git ls-tree exit=N`, `HEAD has no regular files under plugins/<name>/`, `find exit=N`, `git hash-object exit=N gave H hashes for F files`, `the name before the @ of <id> does not match <pattern>`. | Read the measurement line above it with a non-zero exit, and run that command by hand. |
+| `claude plugin uninstall <id> --scope user -> exit=N` | The removal before a reinstall. A non-zero `N` is one failure. | Run it by hand for the error. |
+| `claude plugin install <id> --scope user --yes -> exit=N` | The reinstall after an uninstall. A non-zero `N` is one failure. | Run it by hand for the error. |
+| `claude plugin list --json, after the reinstall of <id> -> exit=N` | The list read for the comparison after the reinstall. | As for the list line after the update or install. |
+| `compare the files under the installPath of <id> against <copy> HEAD:plugins/<name>, after the reinstall -> yes, N files` / `... -> no, <detail>` | The comparison after the reinstall. `no` is one failure. The reinstall copies from the marketplace clone, so a clone whose files differ from the deployed copy's `HEAD` reads `no` here. | Where `no`, read the detail, then the marketplace clone lines below. |
+| `jq .["<marketplace>"].installLocation <config dir>/plugins/known_marketplaces.json -> exit=N value=[<dir>]` | The clone directory the CLI keeps for the marketplace. An empty value with `exit=0` means the file names no such marketplace. | Where the value is empty or `N` is not 0, the next line reads `not measured`. Read the file. |
+| `installLocation of the marketplace of <id> -> not read, plugin_id names no marketplace after an @` | A shipped plugin's row whose id names no marketplace. One failure. | Fix the row in `config/plugins.tsv`. |
+| `tracked files in the clone of marketplace <marketplace> whose bytes differ from their blob -> not measured, no single installLocation directory read from <file>` | The clone was not measured. One failure. | Read the `installLocation` line above it. |
+| `git -C <dir> rev-parse --show-cdup -> exit=N value=[<path>]` | `<dir>` is the top level of its work tree where `N` is 0 and the value is empty. Otherwise the clone counts one failure with no further line. | Where the value is not empty, `installLocation` names a subdirectory of a repository: read the `installLocation` line above. Where `N` is not 0, the value holds git's first error line. |
+| `tracked files in <dir>, the clone of marketplace <marketplace>, whose bytes differ from their blob -> exit=0 count=N of M regular files, ...` | The clone's tracked files that differ from their blobs. Nothing re-checks out the clone, so `N` above zero is one failure. A `count=unread` form reads as in the deployed copy's row. | Run `claude plugin marketplace update <marketplace>`, which re-clones the marketplace, then re-run the installer. |
 
 ### Removing the dependency step
 
@@ -280,17 +320,13 @@ deployed copy, so a merge to `main` reaches local sessions only when the
 installer runs again. A branch switch, a pull or an edit in a checkout
 changes no session.
 
-The installer does not update a plugin that is already installed. After a
-merge that bumps `version` in `plugins/my-harness/.claude-plugin/plugin.json`,
-run these after the installer:
-
-```
-claude plugin marketplace update my-harness-wrapper
-```
-
-```
-claude plugin update my-harness@my-harness-wrapper
-```
+For each plugin already installed, the installer runs `claude plugin marketplace
+update <marketplace>`, then `claude plugin update <plugin_id>`. A version bump in
+`plugins/my-harness/.claude-plugin/plugin.json` that has reached the marketplace
+clone therefore takes effect on the next run, with no `claude plugin` command
+run by hand. A shipped plugin whose installed files differ from the deployed copy
+is uninstalled and installed again. The plugin comes from the marketplace clone
+named in `config/plugins.tsv`, not from the deployed copy.
 
 ### Renormalizing a Windows checkout
 
@@ -423,7 +459,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL config/plugins.tsv` | No file at that path under the repository being checked. | Read the `test -f` line above it. The deployed copy is absent, incomplete, or `HARNESS_DIR` names another tree. |
 | `FAIL plugin: ... among the installed ids` | A plugin named in `config/plugins.tsv` is not among the ids `claude plugin list --json` reports. | Read the `claude plugin install ... -> exit=` line in `/home/user/bootstrap.log`, then re-run the install by hand for the current error. |
 | `FAIL plugin: ... expected an id list` | No id list could be read, so the plugin could not be tested. | Act on the `FAIL live config dir agreement` line above it. |
-| `jq installPath of <id> from claude plugin list --json -> exit=N count=C value=[...]` | Printed for each listed `config/plugins.tsv` plugin: the distinct `installPath` values the list carries for it. | Nothing, unless `FAIL plugin installPath` follows it. |
+| `jq installPath of <id> from claude plugin list --json -> exit=N count=C value=[...]` | Printed for each listed `config/plugins.tsv` plugin, and again by the content comparison of a shipped plugin: the distinct `installPath` values the list carries for it. | Nothing, unless `FAIL plugin installPath` follows it. |
 | `FAIL plugin installPath: expected one installPath` | The list carries no `installPath` for that id, or several different ones, or `jq` could not read it. | Read `claude plugin list --json` by hand. Re-run the installer, or rebuild in the cloud. |
 | `FAIL plugin installPath: expected an absolute installPath` | The `installPath`, converted with `cygpath -u` where it exists, is relative. | Read `claude plugin list --json` by hand. |
 | `test -d <path> -> yes` or `-> no` | Whether a directory exists at the `installPath`. | Nothing, unless `FAIL plugin installPath` follows it. |
@@ -444,9 +480,12 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL plugin version: expected one non-empty string version` | The shipped `plugin.json` does not parse, its top level is not an object, or its `version` is absent, empty or not a string. | Fix the tree. This is a repository fault, not a session fault. |
 | `jq version of <id> from claude plugin list --json -> exit=N count=C value=[...]` | The distinct installed versions the list carries for that id. | Nothing, unless `FAIL plugin version: expected one installed version` follows it. |
 | `FAIL plugin version: expected one installed version` | An entry for that id carries a version that is not a string, the entries carry several different versions, or `jq` could not read the list. `count=0` with a non-zero exit is the first or the last. | Read `claude plugin list --json` by hand. |
-| `FAIL plugin version: expected <id> installed at version` | The installed plugin's version differs from the one the repository under test ships. The states that produce it include a plugin installed before a version bump, since neither installer updates an installed plugin, and a repository under test older than the installed plugin. | Locally, run `claude plugin marketplace update my-harness-wrapper`, then `claude plugin update '<id>'`, then start a new session. In the cloud, rebuild. Where the installed version is the newer one, re-run `scripts/install-local.sh`, which refreshes the deployed copy. |
+| `FAIL plugin version: expected <id> installed at version` | The installed plugin's version differs from the one the repository under test ships. The states that produce it include an installer run that predates a version bump, and a repository under test older than the installed plugin. | Locally, re-run `scripts/install-local.sh`, which updates the installed plugin, then start a new session. Where the versions still differ, read `claude plugin list --json` by hand. In the cloud, rebuild. |
 | `FAIL plugin version: expected the name` | The id's part before `@` falls outside `[A-Za-z0-9][A-Za-z0-9._-]*`, so no manifest path was built from it. | Fix the row in `config/plugins.tsv`. |
-| `compare the installed version of <id> against <manifest> -> yes, both <version>` | The installed plugin and the repository under test carry the same version. It does not establish that their files are identical. | Nothing. |
+| `compare the installed version of <id> against <manifest> -> yes, both <version>` | The installed plugin and the repository under test carry the same version. Their files are compared by the content check below. | Nothing. |
+| `compare the files under the installPath of <id> against <repo> HEAD:plugins/<name> -> yes, N files` | The files under the installed plugin equal the blobs at `$REPO` HEAD, `N` in number. | Nothing. |
+| `FAIL plugin contents: expected the files under the installPath of <id> to equal <repo> HEAD:plugins/<name>, actual <detail>` | The installed files differ from the blobs at `$REPO` HEAD, a file is missing or extra, or a measurement failed. The `<detail>` has the forms listed under `scripts/install-local.sh`'s plugin table. Shipped plugins only. | Locally, re-run `scripts/install-local.sh`, which reinstalls the plugin. In the cloud, rebuild. |
+| `git -C <repo> ls-tree ...`, `find <installPath> ...`, `git -C <installPath> hash-object ...` | The measurements behind the content check, with the same meaning as in the `scripts/install-local.sh` plugin table. | Nothing, unless `FAIL plugin contents` follows. |
 | `FAIL git AUTHOR variables` / `FAIL git COMMITTER variables` | That role's `GIT_*_NAME` or `GIT_*_EMAIL` is unset or empty. The line above names which, and separates the two. | Set both in the environment variables panel. Nothing in this repository supplies an identity. |
 | `FAIL git AUTHOR identity` / `FAIL git COMMITTER identity`, `... expected an identity of the form Name <email>` | `git var` returned nothing usable for that role. | Read the state on the line above. An empty `GIT_*_NAME` exits 128; a repository git will not read is reported as such. |
 | `FAIL git AUTHOR identity` / `FAIL git COMMITTER identity`, `... from that role's GIT_*_NAME and GIT_*_EMAIL` | Git did not resolve that role to the pair the session was given. | Check for a `GIT_CONFIG_KEY_n` overlay or a repository-local `user.*`. |

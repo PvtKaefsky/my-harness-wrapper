@@ -119,16 +119,46 @@ PLUGINS="$SRC/config/plugins.tsv"
 echo "command -v claude -> $(command -v claude || echo none)"
 echo "test -f $PLUGINS -> $([ -f "$PLUGINS" ] && echo yes || echo no)"
 if [ -f "$PLUGINS" ]; then
+  LIST_READ=no
+  LIST_JSON=$(claude plugin list --json 2>/dev/null); rc=$?
+  echo "claude plugin list --json, before the plugins.tsv rows -> exit=$rc"
+  INSTALLED_IDS=$(printf '%s' "$LIST_JSON" | jq -r -n 'input | if type == "array" then .[] | .id | strings else error("top level is " + type) end' 2>/dev/null); ids_rc=$?
+  INSTALLED_IDS=${INSTALLED_IDS//$'\r'/}
+  echo "jq .[].id of that output -> exit=$ids_rc value=[$(printf '%s' "$INSTALLED_IDS" | LC_ALL=C tr '\n' ' ' | LC_ALL=C tr '\000-\037\177' '?')]"
+  [ "$rc" -ne 0 ] || [ "$ids_rc" -ne 0 ] || LIST_READ=yes
   while IFS=$'\t' read -r -u 3 mp_source plugin_id _rest || [ -n "${mp_source:-}" ]; do
     case "${mp_source:-}" in ''|'#'*) continue ;; esac
     echo "plugins.tsv marketplace_source=$mp_source plugin_id -> ${plugin_id:-empty}"
     [ -n "${plugin_id:-}" ] || { fails=$((fails + 1)); continue; }
-    claude plugin marketplace add "$mp_source"; rc=$?
-    echo "claude plugin marketplace add $mp_source -> exit=$rc"
-    [ "$rc" -eq 0 ] || fails=$((fails + 1))
-    claude plugin install "$plugin_id" --scope user --yes; rc=$?
-    echo "claude plugin install $plugin_id --scope user --yes -> exit=$rc"
-    [ "$rc" -eq 0 ] || fails=$((fails + 1))
+    installed=no
+    if [ "$LIST_READ" = yes ]; then
+      while IFS= read -r have_id; do
+        [ "$have_id" != "$plugin_id" ] || installed=yes
+      done <<< "$INSTALLED_IDS"
+      echo "plugin_id $plugin_id installed before this run -> $installed"
+    else
+      echo "plugin_id $plugin_id installed before this run -> unknown, claude plugin list --json was not read, treated as not installed"
+    fi
+    mp_name=""
+    case "$plugin_id" in *@?*) mp_name=${plugin_id#*@} ;; esac
+    if [ "$installed" = yes ] && [ -z "$mp_name" ]; then
+      echo "claude plugin marketplace update <marketplace> -> not run, plugin_id $plugin_id names no marketplace after an @"
+      fails=$((fails + 1))
+    elif [ "$installed" = yes ]; then
+      claude plugin marketplace update "$mp_name"; rc=$?
+      echo "claude plugin marketplace update $mp_name -> exit=$rc"
+      [ "$rc" -eq 0 ] || fails=$((fails + 1))
+      claude plugin update "$plugin_id"; rc=$?
+      echo "claude plugin update $plugin_id -> exit=$rc"
+      [ "$rc" -eq 0 ] || fails=$((fails + 1))
+    else
+      claude plugin marketplace add "$mp_source"; rc=$?
+      echo "claude plugin marketplace add $mp_source -> exit=$rc"
+      [ "$rc" -eq 0 ] || fails=$((fails + 1))
+      claude plugin install "$plugin_id" --scope user --yes; rc=$?
+      echo "claude plugin install $plugin_id --scope user --yes -> exit=$rc"
+      [ "$rc" -eq 0 ] || fails=$((fails + 1))
+    fi
     bash "$SRC/scripts/plugin-dependencies.sh" claude "$plugin_id"; rc=$?
     echo "bash $SRC/scripts/plugin-dependencies.sh claude $plugin_id -> exit=$rc"
     [ "$rc" -eq 0 ] || fails=$((fails + 1))
