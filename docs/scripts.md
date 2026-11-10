@@ -1722,6 +1722,16 @@ skipped.
 
 `README.md` carries the format.
 
+| `marketplace_source` | `plugin_id` | Plugin |
+| --- | --- | --- |
+| `affaan-m/ECC` | `ecc@ecc` | ECC, the default harness. |
+| `PvtKaefsky/my-harness-wrapper` | `my-harness@my-harness-wrapper` | This repository's own plugin, `plugins/my-harness/`, listed by `.claude-plugin/marketplace.json`. |
+
+`claude plugin marketplace add PvtKaefsky/my-harness-wrapper` clones
+`https://github.com/PvtKaefsky/my-harness-wrapper.git` under the config
+directory's `plugins/`. The CLI installs the `my-harness` plugin from that
+clone, not from the deployed copy or the invoking checkout.
+
 Bootstrap, the local installer and verify read the file on descriptor 3, so the
 loop body — `claude plugin install` in the first two, `grep` in verify — cannot
 consume it from stdin. The loop's `|| [ -n "${mp_source:-}" ]` clause processes

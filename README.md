@@ -6,7 +6,8 @@ script, `scripts/test-attribution-guard.sh`, is run by hand.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
 into a session's Claude config directory. It also holds one plugin,
-`plugins/my-harness/`.
+`plugins/my-harness/`, which those scripts install from `config/plugins.tsv`
+and which is packaged for upload to claude.ai for Cowork sessions.
 
 ## How delivery works
 

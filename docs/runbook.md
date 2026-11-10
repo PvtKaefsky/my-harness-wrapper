@@ -251,9 +251,23 @@ any message.
    keys `config/settings.json` carries and `env.HARNESS_DIR`.
 5. Remove `my-harness-wrapper`, `.my-harness-wrapper.manifest.json`,
    `.my-harness-wrapper.install.log` and `session-check.log` there.
-6. Optionally uninstall the plugins `config/plugins.tsv` names with
+6. Uninstall the harness's own plugin and remove its marketplace. The payload
+   removed in step 4 is what names its skill:
+
+   ```
+   claude plugin uninstall my-harness@my-harness-wrapper
+   ```
+
+   ```
+   claude plugin marketplace remove my-harness-wrapper
+   ```
+
+7. Optionally uninstall the other plugins `config/plugins.tsv` names with
    `claude plugin uninstall <plugin_id>`, and unset `commit.gpgsign` and
    `tag.gpgsign` globally.
+
+A copy of the plugin installed through claude.ai is removed there, not by
+these steps.
 
 ### Update
 
@@ -266,6 +280,18 @@ deployed copy, so a merge to `main` reaches local sessions only when the
 installer runs again. A branch switch, a pull or an edit in a checkout
 changes no session.
 
+The installer does not update a plugin that is already installed. After a
+merge that bumps `version` in `plugins/my-harness/.claude-plugin/plugin.json`,
+run these after the installer:
+
+```
+claude plugin marketplace update my-harness-wrapper
+```
+
+```
+claude plugin update my-harness@my-harness-wrapper
+```
+
 ### Verify
 
 ```
@@ -274,6 +300,33 @@ d="${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper"; HARNESS_DIR="$d" bash
 
 A local session's hook processes carry `HARNESS_DIR` from `settings.json`, so
 the session-start check needs no setting.
+
+## Packaging the plugin for claude.ai
+
+The package is the form in which the `my-harness` plugin is uploaded to
+claude.ai for Cowork sessions. Issue #72 records what was observed in a Cowork
+session: no `CLAUDE.md`, no harness manifest, and ECC present under
+`~/.claude/plugins/synced/`.
+
+1. From a checkout of `main` at the merge, write the package. It is a zip of
+   the contents of `plugins/my-harness/`, named `my-harness.plugin`, with
+   `.claude-plugin/plugin.json` at the archive root:
+
+   ```
+   git archive --format=zip --output=my-harness.plugin main:plugins/my-harness
+   ```
+
+2. Upload `my-harness.plugin` through claude.ai and accept it there.
+3. Repeat both steps after every change to the plugin.
+
+`git archive` packs the committed tree, so an uncommitted edit is not in the
+package. The package is not committed to this repository.
+
+| Fact | State |
+| --- | --- |
+| The command writes a zip holding `.claude-plugin/plugin.json`, `agents/`, `hooks/` and `skills/` at its root | Verified with git 2.56 in Git Bash. |
+| claude.ai accepts the package and a Cowork session loads it | Not verified. It cannot be exercised from a Claude Code session. |
+| A Claude Code session holding both an installed plugin and a synced copy of the same name | Observed for `ecc` only: `claude plugin list` reports `ecc@synced` as not loaded because the installed `ecc@ecc` takes precedence. Not observed for `my-harness`, and the line reports the list's state, not what a session loaded. |
 
 ## The version line
 

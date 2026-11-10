@@ -30,12 +30,18 @@ The hook command is `printf '%s\n' '<line>'`, run by the shell Claude Code
 runs hook commands in. A hook command that fails prints nothing, and the
 prompt goes on without the line.
 
-## Install
+## Delivery
 
-In Claude Code:
+| Session | How the plugin arrives |
+| --- | --- |
+| Claude Code, cloud and local | The harness installers install `my-harness@my-harness-wrapper`, named in `config/plugins.tsv`. |
+| Cowork | The user uploads the packaged plugin through claude.ai. `docs/runbook.md` carries the packaging steps and what is verified about them. |
+
+By hand, in Claude Code:
 
 ```
 /plugin install my-harness --marketplace PvtKaefsky/my-harness-wrapper
 ```
 
 A change to any file here bumps `version` in `.claude-plugin/plugin.json`.
+`scripts/verify.sh` compares the installed version with that field.
