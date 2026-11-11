@@ -626,17 +626,19 @@ directory git would run hooks from without the harness. `hook_configured_dir`
 reads every `core.hooksPath` value with one git process,
 `git config --show-scope --type=path --get-all core.hooksPath`, and takes the
 last value of the worktree, local, global and system scopes, in that order. It
-skips an empty value and a value naming this directory by `test -ef`, and
-returns the first other value, resolved against the hook's working directory
-where it is relative. Git resolves a relative `core.hooksPath` against the
-directory it starts the hook in, and `--type=path` expands a leading `~`. The
+skips an empty value and a value whose directory holds a file
+`lib/dispatch.sh`, by `test -f`; this directory is one such value, and any
+other copy of `git-hooks/` is another. It returns the first value it does not
+skip, resolved against the hook's working directory where it is relative. Git
+resolves a relative `core.hooksPath` against the directory it starts the hook
+in, and `--type=path` expands a leading `~`. The
 command scope is never taken: it holds a `GIT_CONFIG_KEY_n` overlay or a
 `git -c` value. Exit 1 from that command means no scope sets a value; any other
 non-zero exit refuses with a line naming it.
 
 | Lookup result | `<hooks dir>` |
 | --- | --- |
-| A worktree, local, global or system value naming another directory | That value |
+| A worktree, local, global or system value naming a directory without `lib/dispatch.sh` | That value |
 | No such value | `<common dir>/hooks` |
 
 `hook_common_dir` finds the git dir in the shell, starting no process, by the
@@ -665,10 +667,21 @@ the git dir of a bare repository. `git init` and `git clone` run
 subdirectory finds no row and takes the `rev-parse` fallback.
 
 A global value naming this directory, as the cloud's is, is skipped, so the
-lookup reaches the next scope or `<common dir>/hooks`. In a linked worktree the
-common dir is the main repository's git directory; in a bare repository
-receiving a push it is the repository itself, as git uses for `hooks/` without
-the harness.
+lookup reaches the next scope or `<common dir>/hooks`. The test checks that the
+file is present, not what it contains, so a directory holding a
+`lib/dispatch.sh` that is not a harness copy is skipped as well. Where every
+`core.hooksPath` value names a directory holding `lib/dispatch.sh`, the lookup
+skips them all and forwards to `<common dir>/hooks`. In a linked worktree the common dir is the main
+repository's git directory; in a bare repository receiving a push it is the
+repository itself, as git uses for `hooks/` without the harness.
+
+A copy whose `lib/dispatch.sh` is the `5f3f87a` version skips only its own
+directory, so it forwards to the first other copy. That chain ends at the first
+copy carrying the current rule. Two copies of the `5f3f87a` version, named at
+different scopes, forward to each other without end. Where a `5f3f87a` copy
+forwards to a current one, the message check runs in both, each reading
+its own `lib/attribution.ere`, and a message is refused where either copy
+refuses it.
 
 | State of `<hooks dir>/<name>` | Result |
 | --- | --- |
@@ -695,7 +708,7 @@ runs hook files with either line ending.
 
 | Path | Effect |
 | --- | --- |
-| A repository whose own config sets `core.hooksPath`, in the cloud | That value overrides the global one, so neither the message check nor forwarding runs there. `scripts/session-check.sh` prints the effective value with its origin. Locally, inside Claude Code sessions, the triple outranks it, the message check runs, and forwarding runs the hooks that value names. |
+| A repository whose own config sets `core.hooksPath`, in the cloud | That value overrides the global one, so neither the message check nor forwarding runs there. Where that value names another copy of `git-hooks/`, that copy runs the message check and forwarding, and forwarding skips both copies, so the hook forwards to `<common dir>/hooks`. `scripts/session-check.sh` prints the effective value with its origin. Locally, inside Claude Code sessions, the triple outranks it, the message check runs, and forwarding runs the hooks that value names. |
 | A git command started outside Claude Code, locally | It reads no triple, so no harness hook runs for it. |
 | `git -c core.hooksPath=<dir>`, locally | A `-c` value outranks the triple, so no harness hook runs for that command. |
 | A push over git's local transport, locally | Git removes the `GIT_CONFIG_*` variables from the environment of the git it starts in the receiving repository, so that repository runs its own hooks directly and no harness hook runs there. |
@@ -714,6 +727,7 @@ runs hook files with either line ending.
 
 Every hook git runs starts bash. Forwarding starts one git process, the
 `core.hooksPath` lookup, and a second where the `rev-parse` fallback above runs.
+The `lib/dispatch.sh` test is a shell builtin and starts no process.
 One commit and one checkout ran 13 `reference-transaction` hooks on Git for
 Windows 2.51.0.
 
@@ -1770,6 +1784,61 @@ passed, and 1 otherwise.
 | Create response over 1 MiB with a clean `body` | A `body` of 1,100,000 bytes with no footer | 2 |
 | Update response with a `body` carrying the marker | A `PostToolUse` event whose `tool_name` is `mcp__github__update_pull_request` | 0 |
 | Create response text content carrying a `body` with the marker | A text content block whose JSON-encoded text carries that `body` | 2 |
+
+## scripts/test-hook-forwarding.sh
+
+Runs the `git-hooks/` of the tree the script sits in, through `git add` and
+`git commit` in scratch repositories, and reports which hook runs in each case.
+It takes no arguments and is run by hand only. Neither `scripts/verify.sh` nor
+`scripts/session-check.sh` runs it. Run it from a full checkout: the deployed
+copy `/opt/my-harness-wrapper` is a `--depth 1` clone and lacks commit
+`5f3f87a`.
+
+Work happens in a `mktemp -d` directory, removed on exit. Each case has its own
+scratch repository and its own empty global config file, passed as
+`GIT_CONFIG_GLOBAL`, with `GIT_CONFIG_NOSYSTEM=1`. The real global config is
+not read or written.
+
+Every git command unsets `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`,
+`GIT_OBJECT_DIRECTORY`, `GIT_COMMON_DIR`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`,
+`GIT_CONFIG_PARAMETERS`, and the `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0` and
+`GIT_CONFIG_VALUE_0` triple.
+It sets a fixed author and committer, and runs under `timeout -k 2 10`. Where a
+case names a command-scope `core.hooksPath`, the script sets it through that
+triple.
+
+`C` and `D` are `cp -R` copies of the tree's `git-hooks/`. An old copy has its
+`lib/dispatch.sh` replaced by the `5f3f87a` version; that code is never written
+into the tree. `P` is a plain directory with no `lib/`.
+
+Each case's repository has a `.git/hooks/commit-msg` that appends a line to a
+marker file. `P`'s `commit-msg` appends to a second marker file. Each case runs
+`git add f`, which runs `post-index-change`, then `git commit -q` with a clean
+message. A case passes where both exit 0 and the markers hold the expected
+counts.
+
+| Line | What it reports |
+| --- | --- |
+| `test -f <root>/git-hooks/lib/dispatch.sh -> yes/no` | Whether the tree holds the hook library. |
+| `command -v timeout -> <path>/none` | Whether `timeout` is on `PATH`. |
+| `git -C <root> show 5f3f87a:git-hooks/lib/dispatch.sh -> exit=N` | Whether that commit's file is readable. Where it is not, T2 and T3 print `FAIL` with `unreadable`, and the other cases still run. |
+| `fail -> not run` | Printed, with exit 1, where `git-hooks/lib/dispatch.sh`, `timeout` or `git` is absent. |
+| `<id> <label> -> expected add=0 commit=0 ..., actual add=<rc> commit=<rc> ..., pass/FAIL` | One line per case. `add` and `commit` are the exits of the two git commands under `timeout`; `timeout` exits 124 when it stops a command. Each `runs=<n>` counts the marker lines. |
+| `fail -> N` | The number of failed cases. |
+
+| Case | `core.hooksPath` | Expected |
+| --- | --- | --- |
+| T1 | local `C`, global `D` | `add` and `commit` exit 0; repository hook runs 1 |
+| T2 | local `C` at `5f3f87a`, global `D` | Same as T1 |
+| T3 | local `C`, global `D` at `5f3f87a` | Same as T1 |
+| T4 | local `D`, global `D` | Same as T1 |
+| T5 | command-scope `D`, local `P` | `add` and `commit` exit 0; `P`'s hook runs 1, repository hook runs 0 |
+| T6 | command-scope `C`, local `D` | Same as T1 |
+
+With `git-hooks/lib/dispatch.sh` at the `5f3f87a` version, T1, T2 and T3 print
+`add=124 commit=124` and `FAIL`, and the script prints `fail -> 3`.
+
+The script exits 0 only where every case passes, and 1 otherwise.
 
 ## scripts/check-hook-matchers.sh
 

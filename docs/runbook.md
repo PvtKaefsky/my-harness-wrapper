@@ -619,7 +619,10 @@ local repository whose `main` carries the change, named in `HARNESS_REPO_URL`.
 Run
 `scripts/test-attribution-guard.sh` before committing a change to
 `scripts/attribution-guard.sh` or to the test script itself; it exits 0 only
-where every case passes. `bash -n` is not
+where every case passes. Run
+`scripts/test-hook-forwarding.sh` before committing a change to `git-hooks/`
+or to that script. It exits 0 only where every case passes, and it needs a
+checkout holding commit `5f3f87a`. `bash -n` is not
 a gate here: it accepts invalid parameter expansion that fails at runtime.
 `shellcheck` is not installed in this sandbox. Never execute `env/setup.sh`; run
 `bash -n` on it, and exercise the branches a change touches by extracting them
