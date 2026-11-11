@@ -27,13 +27,34 @@
 * Docstrings are allowed where the language has them. A docstring states what the unit does, its inputs and outputs, and any decision a caller must know, without the reasoning behind it.
 * The rule governs code a session writes or edits. Existing comments are removed only from lines the session's change already touches, unless the user asks for a wider pass. Where a project's own conventions require comments, they win.
 
+## Writing code
+
+* This section governs changes to code, as Code comments defines it, and to configuration. Code the task, this file or the project's rules require counts as asked for. Project conventions that differ win.
+* Before editing, the session establishes the change's scope: every caller, test, fixture, configuration and export it must reach, and the data loss, exposure or broken callers it could cause users. Nothing beyond the scope is built. A place no search establishes is named as not checked.
+* Each part takes the first option that fully does its job:
+  1. Nothing, where nobody asked for it; the reply names the skip. A vague request gets the smallest version doing its core job.
+  2. What the codebase has, used as nearby code uses it.
+  3. The standard library or platform, unless the project has its own.
+  4. An installed dependency; none is added for a few lines' work.
+  5. One line a reader understands at a glance.
+  6. Otherwise, the least code that works.
+* The change is complete, including the callers, tests and fixtures it breaks.
+* Nothing unasked is added: no abstraction, wrapper, type conversion, option, configuration, boilerplate or code for later. Values keep the platform's form. Removing is preferred to adding. The codebase's layers, interfaces and conventions are kept.
+* In scope, the shortest diff wins; a line that needs decoding is not short. At equal size, the option correct on edge cases wins.
+* Before fixing a bug in a function, the session finds all its callers, then fixes the cause once, in shared code. Callers no search establishes, such as dynamic dispatch or external consumers, are named as not checked.
+* Moved or merged code keeps its error handling and validation.
+* A fix for a review finding covers every input of the kind the finding names, not only the example it gives.
+* Each unit of new non-trivial logic (a branch, loop, parser, money or security code, or a new script or application) gets a small test that fails when it breaks, or an assert-based self-check where the repository has no tests. Trivial changes need none; stricter requirements still apply. Where no test can run, the reply says so.
+* No change cuts validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, or anything the user asked for. Where only such a cut meets a request, the session stops and asks, naming the cut.
+* A reply reporting a code change ends with at most two closing lines naming what was skipped or not checked and any risk the user must know, such as a shortcut's known limit and when to upgrade it. Without any, they are omitted.
+
 ## Harness
 
 * ECC — the `ecc@ecc` plugin — is the default harness. Use its hooks, gates and reviewer agents in every repository.
 * When the session-start check reports a `FAIL`, the first reply names it.
 * Every task a main session takes follows the `my-harness:task-delegation` skill. A subagent follows its brief instead. Where the main session lists no such skill, it does each task whole and names the missing skill in its first reply.
 * A Markdown or JSON file draws `ecc:code-reviewer` alone. Any other changed file draws every reviewer whose subject it matches: the general code reviewer, the language reviewer for its language, and any domain reviewer it touches. A commit draws the union across its files. Name the reviewers judged applicable and those ruled out.
-* Before every commit, stage the change and invoke every applicable reviewer on the staged diff, in one parallel batch when several apply. Each brief names the reviewer as the one being invoked, and marks the hunks that carry text the user supplied verbatim. Run each reviewer on the model its agent definition sets. Decline any path that sends the diff to a provider outside this session, and name it.
+* Before every commit, stage the change and invoke every applicable reviewer on the staged diff, in one parallel batch when several apply. Each brief names the reviewer as the one being invoked, and marks the hunks that carry text the user supplied verbatim. Run each reviewer on the model its agent definition sets. Decline any path that sends the diff to a provider outside this session, and name it. Each brief also asks the reviewer to report code the change does not need under Writing code, naming its lines and what removing or replacing them costs, to label such a finding LOW unless that code carries a defect or a risk, and to give for every finding the concrete input or situation that produces it, dropping any finding that has none.
 * A reviewer that has approved the commit is not invoked again for it; its approval stands through later fixes. After a fix, re-stage and invoke only the reviewers that have not yet approved. Approval is a stated verdict, not an empty findings list; a verdict of approval that carries a finding other than LOW is not one, and that reviewer has not yet approved.
 * Wait for a reviewer on its completion notice. Wait for a long command with a tool that watches the command's exit or its own output. Never wait on a timer, or on text you wrote. A reviewer whose completion notice does not arrive, and whose agent is no longer running, is a reviewer that cannot run.
 * Five review rounds is the cap. A round ends by the first row of this table that fits, and no other bullet restates it:
