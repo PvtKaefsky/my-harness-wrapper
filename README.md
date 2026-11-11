@@ -97,6 +97,7 @@ every session.
 | `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, directly and through the `PreToolUse` hook the tree's `config/settings.json` registers, one line per case. Run by hand only. |
 | `git-hooks/` | The git hooks `core.hooksPath` names: globally in the cloud, and locally only for the git commands Claude Code sessions start. One file per hook name git looks up. `commit-msg` rejects a message carrying a Claude Code attribution line; every hook then runs the hook of that name git would run without the harness. `git-hooks/lib/attribution.ere` is the pattern both it and the attribution guard read. |
 | `scripts/check-hook-matchers.sh` | Compares the tool names the attribution guard's hook matchers name with a file of a session's tool names. Run by hand only. |
+| `.gitattributes` | The line-ending rule. Git checks out every file it detects as text with LF line endings, on every platform. |
 | `README.md` | This file. |
 | `docs/` | Documentation. |
 

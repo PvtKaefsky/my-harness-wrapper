@@ -30,20 +30,124 @@ settings_carries() {
     end' 2>/dev/null
 }
 resolve_cli() {
-  local found base cand
+  local found base cand ver list
+  CLI_GLOB="\$LOCALAPPDATA/Claude-Data/*/claude-code/<version>/<build>/claude.exe"
+  CLI_SEARCH="not searched, an earlier rule found the CLI"
   found=$(command -v claude 2>/dev/null)
   if [ -n "$found" ]; then CLI=$found; CLI_FROM=PATH; return; fi
   if [ -n "${CLAUDE_CODE_EXECPATH:-}" ] && [ -f "$CLAUDE_CODE_EXECPATH" ]; then
     CLI=$CLAUDE_CODE_EXECPATH; CLI_FROM=CLAUDE_CODE_EXECPATH; return
   fi
+  CLI_SEARCH="not searched, LOCALAPPDATA unset or empty, or cygpath absent"
   if [ -n "${LOCALAPPDATA:-}" ] && [ "$CYGPATH" != none ]; then
     base=$(cygpath -u "$LOCALAPPDATA" 2>/dev/null)
-    found=$(for cand in "$base"/Claude-Data/claude_*/claude-code/*/*/claude.exe; do
-      [ -f "$cand" ] && printf '%s\n' "$cand"
-    done | sort -V | tail -n 1)
-    if [ -n "$found" ]; then CLI=$found; CLI_FROM="the highest-sorting desktop app CLI under LOCALAPPDATA"; return; fi
+    CLI_GLOB="$base/Claude-Data/*/claude-code/<version>/<build>/claude.exe"
+    list=$(for cand in "$base"/Claude-Data/*/claude-code/*/*/claude.exe; do
+      [ -f "$cand" ] || continue
+      ver=${cand%/*/claude.exe}; ver=${ver##*/}
+      printf '%s\t%s\n' "$ver" "$cand"
+    done | LC_ALL=C sort -t "$(printf '\t')" -k1,1V -k2,2)
+    CLI_SEARCH="count=$(printf '%s' "$list" | grep -a -c '')"
+    found=${list##*$'\n'}
+    if [ -n "$found" ]; then
+      CLI=${found#*$'\t'}; CLI_FROM="the highest-version desktop app CLI under LOCALAPPDATA, version ${found%%$'\t'*}"; return
+    fi
   fi
   CLI=""; CLI_FROM=none
+}
+plugin_content_check() {
+  local id=$1 repo=$2 json=$3 name raw rc count p p_show conv tree tree_rc files files_rc hashes hash_rc line meta path rel i
+  local m_mode m_type m_blob diff_n=0 miss_n=0 extra_n=0 diff_l="" miss_l="" extra_l=""
+  local name_re='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+  local -A want=() have=()
+  local -a paths=() sums=()
+  PC_EQUAL=no; PC_FILES=0; PC_DETAIL=""
+  name=${id%%@*}
+  if ! [[ "$name" =~ $name_re ]]; then
+    PC_DETAIL="the name before the @ of $id does not match $name_re"
+    return 1
+  fi
+  raw=$(printf '%s' "$json" | jq -r --arg id "$id" 'if type == "array" then [.[] | select(.id == $id) | .installPath | strings] | unique | .[] else error("top level is " + type) end' 2>/dev/null); rc=$?
+  raw=${raw//$'\r'/}
+  count=$(printf '%s' "$raw" | grep -a -c '')
+  echo "jq installPath of $id from claude plugin list --json -> exit=$rc count=$count value=[$(printf '%s' "$raw" | LC_ALL=C tr '\n' ' ' | LC_ALL=C tr '\000-\037\177' '?')]"
+  if [ "$rc" -ne 0 ] || [ "$count" != 1 ]; then
+    PC_DETAIL="jq exit=$rc read $count installPath values for $id"
+    return 1
+  fi
+  p=$raw
+  if [ "$CYGPATH" != none ]; then
+    conv=$(cygpath -u -- "$raw" 2>/dev/null) && [ -n "$conv" ] && p=$conv
+  fi
+  p_show=$(printf '%s' "$p" | LC_ALL=C tr '\000-\037\177' '?')
+  case "$p" in
+    /*) ;;
+    *) PC_DETAIL="the installPath of $id is not an absolute path"; return 1 ;;
+  esac
+  if [ ! -d "$p" ]; then
+    PC_DETAIL="the installPath $p_show of $id is not a directory"
+    return 1
+  fi
+  tree=$(git -C "$repo" -c core.quotePath=false ls-tree -r --full-name HEAD -- "plugins/$name/" 2>/dev/null); tree_rc=$?
+  tree=${tree//$'\r'/}
+  echo "git -C $repo ls-tree -r --full-name HEAD -- plugins/$name/ -> exit=$tree_rc entries=$(printf '%s' "$tree" | grep -a -c '')"
+  if [ "$tree_rc" -ne 0 ]; then
+    PC_DETAIL="git ls-tree exit=$tree_rc"
+    return 1
+  fi
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    meta=${line%%$'\t'*}; path=${line#*$'\t'}
+    rel=${path#"plugins/$name/"}
+    case "/$rel" in */.in_use/*) continue ;; esac
+    read -r m_mode m_type m_blob <<< "$meta"
+    [ "$m_type" = blob ] && [ "$m_mode" != 120000 ] || continue
+    want["$rel"]=$m_blob
+  done <<< "$tree"
+  if [ "${#want[@]}" -eq 0 ]; then
+    PC_DETAIL="HEAD has no regular files under plugins/$name/"
+    return 1
+  fi
+  files=$(cd -- "$p" && find . -name .in_use -prune -o -type f -print); files_rc=$?
+  files=${files//$'\r'/}
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    paths+=("${line#./}")
+  done <<< "$files"
+  echo "find $p_show -type f, .in_use excluded -> exit=$files_rc files=${#paths[@]}"
+  if [ "$files_rc" -ne 0 ]; then
+    PC_DETAIL="find exit=$files_rc"
+    return 1
+  fi
+  hash_rc=0
+  if [ "${#paths[@]}" -gt 0 ]; then
+    hashes=$(printf '%s\n' "${paths[@]}" | git -C "$p" hash-object --no-filters --stdin-paths 2>/dev/null); hash_rc=$?
+    hashes=${hashes//$'\r'/}
+    mapfile -t sums <<< "$hashes"
+  fi
+  echo "git -C $p_show hash-object --no-filters --stdin-paths over those files -> exit=$hash_rc hashes=${#sums[@]}"
+  if [ "$hash_rc" -ne 0 ] || [ "${#sums[@]}" -ne "${#paths[@]}" ]; then
+    PC_DETAIL="git hash-object exit=$hash_rc gave ${#sums[@]} hashes for ${#paths[@]} files"
+    return 1
+  fi
+  for i in "${!paths[@]}"; do have["${paths[i]}"]=${sums[i]}; done
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    if [ -z "${have["$rel"]+set}" ]; then
+      miss_n=$((miss_n + 1)); [ "$miss_n" -gt 5 ] || miss_l="$miss_l $rel"
+    elif [ "${have["$rel"]}" != "${want["$rel"]}" ]; then
+      diff_n=$((diff_n + 1)); [ "$diff_n" -gt 5 ] || diff_l="$diff_l $rel"
+    fi
+  done < <(printf '%s\n' "${!want[@]}" | LC_ALL=C sort)
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    [ -n "${want["$rel"]+set}" ] && continue
+    extra_n=$((extra_n + 1)); [ "$extra_n" -gt 5 ] || extra_l="$extra_l $rel"
+  done < <(printf '%s\n' "${!have[@]}" | LC_ALL=C sort)
+  PC_FILES=${#want[@]}
+  PC_DETAIL=$(printf 'differing=%s [%s] missing=%s [%s] extra=%s [%s], up to 5 named each' "$diff_n" "${diff_l# }" "$miss_n" "${miss_l# }" "$extra_n" "${extra_l# }" | LC_ALL=C tr '\000-\037\177' '?')
+  if [ "$diff_n" -eq 0 ] && [ "$miss_n" -eq 0 ] && [ "$extra_n" -eq 0 ]; then PC_EQUAL=yes; fi
+  return 0
 }
 canon_path() {
   local u r m
@@ -227,6 +331,7 @@ echo "$CANON_HOW $LIVE_DIR -> $(sanitize "${LIVE_REAL:-unresolved}")"
 resolve_cli
 echo "command -v claude -> $(command -v claude || echo none)"
 echo "CLAUDE_CODE_EXECPATH -> ${CLAUDE_CODE_EXECPATH:-unset or empty}"
+echo "desktop app CLIs under $CLI_GLOB -> $CLI_SEARCH"
 echo "claude CLI -> ${CLI:-none} from $CLI_FROM"
 if [ -n "$CLI" ]; then
   run "$CLI" --version
@@ -566,6 +671,16 @@ IDS_EOF
       plugin_enabled_check "$plugin_id"
       plugin_deps_check "$plugin_id"
       plugin_version_check "$plugin_id"
+      SHIP_NAME=${plugin_id%%@*}
+      if [ -n "$SHIP_NAME" ] && [ -d "$REPO/plugins/$SHIP_NAME" ]; then
+        plugin_content_check "$plugin_id" "$REPO" "$PLUGIN_JSON"
+        if [ "$PC_EQUAL" = yes ]; then
+          echo "compare the files under the installPath of $(sanitize "$plugin_id") against $REPO HEAD:plugins/$(sanitize "$SHIP_NAME") -> yes, $PC_FILES files"
+        else
+          echo "FAIL plugin contents: expected the files under the installPath of $(sanitize "$plugin_id") to equal $REPO HEAD:plugins/$(sanitize "$SHIP_NAME"), actual $PC_DETAIL"
+          fail=1
+        fi
+      fi
     else
       echo "FAIL plugin: expected $plugin_id from $REPO/config/plugins.tsv among the installed ids, actual $(sanitize "${PLUGIN_IDS:-none}")"
       fail=1

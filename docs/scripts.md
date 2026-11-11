@@ -27,7 +27,7 @@ The logged `fails` is the true count. The exit status is that count clamped to
 | 3 | Copies `config/CLAUDE.md` to `/root/.claude/CLAUDE.md`. |
 | 4 | Merges `config/settings.json` into `/root/.claude/settings.json`. |
 | 5 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, and the global `core.hooksPath` to `git-hooks/` in the clone. |
-| 6 | Installs each plugin named in `config/plugins.tsv`, then runs `scripts/plugin-dependencies.sh` for it. |
+| 6 | Installs each plugin named in `config/plugins.tsv` that is not installed yet, updates each one that is, then runs `scripts/plugin-dependencies.sh` for it. |
 | 7 | Writes `/root/.claude/.my-harness-wrapper.manifest.json`. |
 
 ### Step 2, the config directory
@@ -129,7 +129,25 @@ value written, and is empty where the step wrote nothing.
 The CLI owns `extraKnownMarketplaces` and `enabledPlugins` at user scope.
 Neither key is ever hand-written.
 
-After each plugin's install, whatever its exit status, the step runs
+The installed ids are read once, before the rows, by `claude plugin list --json`.
+The line `claude plugin list --json, before the plugins.tsv rows -> exit=N` gives
+its exit status, and `jq .[].id of that output -> exit=N value=[...]` gives the
+ids read from it. Where either exit is non-zero, the list's failure is not
+counted into `fails`, and each row takes the add and install path below. Each row
+prints `plugin_id <id> installed before this run -> yes`, `no`, or `unknown` where
+the list was not read.
+
+A row whose `plugin_id` is among those ids runs
+`claude plugin marketplace update <marketplace>`, then
+`claude plugin update <plugin_id>`, each counted into `fails` where its exit is
+non-zero. The marketplace is the text after the first `@`. A row whose id has no
+such text counts one failure and runs neither command.
+
+Any other row runs `claude plugin marketplace add <marketplace_source>`, then
+`claude plugin install <plugin_id> --scope user --yes`, each counted into `fails`
+where its exit is non-zero.
+
+After each plugin's install or update, whatever its exit status, the step runs
 `bash "$SRC/scripts/plugin-dependencies.sh" claude <plugin_id>` and counts a
 non-zero exit as one failure.
 
@@ -180,11 +198,11 @@ before step 3 can rewrite it in a deployed copy the script runs from.
 | --- | --- |
 | 1 | Resolves the invoking checkout from the script's own location, with `CDPATH` cleared, and the config directory as `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, converted with `cygpath -u` where `cygpath` exists. A path that is not absolute stops the run with exit 1 and no log. |
 | 2 | Creates the config directory, then checks `jq` and `git`. A failing tool ends the run before step 3. |
-| 3 | Clones or refreshes the deployed copy, `my-harness-wrapper` in the config directory. A failure ends the run. |
+| 3 | Clones or refreshes the deployed copy, `my-harness-wrapper` in the config directory, then re-checks out its tracked files where their bytes differ from their blobs. A failure ends the run. |
 | 4 | Copies `config/CLAUDE.md` from the deployed copy to `CLAUDE.md` there, first printing `test -f` or `cmp -s` for the file it replaces, and keeping a differing one as `CLAUDE.md.pre-harness` where no such copy exists. |
 | 5 | Merges the deployed copy's `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the deployed copy, and `env.GIT_CONFIG_COUNT`, `env.GIT_CONFIG_KEY_0` and `env.GIT_CONFIG_VALUE_0` to deliver `core.hooksPath` naming the deployed copy's `git-hooks/`. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
 | 6 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status, then unsets a global `core.hooksPath` naming the deployed copy's `git-hooks/`. |
-| 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv` and runs the deployed copy's `scripts/plugin-dependencies.sh` for it, then prints how many rows carried a `plugin_id`. |
+| 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv` that is not installed yet, updates each one that is, and reinstalls a shipped plugin whose files differ from the deployed copy. It runs the deployed copy's `scripts/plugin-dependencies.sh` for each, then prints how many rows carried a `plugin_id`. |
 | 8 | Writes `.my-harness-wrapper.manifest.json` there. |
 
 ### Step 2, the prerequisites
@@ -266,6 +284,29 @@ credential helper keeps it out.
 Steps 4 to 8 read only the deployed copy, apart from step 8's `user.email`,
 which is read in the invoking checkout as before. The invoking checkout is
 printed on the `SRC ->` line.
+
+### Step 3, the line endings
+
+After the clone or refresh, the step lists the tracked files with
+`git ls-files -s`, keeps the entries of mode `100644` and `100755`, and hashes
+their working-tree bytes with one `git hash-object --no-filters --stdin-paths`
+process. Symlinks and submodule entries are not compared. The line
+`tracked files in <copy> whose bytes differ from their blob, before the renormalize -> exit=0 count=N of M regular files, the first up to 5 [<paths>]`
+gives the count of files whose bytes differ from their blobs.
+
+Where that count is above zero, the step runs `git rm -q -r --cached -- .`,
+which removes the index entries and leaves the files, then
+`git reset -q --hard HEAD`, which writes the tracked files from `HEAD`. Each
+command has a line with its exit status. The step then measures again, and the
+line `... after the renormalize -> ...` must read `count=0`. Where the first
+count is zero, both commands are skipped, and one line says so.
+
+A measurement reads `count=unread` where `git ls-files -s` exits non-zero, where
+`git hash-object` exits non-zero, and where it returns a count of hashes other
+than the file count. A tracked file missing from the copy makes `hash-object`
+exit 128. Each such failure, a non-zero exit from either command, and a count
+above zero after the renormalize counts one failure and ends the run as the
+other step 3 failures do.
 
 ### Step 5, the settings file
 
@@ -370,14 +411,64 @@ forwarding runs the hooks it names.
 ### Step 7, the plugins
 
 The CLI is taken from the first of three sources that yields one: `command -v
-claude`, `CLAUDE_CODE_EXECPATH` where it names a file, and the highest-sorting
-`claude.exe` under `$LOCALAPPDATA/Claude-Data/claude_*/claude-code/*/*/`, by
-`sort -V` on the full path. Claude Code sets `CLAUDE_CODE_EXECPATH` in the
-processes it starts. The desktop app keeps its bundled CLI under
-`$LOCALAPPDATA` and puts none on `PATH`. Where no source yields one, each
-plugin's line names the two commands to run instead and counts one failure.
+claude`, `CLAUDE_CODE_EXECPATH` where it names a file, and the desktop app's
+bundled `claude.exe`. Claude Code sets `CLAUDE_CODE_EXECPATH` in the processes it
+starts. The desktop app keeps its bundled CLI under `$LOCALAPPDATA` and puts
+none on `PATH`. Where no source yields one, each plugin's line names the two
+commands to run instead and counts one failure.
 
-After each plugin's install, whatever its exit status, the step runs
+The bundled CLI is the `claude.exe` with the highest `<version>` among
+`$LOCALAPPDATA/Claude-Data/*/claude-code/<version>/<build>/claude.exe`. The app
+data directory name is any name, such as `claude_<id>` or
+`anthropicpbc.claude_<id>`. Candidates are ordered by `sort -V` on `<version>`
+alone, and equal versions by full path. The line
+`desktop app CLIs under <pattern> -> count=N` gives the candidate count, or
+`not searched` with its reason. The `claude CLI ->` line names the CLI and its
+source, and for the desktop app, its version.
+
+Where a CLI is found, the step reads the installed ids once, before the rows,
+with `claude plugin list --json`, as bootstrap's step 6 does. Where none is
+found, the line `claude plugin list --json, before the plugins.tsv rows -> not run, no CLI`
+is printed instead.
+
+Each row whose `plugin_id` is among those ids runs `"$CLI" plugin marketplace
+update <marketplace>`, then `"$CLI" plugin update <plugin_id>`, each counted
+where its exit is non-zero. Any other row runs the `marketplace add` and
+`install` pair as before. A row whose id has no text after its first `@` counts
+one failure and runs neither update. A list read that fails is not counted into
+`fails`, and each row then takes the add and install path.
+
+A shipped plugin is one whose name before the `@` is a directory `plugins/<name>`
+in the deployed copy. The line `test -d <copy>/plugins/<name> -> yes, a shipped
+plugin`, or `-> no, not a shipped plugin`, says which. For a shipped plugin the
+step lists the plugins again, with `claude plugin list --json, after the update
+or install of <id> -> exit=N`, and compares the files under the plugin's
+`installPath` with the blobs at the deployed copy's `HEAD` under
+`plugins/<name>/`. Files under a `.in_use` directory are not compared. Only
+regular files are compared, by content: symlinks are skipped and file modes are
+not read. A `HEAD` with no regular file under `plugins/<name>/` is a failed
+measurement. The comparison prints a `jq installPath` line, then `git ls-tree`, `find` and
+`git hash-object` lines, and ends with one of these results:
+
+| Result | Line | Then |
+| --- | --- | --- |
+| Equal | `compare the files under the installPath of <id> against <copy> HEAD:plugins/<name> -> yes, N files` | Nothing. |
+| A measurement failed | `... -> not measured, <detail>; no reinstall` | One failure. The plugin is left as installed. |
+| Not equal | `... -> no, <detail>` | `"$CLI" plugin uninstall <id> --scope user`, then `"$CLI" plugin install <id> --scope user --yes`, each with its exit line counted where non-zero. The list is read again and the comparison runs again, printing `... after the reinstall -> yes, N files` or `... after the reinstall -> no, <detail>`. The second `no` counts one failure. |
+
+The uninstall and install re-copy the files, and the plugin stays enabled.
+
+For a shipped plugin the step then measures the marketplace clone of the plugin.
+The clone directory is the `installLocation` of that marketplace in
+`<config dir>/plugins/known_marketplaces.json`, read by the line
+`jq .["<marketplace>"].installLocation <file> -> exit=N value=[...]`. The
+directory must exist and be the top level of its own work tree, which the line
+`git -C <dir> rev-parse --show-cdup -> exit=N value=[...]` shows as an empty
+value. Its tracked files are then compared with their blobs as in the
+line-endings step, and nothing is renormalized. Each failure to read or measure
+the clone counts one failure.
+
+After each plugin's install or update, whatever its exit status, the step runs
 `bash "$DEPLOY/scripts/plugin-dependencies.sh" "$CLI" <plugin_id>` with the CLI
 it found, and counts a non-zero exit as one failure. Where no CLI is found, the
 dependency step is not run and counts one failure of its own.
@@ -397,7 +488,7 @@ step 1. `scripts/session-check.sh` takes the local branch on a non-empty
 ## scripts/plugin-dependencies.sh
 
 Installs a delivered plugin's npm dependencies where its install left any
-unresolved. Run once per plugin, after that plugin's install, by
+unresolved. Run once per plugin, after that plugin's install or update, by
 `scripts/bootstrap.sh` step 6 and `scripts/install-local.sh` step 7. Both run it
 as `bash <harness>/scripts/plugin-dependencies.sh <CLI> <plugin_id>`, so the two
 loops share one implementation.
@@ -594,8 +685,11 @@ with `#!` as executable.
 Every hook file is committed with mode `100755`, set on Windows with
 `git update-index --chmod=+x`. `lib/` is not a hook and stays `100644`.
 
-A checkout under `core.autocrlf=true` writes the hook files with CRLF line
-endings. Git for Windows runs them.
+The repository's `.gitattributes` sets `* text=auto eol=lf`, so a checkout writes
+LF line endings to every text file, whatever `core.autocrlf` says. A checkout
+made before that file was committed keeps CRLF line endings until the step under
+"Renormalizing a Windows checkout" in `docs/runbook.md` is run. Git for Windows
+runs hook files with either line ending.
 
 ### Accepted gaps
 
@@ -798,7 +892,8 @@ Plugin state is read from `claude plugin list --json`, not from the command's
 human-readable output, which a wording, format or localisation change moves.
 
 The CLI is found the way `scripts/install-local.sh`'s step 7 finds it, and the
-`claude CLI ->` line names it and its source. Where none is found, the list is
+`claude CLI ->` line names it and its source, and the `desktop app CLIs under ...`
+line before it gives the candidate count. Where none is found, the list is
 not run and its exit reads 127, which gives `CLI_PLUGINS=unknown`.
 
 Three states are separated. A non-zero exit, output whose top level is not an
@@ -821,32 +916,34 @@ other than one, a path that is not absolute or not a directory, an unreadable
 absent `package.json` declares no dependencies and is not one. The predicate is
 the one `scripts/plugin-dependencies.sh` tests, with the same limits.
 
-For each `config/plugins.tsv` plugin found in the list, two further checks run.
+For each `config/plugins.tsv` plugin found in the list, two further checks run,
+and a third where the repository under test ships the plugin.
 
 | Function | Reads | `FAIL` where |
 | --- | --- | --- |
 | `plugin_enabled_check` | the `enabled` field of every list entry carrying the id | the distinct values are anything but the one value `true` |
 | `plugin_version_check` | `version` in `plugins/<name>/.claude-plugin/plugin.json` of the repository under test, `<name>` being the id before its `@`, and the `version` field of every list entry carrying the id | the two differ, the directory `plugins/<name>` exists without that manifest, the manifest holds no single non-empty string version, a list entry for the id carries a version that is not a string, the entries carry several different versions, or `<name>` falls outside `[A-Za-z0-9][A-Za-z0-9._-]*` |
+| `plugin_content_check`, shipped plugins only | every file under the `installPath` except those under a `.in_use` directory, against the blob at `$REPO` HEAD under `plugins/<name>/` | a file whose bytes differ from its blob, a blob with no file, a file with no blob, a `HEAD` with no regular file under `plugins/<name>/`, or a failed `git ls-tree`, `find` or `git hash-object` |
 
 A list entry of a disabled plugin stays in the list with `enabled` false, so
 the id test alone passes for it.
 
 Where the repository under test holds no `plugins/<name>` directory, as for
 `ecc@ecc`, `plugin_version_check` prints the `test -d` line and compares
-nothing.
+nothing, and `plugin_content_check` does not run.
 
-Equal versions do not establish equal contents. A plugin file changed without
-a bump to `version` in its `plugin.json` reads as a match, and so does a
-default branch of the marketplace repository that differs from the repository
-under test while carrying the same version. A mismatch does not separate an
-installed plugin older than the repository under test from a newer one.
+`plugin_version_check` compares versions, and `plugin_content_check` compares
+files, so equal versions do not make the installed files match. A mismatch of
+either is a `FAIL`, reported as `FAIL plugin version: ...` or
+`FAIL plugin contents: ...`. For a plugin the repository under test ships, a copy
+whose files differ from `$REPO` HEAD fails `plugin_content_check` whatever its
+version. Files that differ only in line endings differ, because the blobs hold LF
+and the comparison hashes the bytes as they are.
 
-Neither installer updates a plugin that is already installed: neither runs
-`claude plugin update`. With Claude Code 2.1.317, `claude plugin install`
-exits 0 for an installed plugin and leaves its version, so after a version
-bump a re-run of `scripts/install-local.sh` still ends `fails -> 0` and
-`plugin_version_check` is the check that reports it. Issue #73 carries the
-observed lines.
+A mismatch of version does not separate an installed plugin older than the
+repository under test from a newer one. `scripts/install-local.sh`, step 7,
+updates each installed plugin and reinstalls a shipped plugin whose files differ
+from the deployed copy's `HEAD`. The result is what these checks then read.
 
 An absent `config/plugins.tsv` is a `FAIL`, not a skipped check. Reading no
 rows and having no file to read produce different output, so the check's
@@ -1044,7 +1141,7 @@ read only from a line of 40 or 64 hex digits, a tab and `refs/heads/main`.
 | `git -C <repo> config --get remote.origin.url -> exit=N` | The copy has no readable origin URL; `exit=0 value=empty` where the key holds an empty value. |
 
 The run's other bounded steps, the status probe and `claude plugin list`
-among them, are not bounded together; `scripts/session-check.sh`'s 20-second
+among them, are not bounded together; `scripts/session-check.sh`'s 75-second
 bound reports a run that exceeds it.
 
 Equal values print a `compare` line. Differing values, and a value that was
@@ -1276,7 +1373,7 @@ on the pattern, allowed without it, and stopped by the repository's own
 `pre-commit`, from its common dir and from its own `core.hooksPath`. It does
 not test any other hook name, or the hook files' mode in the deployed copy. It
 adds a `git init`, a `git add`, a `git config` and four commits to the run,
-which `scripts/session-check.sh` bounds at 20 seconds in all. An earlier
+which `scripts/session-check.sh` bounds at 75 seconds in all. An earlier
 scratch install on Windows ran the whole of `verify.sh` in about 8 seconds. On
 the machine the `core.hooksPath` lookup timings above come from, a scratch
 install ran it in about 40 seconds, against about 35 seconds for the tree
@@ -1370,9 +1467,12 @@ visibly does not reach that byte.
 ### The verify.sh bound
 
 The inner bound is strictly shorter than the hook's timeout, so the script
-reports a timeout rather than being killed mid-report.
-`SESSION_CHECK_VERIFY_TIMEOUT` defaults to 20 seconds and
-`SESSION_CHECK_VERIFY_KILL_AFTER` to 5, against the hook's 30.
+reports a timeout rather than being killed mid-report, provided the steps before
+`verify.sh` take under 10 seconds. The steps before `verify.sh` are not bounded.
+Where they take longer, Claude Code ends the hook before the timeout line, and
+the output stops at the last line printed.
+`SESSION_CHECK_VERIFY_TIMEOUT` defaults to 75 seconds and
+`SESSION_CHECK_VERIFY_KILL_AFTER` to 5, against the hook's 90.
 
 `timeout` runs without `--foreground`, so it places the child in its own process
 group and signals that group.
