@@ -121,7 +121,7 @@ hook_configured_dir() {
     value=${!name}
     [ -n "$value" ] || continue
     hook_relative "$PWD" "$value" hooks
-    [ "$hooks" -ef "$HOOK_DIR" ] || return 0
+    [ -f "$hooks/lib/dispatch.sh" ] || return 0
   done
   hooks=""
   return 1

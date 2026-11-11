@@ -1,8 +1,9 @@
 # my-harness-wrapper
 
 A configuration source for Claude Code sessions, cloud and local. It is not
-an application. It has no build, no package manifest and no CI. Its one test
-script, `scripts/test-attribution-guard.sh`, is run by hand.
+an application. It has no build, no package manifest and no CI. Its two test
+scripts, `scripts/test-attribution-guard.sh` and
+`scripts/test-hook-forwarding.sh`, are run by hand.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
 into a session's Claude config directory. It also holds one plugin,
@@ -95,6 +96,7 @@ every session.
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
 | `scripts/attribution-guard.sh` | Blocks a pull request, issue, comment, review or review reply body, or a commit a GitHub tool makes, carrying a Claude Code attribution line, and tells the session to resend a description the create call returns with one. Run by the `PreToolUse` and `PostToolUse` hooks `config/settings.json` registers. |
 | `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, directly and through the `PreToolUse` hook the tree's `config/settings.json` registers, one line per case. Run by hand only. |
+| `scripts/test-hook-forwarding.sh` | Runs the `git-hooks/` of its own tree in scratch repositories through six `core.hooksPath` cases, one line per case. Run by hand only. |
 | `git-hooks/` | The git hooks `core.hooksPath` names: globally in the cloud, and locally only for the git commands Claude Code sessions start. One file per hook name git looks up. `commit-msg` rejects a message carrying a Claude Code attribution line; every hook then runs the hook of that name git would run without the harness. `git-hooks/lib/attribution.ere` is the pattern both it and the attribution guard read. |
 | `scripts/check-hook-matchers.sh` | Compares the tool names the attribution guard's hook matchers name with a file of a session's tool names. Run by hand only. |
 | `.gitattributes` | The line-ending rule. Git checks out every file it detects as text with LF line endings, on every platform. |
