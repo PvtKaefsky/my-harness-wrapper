@@ -417,8 +417,9 @@ pass every reply and deliverable through humanizer, and to follow ponytail's
 `full` rules for the code they write and the changes they design. Both plugins
 rank below that instruction.
 
-Ponytail's hooks run in Cowork, whose container has `node` (v22.23.4, observed
-by the user in a chat session). Upstream's `README.md` at `96608e0` says the
+A Cowork chat session observed `node` v22.23.4 in its container, and observed
+ponytail's `SessionStart` hook run there, as the Facts below record. Upstream's
+`README.md` at `96608e0` says the
 band does not show in cloud sessions. The band in Cowork is not verified.
 
 ### Facts
@@ -426,8 +427,8 @@ band does not show in cloud sessions. The band in Cowork is not verified.
 | Fact | State |
 | --- | --- |
 | The `my-harness` command writes a zip holding `.claude-plugin/plugin.json`, `agents/`, `hooks/` and `skills/` at its root | Verified with git 2.56 in Git Bash. |
-| The `ponytail` and `humanizer` commands write zips of the paths they name | Not verified. |
-| claude.ai accepts a package and a Cowork session loads it | Not verified for any of the three packages. It cannot be exercised from a Claude Code session. |
+| The `ponytail` and `humanizer` commands write zips of the paths they name | Verified by a Cowork chat session on 2026-11-12. In a clone of `DietrichGebert/ponytail`, the command at `96608e0` writes 31 files, the same byte for byte as the `ponytail.plugin` the user accepted, by `unzip` and `diff -r`. In a clone of `blader/humanizer`, the command at `b48c832` writes 15 files, and `claude plugin validate` passes them; no byte comparison of the humanizer package is recorded. Neither result covers another commit. |
+| claude.ai accepts a package and a Cowork session loads it | Observed for `ponytail` and `humanizer` in a Cowork chat session on 2026-11-12. After the user accepted both packages, `~/.claude/plugins/synced/` held `humanizer` 4.0.0, `ponytail` 5.3.3, `my-harness` and `ecc`, by `ls` and each `plugin.json`. The session listed `humanizer:humanizer` and six `ponytail:` skills. Ponytail's `SessionStart` hook ran on resume: its output `PONYTAIL MODE ACTIVE — level: full` reached the session's context, and `~/.claude/.ponytail-active` held `full`. `~/.config/ponytail/band/` did not exist, so the band's ledger had not been written. For `my-harness.plugin`, a synced `my-harness` was present, and that synced copy is all that was observed. One session shows nothing about a later package or about ponytail's other hooks. |
 | A Claude Code session holding both an installed plugin and a synced copy of the same name | In a cloud session with all four plugins installed (scratch config directory, CLI 2.1.322, issue #88), `claude plugin list` reports `ecc@synced`, `my-harness@synced`, `ponytail@synced` and `humanizer@synced` each as "from claude.ai not loaded", because the installed plugin of the same name takes precedence. The line reports the list's state, not what a session loaded. |
 
 ## The version line
