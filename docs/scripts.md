@@ -1902,6 +1902,11 @@ skipped.
 `my-harness` skills. That rank is an instruction to the session, and a hook
 still runs and its text still reaches context.
 
+With ECC installed, the skill listing exceeds the CLI's budget and gives the
+`my-harness` skills by name only (issue #95). `config/CLAUDE.md`'s Harness
+section therefore names the four general `my-harness` skills with their
+triggers.
+
 Each installer run updates ponytail and humanizer to upstream's latest release,
 unpinned. A new release replaces ponytail's hook code, its band module and the
 rule text it injects into every session and subagent, in cloud sessions as
