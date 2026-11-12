@@ -74,6 +74,50 @@ class LocalHarnessTests(unittest.TestCase):
         self.environment = {key: value for key, value in os.environ.items()
                             if not key.startswith(("GIT_", "HARNESS_")) and key != "CODEX_HOME"}
         self.environment.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+        self.addon_log = self.base / "addon-commands.jsonl"
+        self.addon_state = self.base / "addon-state.json"
+        self.stub_bin = self.base / "bin"
+        self.stub_bin.mkdir()
+        stub = self.stub_bin / "addon_stub.py"
+        stub.write_text('''import json
+import os
+import sys
+from pathlib import Path
+tool, arguments = sys.argv[1], sys.argv[2:]
+profile = Path(os.environ["USERPROFILE"])
+state = Path(os.environ["ADDON_FIXTURE_STATE"])
+log = Path(os.environ["ADDON_FIXTURE_LOG"])
+with log.open("a", encoding="utf-8") as stream:
+    stream.write(json.dumps({"command": [tool, *arguments], "profile": str(profile),
+                             "home": os.environ["HOME"], "codex_home": os.environ["CODEX_HOME"],
+                             "cwd": str(Path.cwd())}) + "\\n")
+if os.environ.get("ADDON_FIXTURE_FAIL") == " ".join([tool, *arguments]):
+    sys.exit(7)
+if tool == "codex" and arguments == ["plugin", "list", "--json"]:
+    override = os.environ.get("ADDON_FIXTURE_LIST")
+    print(override if override is not None else json.dumps({"installed": json.loads(state.read_text()) if state.exists() else [], "available": []}))
+elif tool == "codex" and arguments[:2] == ["plugin", "add"] and not os.environ.get("ADDON_FIXTURE_NO_WRITE"):
+    state.write_text(json.dumps([{"pluginId": arguments[2], "installed": True}]))
+elif tool == "npx" and arguments[:2] == ["skills", "add"] and not os.environ.get("ADDON_FIXTURE_NO_WRITE"):
+    skill = profile / ".agents/skills/humanizer/SKILL.md"
+    skill.parent.mkdir(parents=True, exist_ok=True)
+    skill.write_text("---\\nname: humanizer\\n---\\nFixture", encoding="utf-8")
+''', encoding="utf-8")
+        for tool in ["codex", "npx"]:
+            launcher = self.stub_bin / (tool + ".cmd" if os.name == "nt" else tool)
+            launcher.write_text(
+                ('@"' + sys.executable + '" -X utf8 -I "' + str(stub) + '" ' + tool + ' %*\n')
+                if os.name == "nt" else '#!' + sys.executable + '\n' +
+                'import runpy, sys\nsys.argv = [' + repr(str(stub)) + ', ' + repr(tool) +
+                ', *sys.argv[1:]]\nrunpy.run_path(' + repr(str(stub)) + ', run_name="__main__")\n',
+                encoding="utf-8")
+            if os.name != "nt":
+                launcher.chmod(0o700)
+        self.environment.update(
+            PATH=str(self.stub_bin) + os.pathsep + self.environment.get("PATH", ""),
+            HOME=str(self.profile), USERPROFILE=str(self.profile),
+            ADDON_FIXTURE_STATE=str(self.addon_state), ADDON_FIXTURE_LOG=str(self.addon_log),
+        )
         self.git("init", "-q")
         self.git("config", "user.name", "Fixture User")
         self.git("config", "user.email", "fixture@example.invalid")
@@ -106,6 +150,156 @@ class LocalHarnessTests(unittest.TestCase):
 
     def install(self, *extra: object) -> str:
         return self.run_cli("install", "--profile", self.profile, "--apply", *extra)
+
+    def addon_commands(self) -> list[list[str]]:
+        return [entry["command"] for entry in map(json.loads, self.addon_log.read_text().splitlines())
+                if entry["command"] != ["codex", "plugin", "list", "--json"]]
+
+    def test_addon_plan_names_upstream_commands_without_running_them(self) -> None:
+        output = self.run_cli("install", "--profile", self.profile)
+        for command in ["codex plugin marketplace add DietrichGebert/ponytail",
+                        "codex plugin add ponytail@ponytail",
+                        "npx skills add blader/humanizer --global --agent codex"]:
+            self.assertIn(command, output)
+        self.assertFalse(self.addon_log.exists())
+
+    def test_addon_alternate_home_overrides_case_aliases(self) -> None:
+        import runpy
+        from unittest.mock import patch
+        runpy.run_path(str(CLI))
+        inherited = str(self.base / "inherited")
+        with patch.dict(os.environ, {"HOME": inherited, "USERPROFILE": inherited,
+                                     "NPM_CONFIG_CACHE": inherited, "NPM_CONFIG_USERCONFIG": inherited,
+                                     "NPM_CONFIG_GLOBALCONFIG": inherited}):
+            values = sys.modules["harness_local.addons"].environment(self.profile, self.profile / ".codex")
+            for name, destination in {"HOME": self.profile, "USERPROFILE": self.profile,
+                                      "CODEX_HOME": self.profile / ".codex",
+                                      "NPM_CONFIG_CACHE": self.profile / ".npm-cache",
+                                      "NPM_CONFIG_USERCONFIG": self.profile / ".npmrc",
+                                      "NPM_CONFIG_GLOBALCONFIG": self.profile / "global.npmrc"}.items():
+                self.assertEqual([value for key, value in values.items() if key.upper() == name],
+                                 [str(destination)])
+            self.assertEqual(os.environ["NPM_CONFIG_CACHE"], inherited)
+
+    def test_addon_execution_ignores_cwd_and_relative_path_shadows(self) -> None:
+        import contextlib
+        import runpy
+        runpy.run_path(str(CLI))
+        self.profile.mkdir()
+        relative_bin = self.target / "relative-bin"
+        relative_bin.mkdir()
+        marker = self.base / "shadow-executed"
+        shadow = self.target / "shadow.py"
+        shadow.write_text("from pathlib import Path\nPath(" + repr(str(marker)) +
+                          ").write_text('executed')\nraise SystemExit(42)\n", encoding="utf-8")
+        for directory in [self.target, relative_bin]:
+            for tool in ["codex", "npx"]:
+                launcher = directory / (tool + ".cmd" if os.name == "nt" else tool)
+                launcher.write_text(
+                    ('@"' + sys.executable + '" -X utf8 -I "' + str(shadow) + '"\n')
+                    if os.name == "nt" else '#!' + sys.executable + '\n' +
+                    'import runpy\nrunpy.run_path(' + repr(str(shadow)) + ', run_name="__main__")\n',
+                    encoding="utf-8")
+                if os.name != "nt":
+                    launcher.chmod(0o700)
+        values = dict(self.environment, PATH=os.pathsep.join(["", "relative-bin", str(self.stub_bin)]),
+                      CODEX_HOME=str(self.profile / ".codex"))
+        commands = [["codex", "plugin", "list", "--json"],
+                    ["npx", "skills", "add", "blader/humanizer", "--global", "--agent", "codex"]]
+        with contextlib.chdir(self.target):
+            for command in commands:
+                with self.subTest(tool=command[0]):
+                    result = sys.modules["harness_local.addons"].execute(command, values, capture=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for path in ["", "relative-bin", os.pathsep, None, "\x00"]:
+                with self.subTest(path=path), self.assertRaisesRegex(ValueError, "ADDON_(EXECUTABLE_MISSING|PATH_INVALID)"):
+                    sys.modules["harness_local.addons"].execute(commands[0], dict(values, PATH=path), capture=True)
+            missing_path = {key: value for key, value in values.items() if key != "PATH"}
+            with self.assertRaisesRegex(ValueError, "ADDON_EXECUTABLE_MISSING"):
+                sys.modules["harness_local.addons"].execute(commands[0], missing_path, capture=True)
+        self.assertFalse(marker.exists())
+        entries = list(map(json.loads, self.addon_log.read_text().splitlines()))
+        self.assertEqual([entry["command"] for entry in entries], commands)
+        self.assertTrue(all(entry["cwd"] == str(self.profile) for entry in entries))
+
+    def test_addon_install_exact_commands_and_update_current_release(self) -> None:
+        self.install()
+        self.assertEqual(self.addon_commands(), [
+            ["codex", "plugin", "marketplace", "add", "DietrichGebert/ponytail"],
+            ["codex", "plugin", "add", "ponytail@ponytail"],
+            ["npx", "skills", "add", "blader/humanizer", "--global", "--agent", "codex"],
+        ])
+        self.addon_log.unlink()
+        output = self.install()
+        self.assertIn("INSTALL_ALREADY_CURRENT", output)
+        self.assertEqual(self.addon_commands(), [
+            ["codex", "plugin", "marketplace", "upgrade", "ponytail"],
+            ["codex", "plugin", "add", "ponytail@ponytail"],
+            ["npx", "skills", "update", "humanizer", "--global"],
+        ])
+        for entry in map(json.loads, self.addon_log.read_text().splitlines()):
+            self.assertEqual(entry["profile"], str(self.profile))
+            self.assertEqual(entry["home"], str(self.profile))
+            self.assertEqual(entry["codex_home"], str(self.profile / ".codex"))
+            self.assertEqual(entry["cwd"], str(self.profile))
+
+    def test_addon_doctor_reports_each_missing_item(self) -> None:
+        self.install()
+        for command in ["doctor", "session-check"]:
+            output = self.run_cli(command)
+            self.assertIn("PASS ADDON_PRESENT ponytail", output)
+            self.assertIn("PASS ADDON_PRESENT humanizer", output)
+        self.addon_state.unlink()
+        output = self.run_cli("doctor", expected=1)
+        self.assertIn("FAIL ADDON_MISSING ponytail", output)
+        self.assertIn("PASS ADDON_PRESENT humanizer", output)
+        self.addon_state.write_text('[{"pluginId":"ponytail@ponytail","installed":true}]')
+        (self.profile / ".agents/skills/humanizer/SKILL.md").unlink()
+        output = self.run_cli("session-check", expected=1)
+        self.assertIn("PASS ADDON_PRESENT ponytail", output)
+        self.assertIn("FAIL ADDON_MISSING humanizer", output)
+
+    def test_addon_presence_rejects_available_or_malformed_plugin_rows(self) -> None:
+        self.install()
+        for payload in ['{"installed":[],"available":[{"pluginId":"ponytail@ponytail","installed":false}]}',
+                        '{"installed":[{"pluginId":"other@ponytail","installed":true}]}',
+                        '{"installed":[{"pluginId":"ponytail@ponytail","installed":"true"}]}']:
+            self.environment["ADDON_FIXTURE_LIST"] = payload
+            self.assertIn("FAIL ADDON_MISSING ponytail", self.run_cli("doctor", expected=1))
+        for payload in ['not json', '{"installed":{}}']:
+            self.environment["ADDON_FIXTURE_LIST"] = payload
+            output = self.run_cli("doctor", expected=1)
+            self.assertIn("FAIL ADDON_MISSING ponytail", output)
+            self.assertIn("PASS ADDON_PRESENT humanizer", output)
+
+    def test_addon_installer_failure_and_false_success_are_failures(self) -> None:
+        self.environment["ADDON_FIXTURE_FAIL"] = "codex plugin marketplace add DietrichGebert/ponytail"
+        output = self.run_cli("install", "--profile", self.profile, "--apply", expected=1)
+        self.assertIn("exit=7", output)
+        self.assertNotIn(["codex", "plugin", "add", "ponytail@ponytail"], self.addon_commands())
+        del self.environment["ADDON_FIXTURE_FAIL"]
+        self.environment["ADDON_FIXTURE_NO_WRITE"] = "1"
+        self.assertIn("ADDON_MISSING", self.run_cli("install", "--profile", self.profile, "--apply", expected=1))
+
+    def test_addon_rendered_rank_and_unowned_store(self) -> None:
+        self.install()
+        policy = (self.profile / ".codex/AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "* Ponytail and humanizer, the `ponytail@ponytail` plugin and the `humanizer` third-party skill, "
+            "rank below the wrapper and target policy and the native harness skills. "
+            "Where their skills, or the context their hooks inject into sessions and subagents, "
+            "conflict with either, the wrapper and target policy and the native harness skills win. "
+            "For example, ponytail's comment rules give way to Code comments.",
+            policy,
+        )
+        pointer = json.loads((self.state / "active.json").read_bytes())
+        release = self.state / "releases" / pointer["release"]
+        manifest = json.loads((release / "manifest.json").read_bytes())
+        self.assertIn("config/codex/addons.json", manifest["runtime"])
+        self.assertFalse(any("humanizer" in row["path"] or "ponytail" in row["path"]
+                             for row in manifest["artifacts"]))
+        self.run_cli("uninstall", "--apply")
+        self.assertTrue((self.profile / ".agents/skills/humanizer/SKILL.md").is_file())
 
     def test_source_and_full_workflow_reader(self) -> None:
         self.assertIn("PACK_SOURCE_VERIFIED", self.run_cli("verify-source"))
@@ -583,7 +777,7 @@ class LocalHarnessTests(unittest.TestCase):
         pointer = json.loads((self.state / "active.json").read_bytes())
         manifest = json.loads((self.state / "releases" / pointer["release"] / "manifest.json").read_bytes())
         self.assertEqual(manifest["source_commit"], expected)
-        self.assertEqual(manifest["adapter_version"], "2.3.0")
+        self.assertEqual(manifest["adapter_version"], "2.4.0")
         self.assertTrue((self.state / "releases" / pointer["release"] / "docs/native-review.md").exists())
 
     def test_world_writable_state_rejected(self) -> None:

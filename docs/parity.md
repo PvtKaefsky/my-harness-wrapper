@@ -37,6 +37,14 @@ Writing text comparison source: main's PR #87 merge at 1406dc2df29bc102d0b626d96
 | Git workflow checks format and Writing text before posting | The merged check sentence runs once | None. |
 | Policy punctuation contains no em or en dash | Eight existing policy lines use colons, parentheses or commas | No words change. |
 
+Ponytail and humanizer comparison source: main's PR #90 merge at e0f64d48c17d09b582b618a919eebc5ecd81de22.
+
+| Claude behavior | Local Codex equivalent | Necessary adaptation |
+| --- | --- | --- |
+| Install ponytail and humanizer as upstream plugins | config/codex/addons.json drives upstream install/update commands for the ponytail plugin and humanizer skill | Humanizer ships no Codex plugin manifest, so its documented Skills CLI command installs the global Codex skill. Third-party files remain outside harness artifact registration. |
+| Rank both below the payload and my-harness skills | Wrapper and target policy and native harness skills win conflicts with both items' skills and hook context in sessions and subagents | The Harness bullet names the Codex plugin/skill forms and retains the Code comments example. |
+| Use ponytail's upstream default and lifecycle hooks | The default remains full and hook trust is the operator's /hooks step | Doctor reports presence without claiming hook trust, current upstream content or provider discovery. |
+
 The obsolete upstream installer/config template is not run or copied.
 It selects old models/config fields and unrelated MCP defaults.
 Automatic learning, tmux-only execution, external services and upstream executable hooks are not silently enabled.
