@@ -281,6 +281,40 @@ directory (`CLAUDE_CONFIG_DIR`).
 | One-turn headless run with ponytail's `userConfig` at defaults | Wrote `/root/.config/ponytail/band/<cwd basename>.csv`, holding a header and one row whose `name` column held the prompt's text, and `board.html` beside it. The path is under `$HOME/.config`, outside `CLAUDE_CONFIG_DIR` |
 | Headless question on whether written code may carry a one-line why comment or a `shortcut:` comment | A session with the payload carrying the rank bullet and a session with the payload from `1406dc2` both answered no, naming the payload's Code comments section. The answer does not distinguish a payload with the rank bullet from one without it |
 
+### A delivered cloud session at `0.1.32`
+
+Observed on 2026-11-12 in a cloud session at `main` `e0f64d4`, which built the
+snapshot. Evidence: `claude/probe-report-cloud-2026-11-12.md` in the claude.ai
+Project `plugins_experiments`.
+
+| Probe | Observed |
+| --- | --- |
+| Snapshot | Built by the session: `/home/user/bootstrap.log` mtime 11:01:35 UTC, boot 11:00:17 UTC |
+| Manifest and payload | Manifest `0.1.32` and `e0f64d4`; `cmp` of the deployed and delivered `CLAUDE.md` exits 0; the rank bullet is present once |
+| `claude plugin list --json` | `ecc@ecc` 2.2.3, `my-harness@my-harness-wrapper` 0.1.2, `ponytail@ponytail` 5.3.3 and `humanizer@humanizer` 4.0.0, each at user scope, enabled, `notes` null. `ecc@synced`, `my-harness@synced`, `ponytail@synced` and `humanizer@synced` each have version `unknown`, scope `synced` and the note "from claude.ai not loaded", the installed plugin of the same name taking precedence |
+| `verify.sh` | Ends `fail -> 0` |
+| `bootstrap.log` | Each new row's `marketplace add`, `install` and `plugin-dependencies.sh` lines end `exit=0`. Ponytail's install prints "4 userConfig options not yet set" |
+| Mode line and hook records | `PONYTAIL MODE ACTIVE — level: full` appears once in context. The transcript's hook records are `SessionStart:startup` ×4, `UserPromptSubmit` ×2 and `PreToolUse:Bash` ×11. Ponytail's record carries `command` `Loading ponytail mode...`, its hook's `statusMessage` |
+| Status line nudge | `STATUSLINE SETUP NEEDED` is in context; `settings.json` has no `statusLine` key; `/root/.claude/.ponytail-statusline-nudged` is 0 bytes, mtime 11:01:36 UTC, after boot. One built session does not show whether a session that restores the snapshot is also nudged |
+| Band ledger | `/root/.config/ponytail/band/` is absent during the first turn, before any turn has completed |
+
+### A local Windows session at `0.1.32`
+
+Observed on 2026-11-12 in a desktop app Code tab session on the machine under
+"Local sessions on Windows", deployed copy at `e0f64d4`. Evidence:
+`claude/probe-report-windows-2026-11-12.md` in the claude.ai Project
+`plugins_experiments`.
+
+| Probe | Observed |
+| --- | --- |
+| CLI and Node | CLI 2.1.317, Node v24.20.0 |
+| Manifest and payload | Manifest `0.1.32` and `e0f64d4`; the rank bullet is present once |
+| Install log | Each new row's `marketplace add`, `install` and `plugin-dependencies.sh` lines end `exit=0` |
+| `plugin list --json` | The same four ids at user scope, enabled, with no notes, and the same four `@synced` entries with the "from claude.ai not loaded" note. `plugins/synced/` exists in the config directory, so plugins saved in claude.ai reach the desktop app's local CLI |
+| Ponytail's hooks | One `hook_success` record under `SessionStart:startup`, `command` `Loading ponytail mode...`; the mode line appears once in context. No record exists for the mode tracker, whose status message is `Tracking ponytail mode...` and which prints nothing on an ordinary prompt. The absence does not separate a tracker that ran silently from one that did not run |
+| Status line nudge | `STATUSLINE SETUP NEEDED` is absent from context; `settings.json` has no `statusLine` key; `.ponytail-statusline-nudged` exists, 0 bytes, mtime before this session's session-start check, so the nudge came once, in an earlier session |
+| Band ledger | `$HOME/.config/ponytail/band/` holds one CSV and `board.html`, written by a session in another project. The CSV's name is that project's full Windows path with its separators replaced by `_`, not its basename |
+
 ## Snapshot caching
 
 The init script runs only in the session that builds the environment snapshot.
@@ -636,7 +670,7 @@ setting.
 | `claude` on `PATH` | absent | session |
 | The CLI | `%LOCALAPPDATA%\Claude-Data\claude_<id>\claude-code\<version>\<hash>\claude.exe`; `CLAUDE_CODE_EXECPATH` names it in the session's tool and hook processes | session, scratch |
 | `python3` | the Microsoft Store stub | session |
-| Node | v24.14.0, on `PATH` | session |
+| Node | v24.14.0, on `PATH`; v24.20.0, observed 2026-11-12 | session |
 | `jq` | absent | session |
 | The four `GIT_*` variables and `HARNESS_ASSIGNEE` | set in the session's tool and hook processes | session, scratch |
 | `core.autocrlf` | `true`, from Git for Windows' system config, so a checkout's working files carry CRLF | session |
@@ -709,6 +743,26 @@ install was blocked with
 In a later 2.1.309 session the harness's `SessionStart:startup` and
 `UserPromptSubmit` hooks, both of which print, left one `hook_success` record
 each. Observing the guard takes a probe that provokes a block.
+
+On CLI 2.1.317, observed 2026-11-12 with ECC 2.2.3 and Node v24.20.0, ECC's
+hooks recorded 14 `hook_success` records (2 `SessionStart:startup`,
+8 `PreToolUse:Bash`, 4 `PreToolUse:mcp__ccd_turn__update_plan`),
+0 `hook_non_blocking_error` and 8 `async_hook_response` records with no
+`command`. GateGuard blocked the session's first Bash call. ECC's version is
+the one recorded for 2.1.309, while the CLI moved from 2.1.309 to 2.1.317 and
+Node from v24.14.0 to v24.20.0; the observation does not separate the CLI
+change from the Node change. Evidence:
+`claude/probe-report-windows-2026-11-12.md` in the claude.ai Project
+`plugins_experiments`.
+
+A hook record whose hook sets a `statusMessage` carries that message as
+`command`, observed on 2.1.317 and in a cloud session: ponytail's
+`SessionStart` record carries `Loading ponytail mode...`. A search of `command`
+for a script path does not find such a record.
+
+Ponytail's mode tracker is a second silent hook beside the harness guard: on
+2.1.317 it left no record on an ordinary prompt, on which it prints nothing,
+and the absence does not separate a tracker that ran from one that did not.
 
 ## Diagnostic-output invariant
 
