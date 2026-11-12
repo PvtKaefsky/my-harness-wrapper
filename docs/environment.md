@@ -229,6 +229,58 @@ through `scripts/install-local.sh` with `scripts/plugin-dependencies.sh`.
 ECC's `SessionStart` commands are `node -e` wrappers, which fail on Windows for
 the backslash reason under "Hooks", so the hook script was run directly.
 
+## Ponytail and humanizer
+
+Observed on 2026-11-12 in a cloud session with CLI 2.1.322 (Claude Code), `node`
+v22.23.4 at `/opt/node22/bin/node`, from branch `feat/88-ponytail-humanizer-plugins`
+based on `1406dc2`. The installs ran against a scratch copy of the config
+directory (`CLAUDE_CONFIG_DIR`).
+
+### Live session before any install
+
+| Probe | Observed |
+| --- | --- |
+| Deployed `BOOTSTRAP_VERSION` | `0.1.31`, whose `config/plugins.tsv` named only `ecc@ecc` and `my-harness@my-harness-wrapper` |
+| `claude plugin list --json` | `ponytail@synced` 5.3.3 and `humanizer@synced` 4.0.0, both enabled, scope `synced`, under `plugins/synced/` of the config directory, with no note |
+| Session context | ponytail's `SessionStart` mode line, the `humanizer:humanizer` skill and six `ponytail:` skills |
+
+### Install
+
+| Command | Result |
+| --- | --- |
+| `claude plugin marketplace add DietrichGebert/ponytail` | Exit 0, no prompt, marketplace `ponytail` |
+| `claude plugin install ponytail@ponytail --scope user --yes` | Exit 0, no prompt. Printed "4 userConfig options not yet set — run /plugin configure ponytail@ponytail in Claude Code, or pass --config KEY=VALUE." `settings.json` gained `enabledPlugins` and `extraKnownMarketplaces` entries and no `pluginConfigs` key |
+| `claude plugin marketplace add blader/humanizer` | Exit 0, no prompt |
+| `claude plugin install humanizer@humanizer --scope user --yes` | Exit 0, no prompt |
+
+| Plugin | Version | `gitCommitSha` |
+| --- | --- | --- |
+| `ponytail@ponytail` | 5.3.3 | `96608e078b2d5ea607c5c3b8b5a54d1c1fba6846` |
+| `humanizer@humanizer` | 4.0.0 | `b48c832f0f809c1b5658edbb838c2521b72f2413` |
+
+### Update and dependency step
+
+| Command | Result |
+| --- | --- |
+| `claude plugin marketplace update <name>` and `claude plugin update <id>`, for each plugin | Exit 0, "already at the latest version" |
+| `scripts/plugin-dependencies.sh claude <id>`, for each plugin | `package.json` present, `dependencies` count 0, `npm ci` not run, exit 0 |
+
+### Listing and checks after the installs
+
+| Probe | Observed |
+| --- | --- |
+| `claude plugin list --json` | Both ids enabled at user scope with `notes` null. `ecc@synced`, `my-harness@synced`, `ponytail@synced` and `humanizer@synced` each carry the note "from claude.ai not loaded — "<name>@<name>" on this machine has the same name and takes precedence" |
+| `scripts/verify.sh` with `HARNESS_DIR` at the checkout | Both ids pass the listed, enabled, `installPath` and dependency checks. Prints `test -d <checkout>/plugins/<name> -> no` for each. Its `FAIL` lines all came from the checkout not being a deployed copy: manifest version and config directory, payload, branch, uncommitted changes, and `core.hooksPath` |
+| `claude plugin details humanizer` | One skill, `humanizer`; no agents, hooks or MCP servers; about 124 always-on tokens |
+
+### Headless runs
+
+| Probe | Observed |
+| --- | --- |
+| One headless `claude -p` run | Of four `SessionStart` hook responses, one carried "PONYTAIL MODE ACTIVE — level: full", once |
+| One-turn headless run with ponytail's `userConfig` at defaults | Wrote `/root/.config/ponytail/band/<cwd basename>.csv`, holding a header and one row whose `name` column held the prompt's text, and `board.html` beside it. The path is under `$HOME/.config`, outside `CLAUDE_CONFIG_DIR` |
+| Headless question on whether written code may carry a one-line why comment or a `shortcut:` comment | A session with the payload carrying the rank bullet and a session with the payload from `1406dc2` both answered no, naming the payload's Code comments section. The answer does not distinguish a payload with the rank bullet from one without it |
+
 ## Snapshot caching
 
 The init script runs only in the session that builds the environment snapshot.

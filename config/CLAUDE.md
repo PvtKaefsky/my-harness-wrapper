@@ -63,6 +63,7 @@
 ## Harness
 
 * ECC, the `ecc@ecc` plugin, is the default harness. Use its hooks, gates and reviewer agents in every repository.
+* Ponytail and humanizer, the `ponytail@ponytail` and `humanizer@humanizer` plugins, rank below this file and the `my-harness` plugin's skills. Where their skills, or the context their hooks inject into sessions and subagents, conflict with either, this file and `my-harness` win. For example, ponytail's comment rules give way to Code comments.
 * When the session-start check reports a `FAIL`, the first reply names it.
 * Every task a main session takes follows the `my-harness:task-delegation` skill. A subagent follows its brief instead. Where the main session lists no such skill, it does each task whole and names the missing skill in its first reply.
 * A Markdown or JSON file draws `ecc:code-reviewer` alone. Any other changed file draws every reviewer whose subject it matches: the general code reviewer, the language reviewer for its language, and any domain reviewer it touches. A commit draws the union across its files. Name the reviewers judged applicable and those ruled out.
