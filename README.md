@@ -92,7 +92,7 @@ every session.
 | `config/settings.json` | Settings merged into the config directory's `settings.json`. Its hook commands run the scripts under `${HARNESS_DIR:-/opt/my-harness-wrapper}`. |
 | `config/plugins.tsv` | The plugins bootstrap installs. |
 | `.claude-plugin/marketplace.json` | The plugin marketplace `my-harness-wrapper`. It lists the one plugin under `plugins/`. `claude plugin marketplace add` reads it. |
-| `plugins/my-harness/` | The `my-harness` plugin: the `task-delegation`, `python-property-model-tests`, `edit-russian-technical-text`, `quick-human-readable-review` and `python-fp-refactor` skills, the `executor` and `analyst` agents, and a `UserPromptSubmit` hook. `plugins/my-harness/README.md` describes it. |
+| `plugins/my-harness/` | The `my-harness` plugin: the `task-delegation`, `python-property-model-tests`, `edit-russian-technical-text`, `quick-human-readable-review` and `python-fp-refactor` skills, the `executor` and `analyst` agents, a `UserPromptSubmit` hook, and an eval suite under `evals/`. `plugins/my-harness/README.md` describes it. |
 | `env/setup.sh` | The init script pasted into the environment dialog. It clones this repository and is the only version source. |
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config's signing keys. |

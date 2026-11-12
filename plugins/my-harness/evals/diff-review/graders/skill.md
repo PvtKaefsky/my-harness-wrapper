@@ -1,0 +1,8 @@
+---
+type: tool_used
+tool: Skill
+input_match: '"skill"\s*:\s*"(?:[\w-]+:)?quick-human-readable-review"'
+min: 0
+max: 0
+arm: both
+---
