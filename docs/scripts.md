@@ -1894,7 +1894,29 @@ skipped.
 | `marketplace_source` | `plugin_id` | Plugin |
 | --- | --- | --- |
 | `affaan-m/ECC` | `ecc@ecc` | ECC, the default harness. |
+| `DietrichGebert/ponytail` | `ponytail@ponytail` | Ponytail. Its `SessionStart` and `SubagentStart` hooks inject its rule set into each session and subagent, and it loads an in-process band module, `hooks/band/register.tsx`. |
+| `blader/humanizer` | `humanizer@humanizer` | Humanizer, one skill and no hooks. |
 | `PvtKaefsky/my-harness-wrapper` | `my-harness@my-harness-wrapper` | This repository's own plugin, `plugins/my-harness/`, listed by `.claude-plugin/marketplace.json`. |
+
+`config/CLAUDE.md` ranks ponytail and humanizer below itself and the
+`my-harness` skills. That rank is an instruction to the session, and a hook
+still runs and its text still reaches context.
+
+Each installer run updates ponytail and humanizer to upstream's latest release,
+unpinned. A new release replaces ponytail's hook code, its band module and the
+rule text it injects into every session and subagent, in cloud sessions as
+root and in local sessions. `npm ci --ignore-scripts` in the dependency step
+does not cover hook or module code. The releases installed at issue #88 were
+ponytail 5.3.3 at `96608e0` and humanizer 4.0.0 at `b48c832`.
+
+| Ponytail `userConfig` key | Default | Effect at that default |
+| --- | --- | --- |
+| `ledger` | true | After every turn, writes `$HOME/.config/ponytail/band/<project>.csv` and `board.html` beside it. The CSV's `name` column holds the session name or the first prompt line. |
+| `webhookUrl` | empty | Nothing is sent. Once set, it receives each turn's row as JSON, over https, or over http to `localhost`, `127.0.0.1` or `[::1]`. |
+| `webhookToken` | none | Sent as a Bearer header once `webhookUrl` is set. |
+| `sendNames` | true | A set `webhookUrl` receives the `name` field. |
+
+The installers set no `pluginConfigs`, so these defaults hold.
 
 `claude plugin marketplace add PvtKaefsky/my-harness-wrapper` clones
 `https://github.com/PvtKaefsky/my-harness-wrapper.git` under the config
