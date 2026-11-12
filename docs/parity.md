@@ -29,6 +29,14 @@ Delegation comparison source: main's PR #74 merge at 88d6fe688371a95235dc1541d51
 | --- | --- | --- |
 | Task decomposition and implementation delegation | Native collaboration agents use verified pack roles or the hashed executor brief in each installed release | AGENTS.md renders {{HARNESS_ROOT}}/docs/native-delegation.md. Native tools provide inventory and actual dispatch/completion references. Attempts last at most thirty minutes. Completion waits last at most sixty seconds. The coordinator integrates owned-file edits, then uses native review and guarded commits. Delegation records are not guard-enforced. |
 
+Writing text comparison source: main's PR #87 merge at 1406dc2df29bc102d0b626d9647475e4e91ff588.
+
+| Claude behavior | Local Codex equivalent | Necessary adaptation |
+| --- | --- | --- |
+| Writing text governs artifacts and replies | The merged section follows Documentation | Required parts also include a selected catalog rule under native Harness precedence. |
+| Git workflow checks format and Writing text before posting | The merged check sentence runs once | None. |
+| Policy punctuation contains no em or en dash | Eight existing policy lines use colons, parentheses or commas | No words change. |
+
 The obsolete upstream installer/config template is not run or copied.
 It selects old models/config fields and unrelated MCP defaults.
 Automatic learning, tmux-only execution, external services and upstream executable hooks are not silently enabled.

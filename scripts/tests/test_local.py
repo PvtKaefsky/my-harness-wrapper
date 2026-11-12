@@ -168,6 +168,18 @@ class LocalHarnessTests(unittest.TestCase):
         self.assertIn(str(release) + "/docs/native-delegation.md", policy)
         self.assertNotIn("{{", policy)
 
+    def test_install_writing_text_and_rendered_policy(self) -> None:
+        self.install()
+        policy = (self.profile / ".codex/AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("## Writing text", policy)
+        self.assertIn(
+            "Before posting a pull request description or an issue, the session checks it "
+            "against this format and against Writing text, and corrects it; the check runs once.",
+            policy,
+        )
+        self.assertNotIn("\u2014", policy)
+        self.assertNotIn("\u2013", policy)
+
     def test_preserve_policy_hooks_and_configuration(self) -> None:
         home = self.profile / ".codex"
         home.mkdir(parents=True)
@@ -571,7 +583,7 @@ class LocalHarnessTests(unittest.TestCase):
         pointer = json.loads((self.state / "active.json").read_bytes())
         manifest = json.loads((self.state / "releases" / pointer["release"] / "manifest.json").read_bytes())
         self.assertEqual(manifest["source_commit"], expected)
-        self.assertEqual(manifest["adapter_version"], "2.2.0")
+        self.assertEqual(manifest["adapter_version"], "2.3.0")
         self.assertTrue((self.state / "releases" / pointer["release"] / "docs/native-review.md").exists())
 
     def test_world_writable_state_rejected(self) -> None:
