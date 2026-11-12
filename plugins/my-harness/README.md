@@ -1,7 +1,8 @@
 # my-harness
 
-A Claude Code plugin. It makes a session analyze each task for decomposition
-and delegate each subtask to a routed subagent. The marketplace
+A Claude Code plugin. It ships the task-delegation procedure, which makes a
+session analyze each task for decomposition and delegate each subtask to a
+routed subagent. It also ships four general skills. The marketplace
 `my-harness-wrapper`, at the repository root, lists it.
 
 ## Contents
@@ -11,9 +12,13 @@ and delegate each subtask to a routed subagent. The marketplace
 | `.claude-plugin/plugin.json` | The manifest: name `my-harness` and the version. |
 | `skills/task-delegation/SKILL.md` | The whole procedure: what a delegated session does, analysis, ownership, routing, the brief, running, integration, failure, the report and the bounds. |
 | `skills/task-delegation/references/routing.md` | The coding and analysis routing tables. |
+| `skills/python-property-model-tests/SKILL.md` | Writing Python tests that a unit keeps a property across many inputs or operation sequences: tool choice, property kinds, input strategies, state machines, failing examples and CI determinism. |
+| `skills/edit-russian-technical-text/SKILL.md` | Rules for editing Russian technical prose while keeping its meaning, terms and requirements, with before and after examples. |
+| `skills/quick-human-readable-review/SKILL.md` | The shape of a summary of a finished stage of work or an experiment series: outcome, confirmed results, open questions and next step. |
+| `skills/python-fp-refactor/SKILL.md` | Steps for moving the decisions in Python code that mixes them with I/O or state into functions on values, keeping its behaviour. |
 | `agents/executor.md` | The agent for a coding subtask no specialist matches. |
 | `agents/analyst.md` | The agent for an analysis subtask no specialist matches. |
-| `hooks/hooks.json` | A `UserPromptSubmit` hook printing one line that points every prompt at the skill. |
+| `hooks/hooks.json` | A `UserPromptSubmit` hook printing one line that points every prompt at the `task-delegation` skill. |
 
 ## Agents
 

@@ -10,7 +10,7 @@
     {
       "name": "my-harness",
       "source": "./plugins/my-harness",
-      "description": "Task decomposition and delegation: one skill, two executor agents and a per-prompt reminder."
+      "description": "Five skills (task decomposition and delegation, Python property and model tests, Russian technical text, stage summaries, and separating decisions from I/O in Python), two executor agents and a per-prompt reminder."
     }
   ]
 }
