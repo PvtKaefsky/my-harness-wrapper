@@ -3,7 +3,7 @@
 | Path | Contents |
 | --- | --- |
 | runtime/ | Local delivery contract and native environment boundaries. |
-| native-skills.md | Native skills and reviewers. |
+| native-skills.md | Native packages, third-party skills and instruction rank. |
 | parity.md | Claude parity. |
 | runbook.md | Operator runbook. |
 | scripts.md | Native commands. |

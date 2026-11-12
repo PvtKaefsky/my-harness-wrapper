@@ -1,0 +1,22 @@
+[
+  {
+    "name": "ponytail",
+    "source": "https://github.com/DietrichGebert/ponytail",
+    "plugin_id": "ponytail@ponytail",
+    "install": [
+      ["codex", "plugin", "marketplace", "add", "DietrichGebert/ponytail"],
+      ["codex", "plugin", "add", "ponytail@ponytail"]
+    ],
+    "update": [
+      ["codex", "plugin", "marketplace", "upgrade", "ponytail"],
+      ["codex", "plugin", "add", "ponytail@ponytail"]
+    ]
+  },
+  {
+    "name": "humanizer",
+    "source": "https://github.com/blader/humanizer",
+    "skill_path": ".agents/skills/humanizer/SKILL.md",
+    "install": [["npx", "skills", "add", "blader/humanizer", "--global", "--agent", "codex"]],
+    "update": [["npx", "skills", "update", "humanizer", "--global"]]
+  }
+]

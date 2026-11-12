@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import gitguard
+from . import addons, gitguard
 from .install import Installation
 from .pack import PIN, Pack, decode
 from .storage import json_bytes
@@ -55,12 +55,15 @@ def main(root: Path) -> None:
     elif args.command == "install":
         if args.apply:
             print(installation.apply(args.profile, args.codex_home))
+            _, manifest, directory = installation.load()
+            addons.apply(directory, Path(manifest["profile"]), Path(manifest["codex_home"]))
         else:
             plan = installation.plan(args.profile, args.codex_home)
             print("INSTALL_PLAN\n" + json.dumps(
                 {key: plan[key] for key in ["profile", "codex_home", "source_hash"]},
                 ensure_ascii=False))
             print("\n".join(record["path"] for record in plan["artifacts"]))
+            print(addons.plan(root))
     elif args.command in {"doctor", "session-check"}:
         manifest, directory = installation.verify()
         print("SOURCE_AND_DELIVERY=VERIFIED release=" + manifest["release"])
@@ -69,6 +72,8 @@ def main(root: Path) -> None:
         print("HOOK_TRUST=REQUIRES_PROVIDER_EVIDENCE")
         print("NATIVE_DISCOVERY=REQUIRES_FRESH_PROVIDER_SESSION")
         print(Pack(directory).verify().catalog())
+        if not addons.check(directory, Path(manifest["profile"]), Path(manifest["codex_home"])):
+            raise SystemExit(1)
     elif args.command == "hook":
         raw = sys.stdin.buffer.read(1024 * 1024 + 1)
         if len(raw) > 1024 * 1024:

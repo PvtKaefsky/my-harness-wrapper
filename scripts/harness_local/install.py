@@ -17,7 +17,7 @@ BEGIN = b"<!-- BEGIN my-harness-wrapper -->\n"
 END = b"<!-- END my-harness-wrapper -->\n"
 RUNTIME_INPUTS = ["scripts/harness_local", "scripts/codex-local.py", "config/codex/pack",
                   "config/codex/AGENTS.md", "config/codex/local-pack.sha256",
-                  "config/codex/version", "AGENTS.md", "README.md", "docs"]
+                  "config/codex/version", "config/codex/addons.json", "AGENTS.md", "README.md", "docs"]
 
 
 def encoded(data: bytes | None) -> str | None:
