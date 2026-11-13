@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 PIN = "d468c521f1a76e7b05d446d805f6ad2afa8ed066"
+AUTHORED_PIN = "2c5613913f6bd5e2ea37ed4671f6ad69487fe697"
 
 
 def digest(data: bytes) -> str:
@@ -69,6 +70,11 @@ class Pack:
             if digest(path.read_bytes()) != record["sha256"]:
                 raise ValueError("PACK_ARTIFACT_TAMPERED: " + name)
         catalog = decode((self.path / "catalog.json").read_bytes())
+        authored = ("authored_commit" in manifest or "authored.json" in expected
+                    or any("authored_paths" in record for record in expected.values())
+                    or any(item.get("source_kind") == "authored" for item in catalog["items"]))
+        if authored and manifest.get("authored_commit") != AUTHORED_PIN:
+            raise ValueError("PACK_SCHEMA_INVALID")
         self.items = {}
         paths = set()
         for item in catalog["items"]:
@@ -77,8 +83,15 @@ class Pack:
                 raise ValueError("PACK_ID_INVALID")
             if ident in self.items or name in paths or name not in expected:
                 raise ValueError("PACK_CATALOG_INVALID")
-            if item["sources"] != expected[name].get("upstream_paths"):
+            kind = item.get("source_kind", "upstream")
+            if kind not in {"upstream", "authored"}:
+                raise ValueError("PACK_SOURCE_KIND_INVALID")
+            other = "upstream_paths" if kind == "authored" else "authored_paths"
+            if (item["sources"] != expected[name].get(kind + "_paths")
+                    or other in expected[name]):
                 raise ValueError("PACK_SOURCE_MAPPING_INVALID")
+            if "description" in item and (not isinstance(item["description"], str) or not item["description"]):
+                raise ValueError("PACK_DESCRIPTION_INVALID")
             self.items[ident] = item
             paths.add(name)
         for ident in self.items:

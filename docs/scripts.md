@@ -22,7 +22,7 @@ Invoke scripts/codex-local.py with Python 3.12 in isolated UTF-8 mode.
 config/codex/addons.json is the single inventory read by install, doctor and session-check.
 The file contains each item's upstream source and install/update command arrays.
 Installation includes it in the immutable release runtime and source hash.
-The adapter version is 2.4.0.
+The adapter version is 2.5.0.
 
 | Item | Source | Delivery owner |
 | --- | --- | --- |
@@ -95,7 +95,21 @@ Uninstall and rollback manage only harness artifacts.
 ## Pack maintenance and tests
 
 scripts/build-pack.py builds offline into a new --output directory from pinned vendored bytes.
---upstream-checkout is explicit maintenance, never runtime fetching.
+Catalog items with source_kind set to authored read sources under config/codex/authored/.
+The builder checks their source-inventory.json commit against AUTHORED_PIN and each source against its recorded SHA-256.
+A changed commit fails with AUTHORED_COMMIT_CHANGED.
+A changed source fails with AUTHORED_SOURCE_CHANGED.
+Authored packages use the Harness instructions heading.
+Upstream packages retain the Upstream instructions heading and their existing verification.
+Both package kinds retain the same Codex adapter.
+The generated authored.json records the authored commit and raw-source hashes.
+manifest.json records authored_commit beside upstream_commit and uses authored_paths for authored package records.
+Pack.verify checks the pinned commits, source kinds and exclusive source mappings.
+Upstream-only schema 3 predecessor packs may omit authored metadata.
+An explicit catalog description becomes the installed skill description unchanged.
+Without one, the installer retains the title-based description.
+--upstream-checkout refreshes only upstream sources during explicit maintenance.
+It performs no runtime fetching.
 Validate the emitted manifest hash before updating its anchor.
 scripts/tests/test_local.py uses disposable profiles and real temporary Git repositories.
 Synthetic event/receipt tests do not prove provider execution.

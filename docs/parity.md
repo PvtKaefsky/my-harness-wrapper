@@ -45,6 +45,13 @@ Ponytail and humanizer comparison source: main's PR #90 merge at e0f64d48c17d09b
 | Rank both below the payload and my-harness skills | Wrapper and target policy and native harness skills win conflicts with both items' skills and hook context in sessions and subagents | The Harness bullet names the Codex plugin/skill forms and retains the Code comments example. |
 | Use ponytail's upstream default and lifecycle hooks | The default remains full and hook trust is the operator's /hooks step | Doctor reports presence without claiming hook trust, current upstream content or provider discovery. |
 
+Harness-authored skills comparison source: main's PR #96 merge at 2c5613913f6bd5e2ea37ed4671f6ad69487fe697.
+
+| Claude behavior | Local Codex equivalent | Necessary adaptation |
+| --- | --- | --- |
+| Four my-harness skills for Python property tests, Russian technical text, stage summaries and Python FP refactors | Four harness- skill packages use byte-identical sources under config/codex/authored/ | The builder verifies the recorded merge commit and source hashes, strips front matter and adds the unchanged Codex adapter before the Harness instructions heading. |
+| Source front matter supplies each skill's description | An explicit catalog description supplies the same installed description | Existing packages retain their generated descriptions. |
+
 The obsolete upstream installer/config template is not run or copied.
 It selects old models/config fields and unrelated MCP defaults.
 Automatic learning, tmux-only execution, external services and upstream executable hooks are not silently enabled.

@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PIN = "d468c521f1a76e7b05d446d805f6ad2afa8ed066"
+AUTHORED_PIN = "2c5613913f6bd5e2ea37ed4671f6ad69487fe697"
 
 
 def write_json(path: Path, value: object) -> None:
@@ -14,24 +15,38 @@ def write_json(path: Path, value: object) -> None:
 
 def build(target: Path, sources: Path) -> str:
     provenance = json.loads((ROOT / "config/codex/source-inventory.json").read_text(encoding="utf-8"))
+    authored = ROOT / "config/codex/authored"
+    authored_provenance = json.loads((authored / "source-inventory.json").read_text(encoding="utf-8"))
+    if authored_provenance["commit"] != AUTHORED_PIN:
+        raise ValueError("AUTHORED_COMMIT_CHANGED")
     catalog = json.loads((ROOT / "config/codex/catalog.json").read_text(encoding="utf-8"))
     if target.exists():
         raise ValueError("PACK_DESTINATION_EXISTS")
     target.mkdir(parents=True)
-    records, included = {}, {}
+    records, included, authored_included = {}, {}, {}
     for item in catalog["items"]:
+        kind = item.get("source_kind", "upstream")
+        if kind not in {"upstream", "authored"}:
+            raise ValueError("SOURCE_KIND_INVALID")
+        source_root = authored if kind == "authored" else sources
+        inventory = authored_provenance if kind == "authored" else provenance
+        selected = authored_included if kind == "authored" else included
+        origin = "AUTHORED" if kind == "authored" else "UPSTREAM"
         sections = []
         for name in item["sources"]:
-            raw = (sources / name).read_bytes()
+            if kind == "authored" and (name.startswith("/") or "\\" in name
+                                       or ".." in Path(name).parts or ":" in name):
+                raise ValueError("AUTHORED_PATH_UNSAFE")
+            raw = (source_root / name).read_bytes()
             actual = hashlib.sha256(raw).hexdigest()
-            if actual != provenance["files"][name]["sha256"]:
-                raise ValueError("UPSTREAM_SOURCE_CHANGED: " + name)
-            included[name] = {"sha256": actual, "status": "full-body-preserved"}
+            if actual != inventory["files"][name]["sha256"]:
+                raise ValueError(origin + "_SOURCE_CHANGED: " + name)
+            selected[name] = {"sha256": actual, "status": "full-body-preserved"}
             text = raw.decode("utf-8")
             if text.startswith("---"):
                 end = text.find("\n---", 3)
                 if end == -1:
-                    raise ValueError("UPSTREAM_METADATA_MALFORMED")
+                    raise ValueError(origin + "_METADATA_MALFORMED")
                 text = text[end + 4:].lstrip("\r\n")
             sections.append(text)
         header = (
@@ -42,13 +57,13 @@ def build(target: Path, sources: Path) -> str:
             "identify the corresponding harness-workflow skill. Inherit the operator's model choices; "
             "Claude model names do not select a Codex model. Never fabricate unavailable tools, "
             "reviewers or completion evidence. External actions still require task authorization.\n\n"
-            "## Upstream instructions\n\n")
+            "## " + ("Harness" if kind == "authored" else "Upstream") + " instructions\n\n")
         data = (header + "\n\n".join(sections)).encode("utf-8")
         path = target / item["path"]
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
         records[item["path"]] = {"sha256": hashlib.sha256(data).hexdigest(),
-                                 "upstream_paths": item["sources"]}
+                                 kind + "_paths": item["sources"]}
     license_data = (sources / "LICENSE").read_bytes()
     if hashlib.sha256(license_data).hexdigest() != provenance["files"]["LICENSE"]["sha256"]:
         raise ValueError("UPSTREAM_LICENSE_CHANGED")
@@ -59,13 +74,18 @@ def build(target: Path, sources: Path) -> str:
         "adaptation": "Original bodies retained; Claude metadata replaced by native Codex registration.",
         "files": included,
     })
+    write_json(target / "authored.json", {
+        "repository": "PvtKaefsky/my-harness-wrapper", "commit": AUTHORED_PIN,
+        "files": authored_included,
+    })
     (target / "CATALOG.md").write_text(
         "# Shared local workflow catalog\n\n" + "\n".join(
             "- " + item["id"] + ": " + item["title"] for item in catalog["items"]
         ) + "\n", encoding="utf-8", newline="\n")
-    for name in ("LICENSE", "catalog.json", "upstream.json", "CATALOG.md"):
+    for name in ("LICENSE", "catalog.json", "upstream.json", "authored.json", "CATALOG.md"):
         records[name] = {"sha256": hashlib.sha256((target / name).read_bytes()).hexdigest()}
-    write_json(target / "manifest.json", {"schema_version": 3, "upstream_commit": PIN, "files": records})
+    write_json(target / "manifest.json", {"schema_version": 3, "upstream_commit": PIN,
+                                           "authored_commit": AUTHORED_PIN, "files": records})
     return hashlib.sha256((target / "manifest.json").read_bytes()).hexdigest()
 
 
@@ -77,7 +97,9 @@ def main() -> None:
     source = ROOT / "config/codex/upstream"
     if args.upstream_checkout:
         catalog = json.loads((ROOT / "config/codex/catalog.json").read_text(encoding="utf-8"))
-        names = {"LICENSE"} | {name for item in catalog["items"] for name in item["sources"]}
+        names = {"LICENSE"} | {name for item in catalog["items"]
+                               if item.get("source_kind", "upstream") == "upstream"
+                               for name in item["sources"]}
         for name in sorted(names):
             data = subprocess.check_output(["git", "-C", str(args.upstream_checkout),
                                             "show", PIN + ":" + name])

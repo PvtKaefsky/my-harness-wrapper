@@ -905,6 +905,50 @@
         "rules/typescript/testing.md"
       ],
       "title": "typescript testing"
+    },
+    {
+      "description": "Writes tests that a Python unit keeps a property across many inputs or sequences of operations. Use for parsers, serializers, data transformations, state machines, caches and numeric code, and when the user asks for property-based, Hypothesis, invariant or model-based tests.",
+      "id": "skill/python-property-model-tests",
+      "path": "skills/python-property-model-tests/SKILL.md",
+      "requires": "Python and project test runner",
+      "source_kind": "authored",
+      "sources": [
+        "skills/python-property-model-tests/SKILL.md"
+      ],
+      "title": "Python property and model tests"
+    },
+    {
+      "description": "Makes Russian technical prose clearer while keeping its meaning, terms and requirements. Use for Russian replies, Russian text the user gives to edit, Russian deliverables the user asked for, and Russian documentation in a project whose conventions use Russian.",
+      "id": "skill/edit-russian-technical-text",
+      "path": "skills/edit-russian-technical-text/SKILL.md",
+      "requires": "Russian technical prose",
+      "source_kind": "authored",
+      "sources": [
+        "skills/edit-russian-technical-text/SKILL.md"
+      ],
+      "title": "Edit Russian technical text"
+    },
+    {
+      "description": "Shapes a summary of a finished stage of work, a run, a benchmark or an experiment series, with the outcome first, then confirmed results with their evidence, open questions and one next step. Use whenever the user asks for the outcome, results or summary of such work; it is not a code review and does not apply to a request to review code or a diff.",
+      "id": "skill/quick-human-readable-review",
+      "path": "skills/quick-human-readable-review/SKILL.md",
+      "requires": "finished stage or experiment evidence",
+      "source_kind": "authored",
+      "sources": [
+        "skills/quick-human-readable-review/SKILL.md"
+      ],
+      "title": "Quick human-readable review"
+    },
+    {
+      "description": "Separates the decisions in Python code from its I/O and state (files, network, models, global state, time, randomness) into functions on values, keeping its behaviour. Use when the user asks to simplify, untangle or refactor Python code that mixes them, and not otherwise.",
+      "id": "skill/python-fp-refactor",
+      "path": "skills/python-fp-refactor/SKILL.md",
+      "requires": "Python and project regression tests",
+      "source_kind": "authored",
+      "sources": [
+        "skills/python-fp-refactor/SKILL.md"
+      ],
+      "title": "Python FP refactor"
     }
   ],
   "schema_version": 1

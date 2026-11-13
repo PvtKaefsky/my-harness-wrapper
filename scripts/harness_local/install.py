@@ -248,9 +248,10 @@ class Installation:
                 path = home / "agents" / (agent + ".toml")
             else:
                 native = "harness-" + ("workflow-" if kind == "workflow" else "") + name
+                description = item.get("description", item["title"] + ". Apply the harness " + ident +
+                                       " within the user's current task authorization.")
                 raw = ("---\nname: " + native + "\ndescription: " +
-                       json.dumps(item["title"] + ". Apply the harness " + ident +
-                                  " within the user's current task authorization.") +
+                       json.dumps(description) +
                        "\n---\n\n" + instructions).encode("utf-8")
                 path = profile / ".agents/skills" / native / "SKILL.md"
             specs.append({"path": str(path), "kind": "file", "after": encoded(raw)})
