@@ -10,6 +10,13 @@ import unittest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CLI = ROOT / "scripts" / "codex-local.py"
+AUTHORED_COMMIT = "2c5613913f6bd5e2ea37ed4671f6ad69487fe697"
+AUTHORED_HASHES = {
+    "python-property-model-tests": "5dc7dfa21956d0973d637b33f267079b6246c07421b7331026a7e1003e36b0c2",
+    "edit-russian-technical-text": "a3e7457726fc3b1af949a3c9df5f3ea36ba49c95bbf272fa95a285de6ebdf739",
+    "quick-human-readable-review": "bdf82298bf33437d7f8c3bfc33964d24b5c175b97b0033a2a58b9f6f63579c9a",
+    "python-fp-refactor": "18f425b674bab74b7f250295e99968379a155a7c17f853347925fbda3624dc8b",
+}
 
 
 def private_fixture(path: Path, allow_world_write: bool = False, inherit_only: bool = False, delete_child: bool = False) -> None:
@@ -326,7 +333,7 @@ elif tool == "npx" and arguments[:2] == ["skills", "add"] and not os.environ.get
         self.assertIn("SOURCE_AND_DELIVERY=VERIFIED", self.run_cli("doctor"))
         skills = list((self.profile / ".agents/skills").glob("harness-*/SKILL.md"))
         agents = list((self.profile / ".codex/agents").glob("harness-*.toml"))
-        self.assertEqual(len(skills), 58)
+        self.assertEqual(len(skills), 62)
         self.assertEqual(len(agents), 14)
         for path in agents:
             agent = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -572,6 +579,92 @@ elif tool == "npx" and arguments[:2] == ["skills", "add"] and not os.environ.get
         self.run_cli("uninstall", "--apply")
         self.assertEqual((home / "AGENTS.md").read_bytes(), b"Personal policy without newline")
 
+    def legacy_upstream_source(self) -> Path:
+        import hashlib
+        source = self.source_copy()
+        pack = source / "config/codex/pack"
+        catalog_path = pack / "catalog.json"
+        catalog = json.loads(catalog_path.read_bytes())
+        authored_items = [item for item in catalog["items"] if item.get("source_kind") == "authored"]
+        self.assertEqual(len(authored_items), 4)
+        catalog["items"] = [item for item in catalog["items"] if item not in authored_items]
+        catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+        (source / "config/codex/catalog.json").write_bytes(catalog_path.read_bytes())
+        (pack / "CATALOG.md").write_text(
+            "# Shared local workflow catalog\n\n" + "\n".join(
+                "- " + item["id"] + ": " + item["title"] for item in catalog["items"]
+            ) + "\n", encoding="utf-8")
+        manifest_path = pack / "manifest.json"
+        manifest = json.loads(manifest_path.read_bytes())
+        manifest.pop("authored_commit")
+        for name in ["authored.json", *(item["path"] for item in authored_items)]:
+            (pack / name).unlink()
+            manifest["files"].pop(name)
+        for name in ["catalog.json", "CATALOG.md"]:
+            manifest["files"][name]["sha256"] = hashlib.sha256((pack / name).read_bytes()).hexdigest()
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        (source / "config/codex/local-pack.sha256").write_text(
+            hashlib.sha256(manifest_path.read_bytes()).hexdigest() + "\n", encoding="ascii")
+        (source / "config/codex/version").write_text("2.4.0\n", encoding="ascii")
+        verifier = source / "scripts/harness_local/pack.py"
+        verifier.write_text(verifier.read_text(encoding="utf-8").replace(
+            '\n                or manifest.get("authored_commit") != AUTHORED_PIN', ''), encoding="utf-8")
+        return source
+
+    def test_legacy_upstream_pack_upgrade_and_rollback(self) -> None:
+        legacy = self.legacy_upstream_source()
+        self.run_cli("install", "--profile", self.profile, "--apply", source=legacy)
+        active_before = (self.state / "active.json").read_bytes()
+        self.assertIn("SOURCE_AND_DELIVERY=VERIFIED", self.run_cli("doctor", source=legacy))
+        self.install()
+        self.assertNotEqual((self.state / "active.json").read_bytes(), active_before)
+        for name in AUTHORED_HASHES:
+            self.assertTrue((self.profile / ".agents/skills" / ("harness-" + name) / "SKILL.md").is_file())
+        self.assertIn("PASS ROLLED_BACK", self.run_cli("rollback", "--apply"))
+        self.assertEqual((self.state / "active.json").read_bytes(), active_before)
+        for name in AUTHORED_HASHES:
+            self.assertFalse((self.profile / ".agents/skills" / ("harness-" + name) / "SKILL.md").exists())
+        self.assertIn("SOURCE_AND_DELIVERY=VERIFIED", self.run_cli("doctor"))
+
+    def test_legacy_upstream_pack_interrupted_upgrade_recovery(self) -> None:
+        legacy = self.legacy_upstream_source()
+        self.run_cli("install", "--profile", self.profile, "--apply", source=legacy)
+        active_before = (self.state / "active.json").read_bytes()
+        source = self.base / "interrupted-upgrade"
+        shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+        module = source / "scripts/harness_local/install.py"
+        original = module.read_text(encoding="utf-8")
+        selector = "                atomic_write(path, value)"
+        self.assertEqual(original.count(selector), 1)
+        module.write_text(original.replace(selector, selector + "\n                raise OSError('fixture interruption')"),
+                          encoding="utf-8")
+        self.run_cli("install", "--profile", self.profile, "--apply", source=source, expected=1)
+        self.assertTrue((self.state / "journal.json").exists())
+        self.assertIn("PASS RECOVERED", self.run_cli("recover", "--apply"))
+        self.assertEqual((self.state / "active.json").read_bytes(), active_before)
+        self.assertFalse((self.state / "journal.json").exists())
+        self.assertIn("SOURCE_AND_DELIVERY=VERIFIED", self.run_cli("doctor"))
+        self.install()
+        self.assertIn("SOURCE_AND_DELIVERY=VERIFIED", self.run_cli("doctor"))
+
+    def test_authored_pack_requires_exact_commit_pin(self) -> None:
+        import hashlib
+        source = self.source_copy()
+        manifest_path = source / "config/codex/pack/manifest.json"
+        original = json.loads(manifest_path.read_bytes())
+        for commit in [None, "0" * 40]:
+            with self.subTest(authored_commit=commit):
+                manifest = dict(original)
+                if commit is None:
+                    manifest.pop("authored_commit")
+                else:
+                    manifest["authored_commit"] = commit
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                (source / "config/codex/local-pack.sha256").write_text(
+                    hashlib.sha256(manifest_path.read_bytes()).hexdigest() + "\n", encoding="ascii")
+                self.assertIn("PACK_SCHEMA_INVALID",
+                              self.run_cli("verify-source", source=source, expected=1))
+
     def test_recovery_preserves_expected_and_refuses_concurrent_edits(self) -> None:
         self.install()
         active = (self.state / "active.json").read_bytes()
@@ -647,6 +740,8 @@ elif tool == "npx" and arguments[:2] == ["skills", "add"] and not os.environ.get
         inventory = json.loads((ROOT / "config/codex/source-inventory.json").read_text())
         catalog = json.loads((ROOT / "config/codex/catalog.json").read_text())
         for item in catalog["items"]:
+            if item.get("source_kind") == "authored":
+                continue
             emitted = (ROOT / "config/codex/pack" / item["path"]).read_bytes()
             for name in item["sources"]:
                 raw = (ROOT / "config/codex/upstream" / name).read_bytes()
@@ -656,6 +751,118 @@ elif tool == "npx" and arguments[:2] == ["skills", "add"] and not os.environ.get
                     end = body.find("\n---", 3)
                     body = body[end + 4:].lstrip("\r\n")
                 self.assertIn(body.encode("utf-8"), emitted)
+
+    def test_authored_packages_preserve_merge_sources_and_bodies(self) -> None:
+        import hashlib
+        authored = ROOT / "config/codex/authored"
+        inventory = json.loads((authored / "source-inventory.json").read_bytes())
+        self.assertEqual(inventory["commit"], AUTHORED_COMMIT)
+        expected_paths = {"skills/" + name + "/SKILL.md" for name in AUTHORED_HASHES}
+        self.assertEqual(set(inventory["files"]), expected_paths)
+        destination = self.base / "authored-rebuild"
+        result = subprocess.run(
+            [sys.executable, "-X", "utf8", "-I", str(ROOT / "scripts/build-pack.py"),
+             "--output", str(destination)], capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        manifest = json.loads((destination / "manifest.json").read_bytes())
+        self.assertEqual(manifest["authored_commit"], AUTHORED_COMMIT)
+        self.assertEqual(manifest["upstream_commit"], "d468c521f1a76e7b05d446d805f6ad2afa8ed066")
+        catalog = json.loads((destination / "catalog.json").read_bytes())
+        items = {item["id"]: item for item in catalog["items"]}
+        for name, expected_hash in AUTHORED_HASHES.items():
+            with self.subTest(skill=name):
+                path = "skills/" + name + "/SKILL.md"
+                raw = (authored / path).read_bytes()
+                self.assertEqual(hashlib.sha256(raw).hexdigest(), expected_hash)
+                self.assertEqual(inventory["files"][path]["sha256"], expected_hash)
+                item = items["skill/" + name]
+                self.assertEqual(item["source_kind"], "authored")
+                self.assertEqual(item["sources"], [path])
+                self.assertEqual(item["path"], path)
+                self.assertTrue(item["title"])
+                self.assertTrue(item["requires"])
+                front_matter, body = raw.split(b"\n---\n", 1)
+                description = next(line.removeprefix("description: ")
+                                   for line in front_matter.decode("utf-8").splitlines()
+                                   if line.startswith("description: "))
+                self.assertEqual(item["description"], description)
+                for directory in [destination, ROOT / "config/codex/pack"]:
+                    emitted = (directory / path).read_bytes()
+                    self.assertEqual(emitted.count(b"## Harness instructions\n\n"), 1)
+                    self.assertEqual(emitted.split(b"## Harness instructions\n\n", 1)[1],
+                                     body.lstrip(b"\r\n"))
+                self.assertEqual(manifest["files"][path]["authored_paths"], [path])
+                self.assertNotIn("upstream_paths", manifest["files"][path])
+
+    def test_authored_installed_descriptions_preserve_exact_sources_and_existing_defaults(self) -> None:
+        self.install()
+        self.assertIn("SOURCE_AND_DELIVERY=VERIFIED", self.run_cli("doctor"))
+        catalog = json.loads((ROOT / "config/codex/catalog.json").read_bytes())
+        items = {item["id"]: item for item in catalog["items"]}
+        for name in AUTHORED_HASHES:
+            self.assertTrue("skill/" + name in items, "Missing authored skill: " + name)
+        for ident, item in items.items():
+            kind, name = ident.split("/", 1)
+            if kind not in {"skill", "workflow"}:
+                continue
+            with self.subTest(instruction=ident):
+                native = "harness-" + ("workflow-" if kind == "workflow" else "") + name
+                installed = self.profile / ".agents/skills" / native / "SKILL.md"
+                text = installed.read_text(encoding="utf-8")
+                description = json.loads(next(line.removeprefix("description: ")
+                                              for line in text.splitlines()
+                                              if line.startswith("description: ")))
+                if name in AUTHORED_HASHES:
+                    raw = (ROOT / "config/codex/authored/skills" / name / "SKILL.md").read_text(encoding="utf-8")
+                    expected = next(line.removeprefix("description: ")
+                                    for line in raw.split("\n---\n", 1)[0].splitlines()
+                                    if line.startswith("description: "))
+                else:
+                    expected = (item["title"] + ". Apply the harness " + ident +
+                                " within the user's current task authorization.")
+                self.assertEqual(description, expected)
+
+    def test_authored_source_changed_byte_rejected(self) -> None:
+        source = self.source_copy()
+        path = source / "config/codex/authored/skills/python-fp-refactor/SKILL.md"
+        raw = path.read_bytes()
+        path.write_bytes(bytes([raw[0] ^ 1]) + raw[1:])
+        result = subprocess.run(
+            [sys.executable, "-X", "utf8", "-I", str(source / "scripts/build-pack.py"),
+             "--output", str(self.base / "authored-tamper")],
+            capture_output=True, text=True, encoding="utf-8")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("AUTHORED_SOURCE_CHANGED", result.stdout + result.stderr)
+
+    def test_upstream_source_changed_byte_still_rejected(self) -> None:
+        source = self.source_copy()
+        path = source / "config/codex/upstream/skills/api-design/SKILL.md"
+        raw = path.read_bytes()
+        path.write_bytes(bytes([raw[0] ^ 1]) + raw[1:])
+        result = subprocess.run(
+            [sys.executable, "-X", "utf8", "-I", str(source / "scripts/build-pack.py"),
+             "--output", str(self.base / "upstream-tamper")],
+            capture_output=True, text=True, encoding="utf-8")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("UPSTREAM_SOURCE_CHANGED", result.stdout + result.stderr)
+
+    def test_authored_pack_source_mapping_rejected(self) -> None:
+        import hashlib
+        source = self.source_copy()
+        pack = source / "config/codex/pack"
+        catalog_path = pack / "catalog.json"
+        catalog = json.loads(catalog_path.read_bytes())
+        item = next(item for item in catalog["items"] if item["id"] == "skill/python-fp-refactor")
+        item["source_kind"] = "upstream"
+        catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+        manifest_path = pack / "manifest.json"
+        manifest = json.loads(manifest_path.read_bytes())
+        manifest["files"]["catalog.json"]["sha256"] = hashlib.sha256(catalog_path.read_bytes()).hexdigest()
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        (source / "config/codex/local-pack.sha256").write_text(
+            hashlib.sha256(manifest_path.read_bytes()).hexdigest() + "\n", encoding="ascii")
+        self.assertIn("PACK_SOURCE_MAPPING_INVALID",
+                      self.run_cli("verify-source", source=source, expected=1))
 
     def test_git_line_ending_conversion_preserves_hashed_assets(self) -> None:
         shutil.copyfile(ROOT / ".gitattributes", self.target / ".gitattributes")
@@ -777,7 +984,7 @@ elif tool == "npx" and arguments[:2] == ["skills", "add"] and not os.environ.get
         pointer = json.loads((self.state / "active.json").read_bytes())
         manifest = json.loads((self.state / "releases" / pointer["release"] / "manifest.json").read_bytes())
         self.assertEqual(manifest["source_commit"], expected)
-        self.assertEqual(manifest["adapter_version"], "2.4.0")
+        self.assertEqual(manifest["adapter_version"], "2.5.0")
         self.assertTrue((self.state / "releases" / pointer["release"] / "docs/native-review.md").exists())
 
     def test_world_writable_state_rejected(self) -> None:

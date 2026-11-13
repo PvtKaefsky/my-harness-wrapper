@@ -96,3 +96,7 @@
 - rule/typescript/patterns: typescript patterns
 - rule/typescript/security: typescript security
 - rule/typescript/testing: typescript testing
+- skill/python-property-model-tests: Python property and model tests
+- skill/edit-russian-technical-text: Edit Russian technical text
+- skill/quick-human-readable-review: Quick human-readable review
+- skill/python-fp-refactor: Python FP refactor

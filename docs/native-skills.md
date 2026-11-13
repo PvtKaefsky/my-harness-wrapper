@@ -2,11 +2,24 @@
 
 ## Harness packages
 
-The catalog generates 58 skill/workflow packages and 14 reviewer TOML definitions.
+The catalog generates 62 skill/workflow packages and 14 reviewer TOML definitions.
 Names begin with harness-. Models inherit the parent.
 Selected original bodies remain intact with a Codex adapter preface and native metadata.
 Original bytes/license live under config/codex/upstream.
 source-inventory.json retains the original audit/exclusion evidence.
+
+Harness-authored bytes live under config/codex/authored/skills/.
+config/codex/authored/source-inventory.json records their source commit and SHA-256 values.
+Their packages use the Harness instructions heading and retain the same Codex adapter.
+Their installed descriptions equal their source front-matter descriptions.
+Existing packages retain their generated descriptions.
+
+| Catalog ID | Installed skill |
+| --- | --- |
+| skill/python-property-model-tests | harness-python-property-model-tests |
+| skill/edit-russian-technical-text | harness-edit-russian-technical-text |
+| skill/quick-human-readable-review | harness-quick-human-readable-review |
+| skill/python-fp-refactor | harness-python-fp-refactor |
 
 Skills install in the user's .agents/skills; agents install in CODEX_HOME/agents.
 The wrapper need not be the provider-selected target repository.
