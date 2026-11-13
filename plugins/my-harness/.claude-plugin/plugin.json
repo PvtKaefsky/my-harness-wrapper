@@ -1,6 +1,6 @@
 {
   "name": "my-harness",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Five skills (task decomposition and delegation, Python property and model tests, Russian technical text, stage summaries, and separating decisions from I/O in Python), two executor agents and a per-prompt reminder.",
   "author": {
     "name": "PvtKaefsky"
