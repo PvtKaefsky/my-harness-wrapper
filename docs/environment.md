@@ -670,7 +670,9 @@ Both edits of (u) arrived as `issue_comment.edited` events carrying the new body
 
 Pull request comments in `config/CLAUDE.md` names no category for a held answer whose reviewer cannot run.
 
-Not probed: a comment by another account, `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
+A conversation comment by another account, 6982333847, posted at 2026-11-18T15:01:03Z, asked a question and a heading rename. `ReadNotifications` returned no queued notification at about 15:02 and again at 15:02:31Z. The session found the comment by listing the pull request's comments and did not answer it. Whether events are delivered for another account's comments, or only later, is not established, so the session's handling of such an event is not probed.
+
+Not probed: `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
 
 ## Issues
 

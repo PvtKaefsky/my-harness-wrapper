@@ -8,7 +8,7 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | --- | --- |
 | After creating a pull request, a cloud session subscribes to its activity. | probe |
 | A session answers each comment whose author is the pull request's author once, and again only where an edit changes what it asks. | probe |
-| A session answers no comment by another account and no comment it posted itself. | probe, own comments only |
+| A session answers no comment by another account and no comment it posted itself. | probe, own comments only; another account's comment produced no event |
 | A session posts each reply where its comment was asked, through `mcp__github__add_reply_to_pull_request_comment` in a review thread and `mcp__github__add_issue_comment` otherwise, reads it back by its ID, and writes no attribution line into it. | probe |
 | A reply is in its comment's language, and the text the session sends carries no greeting, label or footer. | probe |
 | A change a comment requests is pushed before the reply, and the reply names its commit. | probe |
