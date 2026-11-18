@@ -668,11 +668,37 @@ Both edits of (u) arrived as `issue_comment.edited` events carrying the new body
 | 1 | `Which commit added docs/requirements.md?` | none; the question is unchanged |
 | 2 | `Which commit added docs/requirements.md, and which commit added its first row?` | 6982239489 quoting both questions, after a CLEAR on the second; 6982195877 deleted as a duplicate of its first answer, read back 404 |
 
-Pull request comments in `config/CLAUDE.md` names no category for a held answer whose reviewer cannot run.
+When (t) ran, Pull request comments in `config/CLAUDE.md` named no category for a held answer whose reviewer cannot run; it now names `reviewer unavailable`.
 
 A conversation comment by another account, 6982333847, posted at 2026-11-18T15:01:03Z, asked a question and a heading rename. `ReadNotifications` returned no queued notification at about 15:02 and again at 15:02:31Z. The session found the comment by listing the pull request's comments and did not answer it. Whether events are delivered for another account's comments, or only later, is not established, so the session's handling of such an event is not probed.
 
-Not probed: `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
+### The other-account probe on pull request #107
+
+The scheduling tool is `mcp__claude-code-remote__send_later`, taking `message`, `delay_minutes` or `at`, `name` and `initiation`. Each call schedules one message into the same session, so a check every 30 minutes is re-armed at the end of each check. `mcp__claude-code-remote__create_trigger` takes a cron schedule whose usual minimum interval is one hour.
+
+The first `send_later` call was made at 15:19:35Z, scheduled for 15:50:00Z, with 15:19:29Z as the first check's `since` cursor. The user had the first check run by hand at 15:35:00Z, so its trigger was deleted unfired. The re-arm call at 15:36:11Z with `delay_minutes` 30 returned `fire_at` 16:07:00Z.
+
+| Account | Association | Comments | Events received |
+| --- | --- | --- | --- |
+| `PvtKaefsky`, the pull request's author | `OWNER` | (y), (z) and the session's own replies | `issue_comment.created` for (y) and (z); `pull_request_review_comment.created` for the two thread replies; none for the conversation replies |
+| the second account | `NONE` | (v), (w) and two copies of (x), posted 15:25:10Z to 15:31:27Z | none by 15:36:37Z |
+
+Every comment read back with `user.type` `User`.
+
+| Comment | Comment ID | Reached the session by | Check | Review | Reply ID | Commit |
+| --- | --- | --- | --- | --- | --- | --- |
+| (v) `which file holds the answer-check rule?` | 6982983783 | the check at 15:35:00Z | `answer-check -> clear` | CLEAR | 6983274375 | none |
+| (w) a heading rename in `docs/environment.md` | 6983008776 | the check at 15:35:00Z | `held-check -> held: not a collaborator` | after the user's release, `ecc:code-reviewer` APPROVE, `ecc:security-reviewer` CLEAR | held notice 6983263949, deleted after the release and read back 404; then 6983330437 | `6e22d53` |
+| (x) `does this bullet cover review comments too?`, on `config/CLAUDE.md` line 114, posted as a reply in the thread rooted at 4615287918 | 4616452265 | the check at 15:35:00Z | `answer-check -> clear` | CLEAR | 4616572713, `in_reply_to_id` 4615287918 | none |
+| (x), the same question on line 117 | 4616472032 | the check at 15:35:00Z | `answer-check -> clear` | CLEAR | 4616573267, `in_reply_to_id` 4616472032 | none |
+| (y) a wording change in `README.md` | 6983189772 | event | `held-check -> held: touch a file the pull request does not already change`, from `git diff --name-only origin/main...HEAD`, which did not list `README.md` | not run | held notice 6983209657 | none |
+| (z) `which function in scripts/attribution-guard.sh prints the matched line?` | 6983192953 | event | `answer-check -> clear` | started, then stopped with `TaskStop` before it returned; status `killed`, no verdict | held notice 6983218920, `reviewer unavailable` | none |
+
+Every reply read back as the text sent plus the footer. The session's thread replies produced events and drew no answer.
+
+The table does not show that the second account's comments are never delivered as events; it shows none arrived by 15:36:37Z.
+
+Not probed: a bot's comment, the seven-day stop, the ten-comment cap, `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
 
 ## Issues
 
