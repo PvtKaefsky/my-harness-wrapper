@@ -698,6 +698,8 @@ Every reply read back as the text sent plus the footer. The session's thread rep
 
 The table does not show that the second account's comments are never delivered as events; it shows none arrived by 15:36:37Z.
 
+After the user made the second account a collaborator, its conversation comment 6983884772, posted at 15:58:37Z, read back with association `COLLABORATOR` and arrived as an `issue_comment.created` event by 15:58:46Z. It asked a question and a heading rename, both handled as the user's own: the rename was pushed as `cf0264f` before reply 6983913335, which quotes both. One comment does not show that delivery depends on the association.
+
 Not probed: a bot's comment, the seven-day stop, the ten-comment cap, `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
 
 ## Issues
