@@ -672,7 +672,7 @@ When (t) ran, Pull request comments in `config/CLAUDE.md` named no category for 
 
 A conversation comment by another account, 6982333847, posted at 2026-11-18T15:01:03Z, asked a question and a heading rename. `ReadNotifications` returned no queued notification at about 15:02 and again at 15:02:31Z. The session found the comment by listing the pull request's comments and did not answer it. Whether events are delivered for another account's comments, or only later, is not established, so the session's handling of such an event is not probed.
 
-### The other-account probe on pull request #107
+### The second-account probe on pull request #107
 
 The scheduling tool is `mcp__claude-code-remote__send_later`, taking `message`, `delay_minutes` or `at`, `name` and `initiation`. Each call schedules one message into the same session, so a check every 30 minutes is re-armed at the end of each check. `mcp__claude-code-remote__create_trigger` takes a cron schedule whose usual minimum interval is one hour.
 
