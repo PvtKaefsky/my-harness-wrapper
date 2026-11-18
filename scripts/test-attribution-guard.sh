@@ -129,7 +129,7 @@ run_case 'gh pr create --body-file clean.md' 0 "$(bash_in 'gh pr create --title 
 run_case 'gh pr create -F clean.md' 0 "$(bash_in 'gh pr create --title t -F clean.md')"
 run_case 'pull request tool body, clean' 0 "$(tool_in "$CLEAN")"
 run_case 'grep for the footer, not a pull request operation' 0 "$(bash_in "grep -n '$FOOT_BY' docs/scripts.md")"
-run_case 'input that is not JSON' 0 'not json'
+run_case 'input that is not valid JSON' 0 'not json'
 run_case 'gh issue create --body, Generated with' 2 "$(bash_in "gh issue create --title t --body \"$CLEAN
 
 $FOOT_WITH\"")"
