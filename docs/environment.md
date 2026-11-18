@@ -522,19 +522,20 @@ descriptions and issues only.
 
 ### Which paths append the footer
 
-Measured on pull request #107 for the two conversation-comment tools, with
-bodies sent without the footer; "Pull request activity" below records the
-posts. The other rows are not measured.
+Measured on pull request #107, with bodies sent without the footer; "Pull
+request activity" below records the posts. Rows reading "not measured" were not
+posted through. No path measured stores a reply without the footer, and the
+`gh api` responses already carried it.
 
 | Path | Body field | Footer appended by the path | An edit removes it |
 | --- | --- | --- | --- |
 | `gh issue comment` | `--body`, `-b`, `--body-file`, `-F` | not measured | not measured |
-| `gh pr comment` | `--body`, `-b`, `--body-file`, `-F` | not measured | not measured |
+| `gh pr comment` | `--body`, `-b`, `--body-file`, `-F` | unavailable: GraphQL refused with HTTP 403, nothing posted, for comment 6978116929 | not measured |
 | `gh pr review` | `--body`, `-b`, `--body-file`, `-F` | not measured | not measured |
-| `gh api` | the `body` field | not measured | not measured |
-| `mcp__github__add_issue_comment` | `body` | yes, on #107 | no, through `mcp__github__update_issue_comment` |
+| `gh api` | the `body` field | response and stored body carried the footer, on `issues/107/comments` reply 6978125112 and `pulls/107/comments/4613679530/replies` reply 4613685178 | not measured |
+| `mcp__github__add_issue_comment` | `body` | stored body carried the footer, on #107 | no, through `mcp__github__update_issue_comment` |
 | `mcp__github__update_issue_comment` | `body` | the footer stays after an edit, on #107 | no |
-| `mcp__github__add_reply_to_pull_request_comment` | `body` | not measured | not measured |
+| `mcp__github__add_reply_to_pull_request_comment` | `body` | stored body carried the footer, reply 4613683249 | not measured |
 | `mcp__github__pull_request_review_write` | `body` | not measured | not measured |
 | `mcp__github__add_comment_to_pending_review` | `body` | not measured | not measured |
 
@@ -572,7 +573,22 @@ Each comment arrived as an `issue_comment.created` event marked `trust="relay"`,
 
 None of the five replies produced an event.
 
-Not probed: an inline review comment and its thread reply through `mcp__github__add_reply_to_pull_request_comment`, a comment by another account, an edited comment, and unsubscription at merge.
+### The posting-path probe on pull request #107
+
+`gh` 2.89.0 is installed. `gh auth status` reports the token in `GH_TOKEN` as invalid, yet `gh api` read and write calls succeed as `PvtKaefsky`. `gh pr comment` fails with HTTP 403 and the message "GitHub GraphQL is not available from Claude Code sessions; use the REST API".
+
+The inline comment arrived as a `pull_request_review_comment.created` event whose data carried `author`, `comment`, `comment_id`, `file`, `line` and `pr`. Two of the comments meant as inline arrived as conversation comments.
+
+| Comment | Comment ID | Path | Reply ID | Stored reply |
+| --- | --- | --- | --- | --- |
+| (f) `Which commit added the comment read-back?` | 6978116929 | `gh pr comment 107` | none | unavailable |
+| (f) | 6978116929 | `gh api repos/PvtKaefsky/my-harness-wrapper/issues/107/comments` | 6978125112 | footer |
+| (g) `Is this row observed or only stated?`, inline on `docs/environment.md` line 553 | 4613679530 | `mcp__github__add_reply_to_pull_request_comment` | 4613683249 | footer |
+| (g) | 4613679530 | `gh api repos/PvtKaefsky/my-harness-wrapper/pulls/107/comments/4613679530/replies` | 4613685178 | footer |
+
+Each stored reply read back with `user.login` `PvtKaefsky` and the same footer. Thread replies read back with `in_reply_to_id` 4613679530. Both thread replies, 4613683249 and 4613685178, produced `pull_request_review_comment.created` events carrying their IDs, `author` `PvtKaefsky` and the stored body with the footer. The conversation reply 6978125112 produced none. The session's own replies are told apart only by the IDs its post calls returned.
+
+Not probed: a comment by another account, an edited comment, and unsubscription at merge.
 
 ## Issues
 
@@ -821,8 +837,12 @@ that records observations records the sandbox.
   different single repository attached left the 17:42 build as the snapshot a
   later session with this repository attached restored.
 * The shape of `tool_response` a `PostToolUse` hook receives for an MCP tool.
-* Whether any path other than `mcp__github__add_issue_comment` appends the
-  footer itself, and whether any edit path removes one it appends.
+* Which layer appends the footer to comments posted through both the GitHub
+  MCP tools and `gh api`.
+* Whether `gh issue comment`, `gh pr review`,
+  `mcp__github__pull_request_review_write` and
+  `mcp__github__add_comment_to_pending_review` append the footer, and whether
+  any edit path removes one.
 * Which ECC release or CLI version, if any, installs `ecc@ecc`'s npm
   dependencies itself.
 * Whether a `claude plugin install` of a later CLI version, or a delivered key
