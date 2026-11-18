@@ -538,6 +538,18 @@ deleted.
 
 No `PostToolUse` entry covers a comment, review or reply path.
 
+## Pull request activity
+
+Observed in a cloud session at `3f2b68b`, `BOOTSTRAP_VERSION` `0.1.35`.
+
+| Fact | Observed |
+| --- | --- |
+| Subscription tool | `mcp__claude-code-remote__subscribe_pr_activity`, taking `owner`, `repo` and `pullNumber` |
+| Unsubscription tool | `mcp__claude-code-remote__unsubscribe_pr_activity`, taking the same fields |
+| `mcp__github__subscribe_pr_activity` | not in the session's tool list |
+| Events listed by the tool's description | comments, reviews, CI results and other pull request events |
+| Holder | one session per pull request, as stated by the tool's description |
+
 ## Issues
 
 `mcp__github__issue_write` with `method` `create` returns two fields, `id` and
