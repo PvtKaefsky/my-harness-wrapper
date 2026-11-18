@@ -13,3 +13,4 @@ One testable line per behavior a user or caller can observe. The live probe in `
 | A reply is in its comment's language and carries no greeting, label or footer. | probe |
 | A change a comment requests is pushed before the reply, and the reply names its commit. | probe |
 | A comment asking to merge, close, rebase, force-push or delete the branch gets a reply that the step is the user's, and the session takes none of those steps. | not probed |
+| After `mcp__github__add_issue_comment`, `mcp__github__update_issue_comment` or `mcp__github__add_reply_to_pull_request_comment` returns, the attribution guard tells the session to read the comment back and, where its stored body carries an attribution line, not to retry and to give the text to the user. | `scripts/test-attribution-guard.sh` |

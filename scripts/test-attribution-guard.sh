@@ -4,6 +4,7 @@ set -uo pipefail
 GUARD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/attribution-guard.sh"
 MARK='attribution-guard: matched line ->'
 RESEND='attribution-guard: resend the description this create call sent, unchanged, through mcp__github__update_pull_request.'
+REPORT='attribution-guard: read the comment back by the id this call returned; where its stored body carries an attribution line, do not retry the post or edit it again, and give the comment text to the user to post.'
 fails=0
 
 echo "test -f $GUARD -> $([ -f "$GUARD" ] && echo yes || echo no)"
@@ -18,6 +19,7 @@ SETTINGS="$ROOT/config/settings.json"
 ENTRY=$(jq -c '[.hooks.PreToolUse[]? | select(type == "object") | select(any(.hooks[]?; (.command | type) == "string" and (.command | contains("attribution-guard.sh"))))] | first // empty' "$SETTINGS" 2>/dev/null)
 MATCHER=$(printf '%s' "$ENTRY" | jq -r '.matcher // empty | strings' 2>/dev/null)
 HOOK_CMD=$(printf '%s' "$ENTRY" | jq -r '[.hooks[] | .command | strings | select(contains("attribution-guard.sh"))] | first // empty' 2>/dev/null)
+POST_MATCHER=$(jq -r '[.hooks.PostToolUse[]? | select(type == "object") | select(any(.hooks[]?; (.command | type) == "string" and (.command | contains("attribution-guard.sh")))) | .matcher | strings] | first // empty' "$SETTINGS" 2>/dev/null)
 echo "test -f $SETTINGS -> $([ -f "$SETTINGS" ] && echo yes || echo no)"
 echo "PreToolUse matcher naming attribution-guard.sh in $SETTINGS -> ${MATCHER:-none}"
 if [ -z "$MATCHER" ] || [ -z "$HOOK_CMD" ]; then
@@ -59,6 +61,14 @@ run_hook() {
   input=$(cat)
   tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null)
   if ! printf '%s\n' "$tool" | grep -a -q -x -E -- "$MATCHER"; then return 0; fi
+  printf '%s' "$input" | HARNESS_DIR=$ROOT bash -c "$HOOK_CMD"
+}
+
+run_post_hook() {
+  local input tool
+  input=$(cat)
+  tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null)
+  if ! printf '%s\n' "$tool" | grep -a -q -x -E -- "$POST_MATCHER"; then return 0; fi
   printf '%s' "$input" | HARNESS_DIR=$ROOT bash -c "$HOOK_CMD"
 }
 
@@ -253,6 +263,18 @@ run_case 'create response text content carrying a body with the marker' 2 "$(pos
 
 ---
 $FOOT_SERVER" '[{type:"text",text:({number:3,body:$b} | tojson)}]')")" "$RESEND"
+comment_in() { jq -n --arg t "$1" --argjson r "$2" '{hook_event_name:"PostToolUse",tool_name:$t,tool_input:{owner:"o",repo:"r",body:"what changed, in one sentence."},tool_response:$r}'; }
+for tool in mcp__github__add_issue_comment mcp__github__update_issue_comment mcp__github__add_reply_to_pull_request_comment; do
+  run_case "$tool response with no body, through the delivered hook" 2 "$(comment_in "$tool" '{"id":"1","url":"https://github.com/o/r/pull/3#issuecomment-1"}')" "$REPORT" run_post_hook
+  run_case "$tool response with a body carrying the marker" 2 "$(comment_in "$tool" "$(jq -n --arg b "$CLEAN
+
+---
+$FOOT_BY" '{id:1,body:$b}')")" "$REPORT"
+  run_case "$tool response with a clean body" 0 "$(comment_in "$tool" "$(jq -n --arg b "$CLEAN" '{id:1,body:$b}')")"
+  run_case "$tool error response" 0 "$(comment_in "$tool" '{"isError":true,"content":[{"type":"text","text":"failed to create comment"}]}')"
+done
+run_case 'mcp__github__add_reply_to_pull_request_comment response with a nested body only' 2 "$(comment_in mcp__github__add_reply_to_pull_request_comment "$(jq -n --arg b "$CLEAN" '{id:1,in_reply_to:{id:2,body:$b}}')")" "$REPORT"
+run_case 'comment response with no body for a tool outside the comment read-back' 0 "$(comment_in mcp__github__pull_request_review_write '{"id":"1"}')"
 
 echo "fail -> $fails"
 [ "$fails" -eq 0 ]
