@@ -632,6 +632,20 @@ Each comment read back with `user.login` `PvtKaefsky`. Each reply read back as t
 
 The released answer to (k) cites `README.md` on branch `platform/codex` at `5c0a5c4`, which requires Python 3.12 for that branch's scripts. It did not go to `ecc:security-reviewer`; the section does not say whether a released answer does.
 
+### The quote probe on pull request #107
+
+Both comments arrived as `issue_comment.created` events and read back with `user.login` `PvtKaefsky`. Each reply was posted through `mcp__github__add_issue_comment` and read back as the text sent plus the footer.
+
+| Comment | Quote | `answer-check` | `ecc:security-reviewer` | Answer | Reply ID |
+| --- | --- | --- | --- | --- | --- |
+| (n) 6981583899 | `which test covers the PreToolUse footer block?` | `clear` | CLEAR | the delivered-hook footer cases in `scripts/test-attribution-guard.sh` | 6981602566, then 6981644299 |
+| (n) 6981583899 | `and which bash version runs it?` | `held: tools and their versions` | not run while held; CLEAR on the re-check after the user's release | held notice in 6981602566; after the release, the first line of `bash --version` in 6981644299 | 6981602566, then 6981644299 |
+| (o) 6981654104 | `` `@PvtKaefsky` which commit removed the comment read-back? `` | `clear` | CLEAR | `8ae7791` | 6981671799 |
+
+Both quotes in each reply read back verbatim and in the order asked. The stored body of 6981671799 keeps the mention in backticks.
+
+Reply 6981602566 carried both quotes, the first answer and the held notice. After the user released the second question in the session, the session deleted 6981602566, read it back as HTTP 404, and posted 6981644299 with both quotes and both answers, so the comment kept one reply.
+
 Not probed: a comment by another account, an edited comment, a held answer rejected in the session, a held change released in the session, `ecc:security-reviewer` unable to run, the cleanup bullet's other triggers, and unsubscription at merge.
 
 ## Issues
