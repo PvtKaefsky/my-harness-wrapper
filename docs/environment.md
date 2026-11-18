@@ -632,7 +632,7 @@ Each comment read back with `user.login` `PvtKaefsky`. Each reply read back as t
 
 The released answer to (k) cites `README.md` on branch `platform/codex` at `5c0a5c4`, which requires Python 3.12 for that branch's scripts. It did not go to `ecc:security-reviewer`; the section does not say whether a released answer does.
 
-### The quote probe on pull request #107
+### The quoting probe on pull request #107
 
 Both comments arrived as `issue_comment.created` events and read back with `user.login` `PvtKaefsky`. Each reply was posted through `mcp__github__add_issue_comment` and read back as the text sent plus the footer.
 
