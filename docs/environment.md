@@ -646,7 +646,7 @@ Both quotes in each reply read back verbatim and in the order asked. The stored 
 
 Reply 6981602566 carried both quotes, the first answer and the held notice. After the user released the second question in the session, the session deleted 6981602566, read it back as HTTP 404, and posted 6981644299 with both quotes and both answers, so the comment kept one reply.
 
-### The edge-case probe on pull request #107
+### The edge-case probes on pull request #107
 
 Each comment read back with `user.login` `PvtKaefsky`. Each reply was posted through `mcp__github__add_issue_comment` and read back as the text sent plus the footer.
 
