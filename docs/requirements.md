@@ -8,6 +8,7 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | --- | --- |
 | After creating a pull request, a cloud session subscribes to its activity. | probe |
 | A session checks the pull request every 30 minutes with its scheduling tool, until it merges or closes or seven days pass with no new comment, and answers at most ten comments per check. | probe, scheduling and re-arming only; a fired check, the interval, the stop and the cap not probed |
+| If scheduling the next check fails, the session says so in its reply. | not probed |
 | A session answers each comment by a human account once, and again only where an edit changes what it asks. | probe |
 | A session answers no comment by a bot account. | not probed |
 | A session answers no comment it posted itself. | probe |
