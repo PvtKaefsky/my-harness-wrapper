@@ -548,7 +548,7 @@ Observed in a cloud session at `3f2b68b`, `BOOTSTRAP_VERSION` `0.1.35`.
 | Unsubscription tool | `mcp__claude-code-remote__unsubscribe_pr_activity`, taking the same fields |
 | `mcp__github__subscribe_pr_activity` | not in the session's tool list |
 | Events listed by the tool's description | comments, reviews, CI results and other pull request events |
-| Holder | one session per pull request, as stated by the tool's description |
+| Event holder | one session per pull request, as stated by the tool's description |
 
 ## Issues
 
