@@ -539,7 +539,7 @@ posted through. No path measured stores a reply without the footer, and the
 | `mcp__github__pull_request_review_write` | `body` | not measured | not measured |
 | `mcp__github__add_comment_to_pending_review` | `body` | not measured | not measured |
 
-The `PostToolUse` entry covers `mcp__github__add_issue_comment`, `mcp__github__update_issue_comment` and `mcp__github__add_reply_to_pull_request_comment`; `docs/scripts.md` describes it.
+No `PostToolUse` entry covers a comment, review or reply path; the `PreToolUse` scan blocks a footer written into a comment's input.
 
 ## Pull request activity
 

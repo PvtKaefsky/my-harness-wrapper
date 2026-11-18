@@ -26,12 +26,9 @@ block() {
   exit 2
 }
 
-NEXT='resend the description this create call sent, unchanged, through mcp__github__update_pull_request.'
-WHAT='create response carries no string field named body, so the description was not checked.'
-
 resend() {
   printf 'attribution-guard: %s\n' "$1" >&2
-  printf 'attribution-guard: %s\n' "$NEXT" >&2
+  printf 'attribution-guard: resend the description this create call sent, unchanged, through mcp__github__update_pull_request.\n' >&2
   exit 2
 }
 
@@ -52,18 +49,11 @@ if [ -z "$TOOL" ]; then exit 0; fi
 
 EVENT=$(printf '%s' "$INPUT" | jq -r '.hook_event_name // empty' 2>/dev/null)
 if [ "$EVENT" = PostToolUse ]; then
-  BODIES='[.tool_response | ., (.. | strings | try fromjson catch empty)] | [.[] | .. | objects | select(has("body")) | .body | strings]'
-  case "$TOOL" in
-    mcp__github__create_pull_request) ;;
-    mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment)
-      NEXT='read the comment back by the id this call returned; where its stored body carries an attribution line, do not retry the post or edit it again, and give the comment text to the user to post.'
-      WHAT='comment response carries no string field named body, so the stored body was not checked.'
-      BODIES='[.tool_response | ., (.. | strings | try fromjson catch empty)] | [.[] | objects | .body | strings]' ;;
-    *) exit 0 ;;
-  esac
+  if [ "$TOOL" != mcp__github__create_pull_request ]; then exit 0; fi
   if [ "$(printf '%s' "$INPUT" | LC_ALL=C wc -c)" -gt 1048576 ]; then
-    resend 'the hook input exceeds 1 MiB, so it was not checked.'
+    resend 'the hook input exceeds 1 MiB, so the description was not checked.'
   fi
+  BODIES='[.tool_response | ., (.. | strings | try fromjson catch empty)] | [.[] | .. | objects | select(has("body")) | .body | strings]'
   need_re
   hit=$(printf '%s' "$INPUT" | jq -r "$BODIES | .[]" 2>/dev/null | grep -a -i -o -E -m1 -- "$RE" 2>/dev/null | head -n 1)
   if [ -n "$hit" ]; then resend "matched line in the response body -> $(sanitize "$hit")"; fi
@@ -71,7 +61,7 @@ if [ "$EVENT" = PostToolUse ]; then
   if [ -n "$COUNT" ] && [ "$COUNT" != 0 ]; then exit 0; fi
   FAILED=$(printf '%s' "$INPUT" | jq -r '.tool_response as $r | if ($r | type) == "object" and ($r.isError == true or ((($r.error | type) == "string" or ($r.error | type) == "object") and ($r.error | length) > 0)) then "yes" else "no" end' 2>/dev/null)
   if [ "$FAILED" = yes ]; then exit 0; fi
-  resend "the $WHAT"
+  resend 'the create response carries no string field named body, so the description was not checked.'
 fi
 
 if [ "$TOOL" = Bash ]; then

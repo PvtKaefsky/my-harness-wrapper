@@ -1537,11 +1537,10 @@ hook matches these tool names exactly.
 | `mcp__github__merge_pull_request` | A merge commit, with its title and message. |
 | `mcp__github__enable_pr_auto_merge` | A merge that GitHub makes later. Whether its input carries a commit message is not verified. |
 
-The `PostToolUse` hook matches `mcp__github__create_pull_request`,
-`mcp__github__add_issue_comment`, `mcp__github__update_issue_comment` and
-`mcp__github__add_reply_to_pull_request_comment`. `mcp__github__add_issue_comment`
-has been observed appending the footer itself; `docs/environment.md` records it
-under "The footer on comments, reviews and replies".
+The `PostToolUse` hook matches `mcp__github__create_pull_request` only. Every
+comment and reply path measured stores the footer with the comment;
+`docs/environment.md` records the measurements under "The footer on comments,
+reviews and replies".
 
 An input whose `hook_event_name` is `PostToolUse` takes the path under
 "The PostToolUse path" below. Any other input, one with no `hook_event_name`
@@ -1624,33 +1623,25 @@ that found nothing. `scripts/verify.sh` is what separates them.
 
 ### The PostToolUse path
 
-It acts on `mcp__github__create_pull_request` and on the three comment tools
-the hook matches. Any other `tool_name` exits 0, the issue tool among them, so an
-issue create has no `PostToolUse` path.
+It acts only on `mcp__github__create_pull_request`. Any other `tool_name` exits
+0, the issue tool among them, so an issue create has no `PostToolUse` path.
 
 The first row that fits decides the outcome.
 
 | Input | Exit | Output |
 | --- | --- | --- |
-| Hook input over 1 MiB | 2 | That the input was not checked, and the tool's instruction line, on stderr. |
-| A string field named `body` in `tool_response`, at the depth the next paragraph sets, matching the pattern above | 2 | The matched text, and the same instruction, on stderr. |
+| Hook input over 1 MiB | 2 | That the input was not checked, and the instruction to resend the description unchanged through `mcp__github__update_pull_request`, on stderr. |
+| A string field named `body` in `tool_response`, at any depth, matching the pattern above | 2 | The matched text, and the same instruction, on stderr. |
 | One or more string fields named `body`, none matching | 0 | None. |
 | `tool_response` an object whose `isError` is `true`, or whose `error` is a non-empty string or object | 0 | None. |
-| Anything else | 2 | That no string field named `body` was found, so the description or the stored comment body was not checked, and the same instruction, on stderr. |
+| Anything else | 2 | That no string field named `body` was found, and the same instruction, on stderr. |
 
-The search covers `tool_response` itself and every string in it that parses as
-JSON, one level deep, so a `body` inside a JSON-encoded text content block is
-found. For the create tool it reads `body` at any depth of each; for the comment
-tools it reads only a top-level `body`, so a quoted comment's `body` does not
-count as the stored one.
+The depth search covers `tool_response` itself and every string in it that
+parses as JSON, one level deep, so a `body` inside a JSON-encoded text content
+block is found.
 
-| Tool | Instruction line |
-| --- | --- |
-| `mcp__github__create_pull_request` | `attribution-guard: resend the description this create call sent, unchanged, through mcp__github__update_pull_request.` |
-| The three comment tools | `attribution-guard: read the comment back by the id this call returned; where its stored body carries an attribution line, do not retry the post or edit it again, and give the comment text to the user to post.` |
-
-A comment response observed on pull request #107 carries `id` and `url` only,
-so every successful comment post draws the comment instruction.
+The instruction line is
+`attribution-guard: resend the description this create call sent, unchanged, through mcp__github__update_pull_request.`
 
 These gaps are accepted, not handled.
 
@@ -1662,7 +1653,7 @@ These gaps are accepted, not handled.
 | A footer added after the create call returns | Not in the response, so the guard does not see it. |
 | `jq` absent | The guard exits 0 before reading the event, as on the `PreToolUse` path. |
 
-Exit 2 on `PostToolUse` does not undo the create or the comment post. It puts the stderr text in
+Exit 2 on `PostToolUse` does not undo the create. It puts the stderr text in
 front of the session after the call has run.
 
 ### The verify.sh assertion
@@ -1714,12 +1705,11 @@ too.
 
 Runs `scripts/attribution-guard.sh` from its own directory against a fixed set
 of cases, directly and through the `PreToolUse` command and matcher of the
-tree's `config/settings.json`, and the comment response cases through its
-`PostToolUse` command and matcher. It is run by hand only. Neither `scripts/verify.sh` nor
+tree's `config/settings.json`. It is run by hand only. Neither `scripts/verify.sh` nor
 `scripts/session-check.sh` runs it.
 
 Each case pipes one JSON hook input into the guard: a tool call as the
-`PreToolUse` hook passes it, or, for the create and comment response cases, a
+`PreToolUse` hook passes it, or, for the create response cases, a
 `PostToolUse` event carrying `tool_response`. A case marked as through the
 delivered hook runs only where its `tool_name` matches that entry's matcher as
 a whole string, and then runs the entry's command with `HARNESS_DIR` set to the
@@ -1738,8 +1728,7 @@ working directory while the cases run and is removed on exit.
 
 A case expecting exit 2 passes only where the guard's stderr also carries its
 marker: `attribution-guard: matched line ->` for a `PreToolUse` case, and the
-resend instruction line for a create response case, and the comment
-instruction line for a comment response case. The script exits 0 where every case
+resend instruction line for a `PostToolUse` case. The script exits 0 where every case
 passed, and 1 otherwise.
 
 | Case | Input | Expected exit |
@@ -1795,12 +1784,6 @@ passed, and 1 otherwise.
 | Create response over 1 MiB with a clean `body` | A `body` of 1,100,000 bytes with no footer | 2 |
 | Update response with a `body` carrying the marker | A `PostToolUse` event whose `tool_name` is `mcp__github__update_pull_request` | 0 |
 | Create response text content carrying a `body` with the marker | A text content block whose JSON-encoded text carries that `body` | 2 |
-| `mcp__github__add_issue_comment`, `mcp__github__update_issue_comment` and `mcp__github__add_reply_to_pull_request_comment` response with no `body`, through the delivered `PostToolUse` hook | An `id` and a `url` only | 2 |
-| The same three tools, response with a `body` carrying the marker | A `body` ending in a `---` rule and the `Generated by` footer | 2 |
-| The same three tools, response with a clean `body` | A `body` with no footer | 0 |
-| The same three tools, error response | `isError` set to `true` | 0 |
-| `mcp__github__add_reply_to_pull_request_comment` response with a nested `body` only | A clean `body` inside an `in_reply_to` object, none at the top level | 2 |
-| Comment response with no `body` for a tool outside the comment read-back | `mcp__github__pull_request_review_write` with an `id` only | 0 |
 
 ## scripts/test-hook-forwarding.sh
 

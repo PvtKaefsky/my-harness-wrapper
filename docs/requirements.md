@@ -18,4 +18,3 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A comment that asks for nothing gets no reply and no reaction, and the session's reply lists it as read. | probe, `ok` only |
 | An answer in a held category is not given: the session writes an `answer-check -> held: <category>` line and asks for confirmation in the session, and only a confirmation typed in the session releases it. | probe, held path only |
 | An answer that draws on anything beyond the repository's tracked files and the pull request goes to `ecc:security-reviewer` before it is given. | probe |
-| After `mcp__github__add_issue_comment`, `mcp__github__update_issue_comment` or `mcp__github__add_reply_to_pull_request_comment` returns, the attribution guard tells the session to read the comment back and, where its stored body carries an attribution line, not to retry and to give the text to the user. | `scripts/test-attribution-guard.sh` |
