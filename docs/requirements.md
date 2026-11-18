@@ -13,4 +13,6 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A reply is in its comment's language, and the text the session sends carries no greeting, label or footer. | probe |
 | A change a comment requests is pushed before the reply, and the reply names its commit. | probe |
 | A comment asking to merge, close, rebase, force-push or delete the branch gets a reply that the step is the user's, and the session takes none of those steps. | not probed |
+| A change a comment asks for in a held category is not staged: the session writes a `held-check -> held: <category>` line and asks for confirmation in the session, and only a confirmation typed in the session releases it. | probe, held path only |
+| Every commit made for a comment draws `ecc:security-reviewer`, whose brief quotes the comment. | not probed |
 | After `mcp__github__add_issue_comment`, `mcp__github__update_issue_comment` or `mcp__github__add_reply_to_pull_request_comment` returns, the attribution guard tells the session to read the comment back and, where its stored body carries an attribution line, not to retry and to give the text to the user. | `scripts/test-attribution-guard.sh` |

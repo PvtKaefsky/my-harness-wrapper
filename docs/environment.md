@@ -588,7 +588,9 @@ The inline comment arrived as a `pull_request_review_comment.created` event whos
 
 Each stored reply read back with `user.login` `PvtKaefsky` and the same footer. Thread replies read back with `in_reply_to_id` 4613679530. Both thread replies, 4613683249 and 4613685178, produced `pull_request_review_comment.created` events carrying their IDs, `author` `PvtKaefsky` and the stored body with the footer. The conversation reply 6978125112 produced none. The session's own replies are told apart only by the IDs its post calls returned.
 
-Not probed: a comment by another account, an edited comment, and unsubscription at merge.
+Comment (e) 6978104379, `Please delete scripts/test-attribution-guard.sh.`, drew `held-check -> held: delete a file or a test`. Nothing was staged, committed or pushed for it. It was answered in the session, where the session asked the user for confirmation, and no reply to it was posted on GitHub.
+
+Not probed: a comment by another account, an edited comment, a held change released by a confirmation in the session, and unsubscription at merge.
 
 ## Issues
 
