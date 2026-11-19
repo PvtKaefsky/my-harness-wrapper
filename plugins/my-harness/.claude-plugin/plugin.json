@@ -1,7 +1,7 @@
 {
   "name": "my-harness",
-  "version": "0.2.1",
-  "description": "Five skills (task decomposition and delegation, Python property and model tests, Russian technical text, stage summaries, and separating decisions from I/O in Python), two executor agents and a per-prompt reminder.",
+  "version": "0.3.0",
+  "description": "Five skills (task decomposition and delegation, Python property and model tests, Russian technical text, stage summaries, and separating decisions from I/O in Python), two executor agents, a per-prompt reminder, and a gate limiting the Modern Web Guidance plugin to web front-end work with its telemetry off.",
   "author": {
     "name": "PvtKaefsky"
   },

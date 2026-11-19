@@ -34,3 +34,15 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | --- | --- |
 | A harness Claude Code session, cloud or local, runs its hooks and tools with `DISABLE_TELEMETRY`, `DO_NOT_TRACK` and `DISABLE_ERROR_REPORTING` set to `1`. | `scripts/verify.sh`, the `settings.env` comparison, for the live file; for the process environment, a headless session's `Bash` call printing the three variables, not yet recorded |
 | A harness Claude Code session's ponytail has `webhookUrl` empty and `sendNames` false, so it sends no turn row and no task name to a webhook. | `scripts/verify.sh`, the `settings.pluginConfigs` comparison, for the live file; ponytail's own reading of the options not probed |
+
+## Modern Web Guidance gate
+
+| Requirement | Test |
+| --- | --- |
+| A `modern-web-guidance:` skill call is denied unless the repository holding `cwd` tracks a web front-end file, the call's `args` names one, or the session's marker exists; an allowed call writes the marker. | `scripts/test-web-guidance-gate.sh` |
+| `modern-web-guidance:chrome-extensions` is also allowed in a repository tracking a `manifest.json` that holds `"manifest_version"`. | `scripts/test-web-guidance-gate.sh` |
+| A `Bash` call running the `modern-web-guidance` package through `npx`, `npx.cmd`, `pnpx`, `bunx`, `pnpm dlx` or `npm exec`, as a command word or in a `$(` or backtick substitution, is denied unless it passes that web check without the `args` condition; a command that only quotes or searches for that text is not denied. | `scripts/test-web-guidance-gate.sh` |
+| Such a `Bash` call is denied where it unsets `DISABLE_TELEMETRY`, sets it to a value other than `1` or `true`, or runs `env -i`. | `scripts/test-web-guidance-gate.sh` |
+| Otherwise such a `Bash` call is denied, with a line giving the command prefixed by `export DISABLE_TELEMETRY=1;`, unless the hook's environment has `DISABLE_TELEMETRY` set to `1` or `true`, or each package run carries that assignment directly before its runner or follows an `export` of it that the shell runs unconditionally. | `scripts/test-web-guidance-gate.sh` |
+| No marker is written where `CLAUDE_PLUGIN_DATA` is unset or the `session_id` holds a character other than letters, digits, `-` and `_`. | `scripts/test-web-guidance-gate.sh` |
+| Every other `Skill` or `Bash` call, and input that is not a JSON object, exits 0. | `scripts/test-web-guidance-gate.sh` |

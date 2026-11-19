@@ -1887,6 +1887,203 @@ skipped.
 
 `UNMATCHED` lines do not set the exit status.
 
+## plugins/my-harness/hooks/web-guidance-gate.sh
+
+The `PreToolUse` hook of the `my-harness` plugin, matcher `Skill|Bash`, runs
+it with a 10-second timeout. It reads the hook input from stdin. A plugin hook
+runs in every session that loads the plugin, so the gate reaches cloud, local
+and Cowork sessions, where a hook in `config/settings.json` reaches only the
+first two.
+
+### What it gates
+
+| Tool | Gated call |
+| --- | --- |
+| `Skill` | `tool_input.skill` starts with `modern-web-guidance:` |
+| `Bash` | A simple command in `tool_input.command` runs the `modern-web-guidance` package through `npx`, `npx.cmd`, `pnpx`, `bunx`, `pnpm dlx` or `npm exec` |
+
+The gate joins backslash-newline continuations, then splits the command into
+simple commands after each `;`, `&`, `|`, `&&`, `||` and newline. A simple
+command runs the package where the runner is its command word, after an
+optional `then`, `do`, `else`, `elif` or `!`, any leading assignments and an
+optional `env`, `sudo`, `command`, `exec`, `nohup`, `time`, `timeout` or
+`xargs` with its arguments, or opens a `$(` or backtick substitution; and
+where the package name, with an optional `@` version, follows the runner as a
+word or after `=`, as in `--package=modern-web-guidance`. A command that only
+names the package, such as a `git clone` of its repository, a `grep` for the
+runner line or a commit message quoting it, is not gated. Every other call
+exits 0. The tool name and the command are checked before any `git` call, and
+a `Bash` command not holding the string `modern-web-guidance` exits after two
+`jq` calls.
+
+### The web check
+
+A gated call passes the web check where any of these holds:
+
+| Condition | Source |
+| --- | --- |
+| `git ls-files` at the top level of the repository holding `cwd` lists a web front-end file | the hook input's `cwd` |
+| for `modern-web-guidance:chrome-extensions` only, a tracked `manifest.json` that is a regular file and not a symbolic link holds `"manifest_version"` | the same repository |
+| a `Skill` call's `tool_input.args` names a web front-end file | the call |
+| the session's marker exists | `${CLAUDE_PLUGIN_DATA}/web-guidance-sessions/<session_id>` |
+
+A web front-end file is a path ending in `.html`, `.htm`, `.css`, `.scss`,
+`.sass`, `.less`, `.jsx`, `.tsx`, `.vue`, `.svelte` or `.astro`, compared
+without case, with one further extension allowed, as in `.html.j2` or
+`.html.erb`. Plain `.js` and `.ts` files do not count. In `args`, each
+whitespace-separated word is compared after leading and trailing quotes,
+brackets and sentence punctuation are stripped.
+
+A call that fails the web check exits 2 with the line
+`web-guidance-gate: modern-web-guidance applies only to web front-end work. In a repository without web files, call the skill again with args naming the web file the task creates or changes.`
+
+### The marker
+
+An allowed `Skill` call writes an empty marker file named by the hook input's
+`session_id`, so the session's later package runs pass the web check. No marker
+is written, and none is read, where `CLAUDE_PLUGIN_DATA` is unset or the
+`session_id` holds anything other than letters, digits, `-` and `_`. The
+plugin data directory is outside every repository and is kept across plugin
+updates. Markers are never removed.
+
+### The telemetry check
+
+A `Bash` call that passes the web check exits 2 with the line
+`web-guidance-gate: the command unsets DISABLE_TELEMETRY or sets it to a value other than 1 or true; remove that and run the package with DISABLE_TELEMETRY=1.`
+where the command holds a `DISABLE_TELEMETRY=` assignment of any value other
+than `1` or `true`, quoted or bare, an `unset`, `-u` or `--unset` naming
+`DISABLE_TELEMETRY`, or an `env -i` or `env --ignore-environment`. The scan
+reads the whole command text, quoted text and arguments included.
+
+Otherwise the call exits 0 where the hook's own environment has
+`DISABLE_TELEMETRY` set to `1` or `true`, as `config/settings.json`'s `env`
+provides in Claude Code sessions. Without it, each gated simple command passes
+only where one of these holds:
+
+- `DISABLE_TELEMETRY=1` or `DISABLE_TELEMETRY=true`, quoted or bare, is among
+  the assignments directly before its runner, or before the wrapper command
+  that starts the runner;
+- an earlier simple command in the same call is an `export` of that
+  assignment, and the shell runs that `export` unconditionally: it follows a
+  `;`, a newline or the start of the command, and is followed by `;`, `&&` or
+  a newline.
+
+A gated simple command meeting neither makes the call exit 2 with the line
+`web-guidance-gate: run the package with telemetry off: export DISABLE_TELEMETRY=1; <command>`,
+with each newline of the command written as `; ` and every other control
+character as `?`. A Cowork session has no settings `env`, so there only the
+in-command forms pass. The gate never rewrites a command, because
+`updatedInput` is documented only with an `allow` decision, which skips the
+permission prompt.
+
+### Known limits
+
+The gate matches command text with regular expressions and does not parse
+shell syntax.
+
+| Input | Result |
+| --- | --- |
+| The package name built at run time, as in `P=modern-web-guidance; npx $P`, or split by quotes | not gated |
+| A runner the table above does not name, such as `yarn dlx` or `npm x`, or an installed `modern-web-guidance` binary | not gated |
+| A run inside a `sh -c` or `bash -c` string with no separator before the runner, as in `sh -c "npx modern-web-guidance q"` | not gated |
+| A separator inside quotes before a runner, as in `echo "a; npx modern-web-guidance q"` | gated, so the call can be denied although nothing runs |
+| Two package runs in one simple command, as in `DISABLE_TELEMETRY=1 npx modern-web-guidance $(npx modern-web-guidance)` | read as one prefixed run |
+| `env DISABLE_TELEMETRY=1 npx modern-web-guidance` | denied without the hook's environment variable, although telemetry is off |
+| `DISABLE_TELEMETRY=1 sudo npx modern-web-guidance`, where `sudo` resets the environment | allowed, although the package may run with telemetry on |
+| A gated command whose quoted text or arguments hold `DISABLE_TELEMETRY=0`, as in `echo DISABLE_TELEMETRY=0; DISABLE_TELEMETRY=1 npx modern-web-guidance` | denied, although the run has telemetry off |
+| A heredoc line starting with the runner | gated |
+
+In a Claude Code session the settings `env` also reaches the package's
+process, so an ungated run there still has `DISABLE_TELEMETRY` set unless the
+command clears it.
+
+### Input it cannot read
+
+Input that is not a JSON object exits 0 with the line
+`web-guidance-gate: could not read the hook input, so the call was not checked.`
+An absent `jq` exits 0 with
+`web-guidance-gate: jq is not on PATH, so the call was not checked.`, so a
+session without `jq` runs the package unchecked; there, telemetry stays off
+only where `DISABLE_TELEMETRY` reaches the package's environment.
+
+## scripts/test-web-guidance-gate.sh
+
+Runs `plugins/my-harness/hooks/web-guidance-gate.sh` of its own tree against a
+fixed set of cases, directly and through the `PreToolUse` command and matcher of
+the tree's `plugins/my-harness/hooks/hooks.json`. It is run by hand only.
+
+It builds seven directories under a `mktemp -d` directory, removed on exit,
+with `GIT_CEILING_DIRECTORIES` set to that directory.
+
+| Directory | Contents |
+| --- | --- |
+| `web` | a git repository tracking `style.css` |
+| `py` | a git repository tracking only `main.py` |
+| `ext` | a git repository tracking a `manifest.json` that holds `"manifest_version"` |
+| `noext` | a git repository tracking a `manifest.json` without it |
+| `j2` | a git repository tracking only `templates/index.html.j2` |
+| `js` | a git repository tracking only `server.js` and `app.ts` |
+| `nogit` | no repository |
+
+`CLAUDE_PLUGIN_DATA` names a `data` directory there. A case runs with
+`DISABLE_TELEMETRY=1` in the gate's environment unless it is a telemetry case,
+which runs with the variable unset. A case through the plugin hook runs only
+where its `tool_name` matches the entry's matcher as a whole string, with
+`CLAUDE_PLUGIN_ROOT` set to the tree's `plugins/my-harness`.
+
+| Line | What it reports |
+| --- | --- |
+| `test -f <gate> -> yes/no`, `command -v jq`, `command -v git` | The prerequisites. Any one absent stops the run. |
+| `PreToolUse matcher naming web-guidance-gate.sh in <hooks.json> -> <matcher>/none` | The matcher of the plugin's entry. `none` stops the run. |
+| `<case> -> expected exit=N, actual ..., pass/FAIL` | One line per case. A case with a marker passes only where the gate's stderr also carries it. |
+| `<check> -> pass/FAIL` | A file-system check after a case. |
+| `fail -> N` | The number of failed cases and checks. `not run` where a prerequisite is absent. |
+
+The script exits 0 where every case and check passed, and 1 otherwise.
+
+| Case | Expected |
+| --- | --- |
+| Skill in `web` | allowed, marker written |
+| Skill in `py` | denied, no marker |
+| Skill in `py` with `args` naming `app/templates/index.html` | allowed, marker written |
+| Skill in `py` with `args` naming `main.py` | denied |
+| `npx -y modern-web-guidance@latest search "x"` in `py`, same `session_id` as that marker | allowed |
+| The same with another `session_id` | denied |
+| Skill in `web` with `session_id` `../x` | allowed; no file named `x` written, and the marker directory unchanged |
+| `npx` in `web`, `DISABLE_TELEMETRY` unset | denied, the line carrying the prefixed command |
+| `DISABLE_TELEMETRY=1 npx ...` in `web` | allowed |
+| `cd sub && DISABLE_TELEMETRY=1 npx ... retrieve "y"` | allowed |
+| `export DISABLE_TELEMETRY=1; npx ...` | allowed |
+| `DISABLE_TELEMETRY=1 true && npx ...` | denied |
+| `DISABLE_TELEMETRY=true npx ...`, `DISABLE_TELEMETRY="1" npx ...` and `export DISABLE_TELEMETRY=true; npx ...` | allowed |
+| `DISABLE_TELEMETRY=1 npx ...; npx ...` | denied |
+| `DISABLE_TELEMETRY=1 true $(npx ...)` | denied |
+| `false && export DISABLE_TELEMETRY=1; npx ...` and `(export DISABLE_TELEMETRY=1); npx ...` | denied |
+| `npx -y \`, a newline, then `modern-web-guidance@latest search "x"` | denied |
+| `npx --package=modern-web-guidance modern-web-guidance search "x"` | denied |
+| `if true; then npx ...; fi` and `timeout 5 npx ...` | denied |
+| `for x in 1; do DISABLE_TELEMETRY=1 npx ...; done` | allowed |
+| `npx.cmd`, `pnpx`, `bunx`, `pnpm dlx` and `npm exec` in `web`, `DISABLE_TELEMETRY` unset | denied |
+| `DISABLE_TELEMETRY=1 DISABLE_TELEMETRY=0 npx ...`, `DISABLE_TELEMETRY=1 env -u DISABLE_TELEMETRY npx ...`, `unset DISABLE_TELEMETRY; npx ...` and `DISABLE_TELEMETRY=1 env -i npx ...`, with `DISABLE_TELEMETRY=1` in the hook's environment | denied, the line naming the unset or other value |
+| `git commit -m` quoting the `npx` line, and `grep -rn "npx modern-web-guidance" docs`, in `py` | allowed |
+| Skill in a repository tracking only `templates/index.html.j2` | allowed |
+| Skill in a repository tracking only `server.js` and `app.ts` | denied |
+| `modern-web-guidance:chrome-extensions` with a tracked `manifest.json` lacking `"manifest_version"` | denied |
+| Skill in `py` with `args` naming a web file, `CLAUDE_PLUGIN_DATA` unset | allowed, no marker written anywhere |
+| `npx` in `py` with that `session_id` | denied |
+| Skill in `nogit` | denied |
+| `modern-web-guidance:chrome-extensions` in `ext` | allowed |
+| `modern-web-guidance:modern-web-guidance` in `ext` | denied |
+| `humanizer:humanizer` in `py` | allowed |
+| `npx` in `py` | denied |
+| `env npx` in `py` | denied |
+| `git clone https://github.com/GoogleChrome/modern-web-guidance` in `py` | allowed |
+| `ls` | allowed |
+| Input that is not valid JSON | exit 0 with the unreadable-input line |
+| `npx` in `py`, through the plugin hook | denied |
+| `npx` in `web`, through the plugin hook | allowed |
+| Skill in `py`, through the plugin hook | denied |
+
 ## config/settings.json
 
 Both installers merge this file over the live `settings.json`, as their

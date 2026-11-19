@@ -674,7 +674,10 @@ local repository whose `main` carries the change, named in `HARNESS_REPO_URL`.
 Run
 `scripts/test-attribution-guard.sh` before committing a change to
 `scripts/attribution-guard.sh` or to the test script itself; it exits 0 only
-where every case passes. Run
+where every case passes. Run `scripts/test-web-guidance-gate.sh` before
+committing a change to `plugins/my-harness/hooks/web-guidance-gate.sh`, to
+`plugins/my-harness/hooks/hooks.json` or to the test script itself; it exits 0
+only where every case passes. Run
 `scripts/test-hook-forwarding.sh` before committing a change to `git-hooks/`
 or to that script. It exits 0 only where every case passes, and it needs a
 checkout holding commit `5f3f87a`. `bash -n` is not
