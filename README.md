@@ -89,7 +89,7 @@ every session.
 | Path | Role |
 | --- | --- |
 | `config/CLAUDE.md` | The instruction payload, delivered as `CLAUDE.md` in the config directory: `/root/.claude` in the cloud, `${CLAUDE_CONFIG_DIR-$HOME/.claude}` locally. |
-| `config/settings.json` | Settings merged into the config directory's `settings.json`. Its hook commands run the scripts under `${HARNESS_DIR:-/opt/my-harness-wrapper}`. |
+| `config/settings.json` | Settings merged into the config directory's `settings.json`. It turns Claude Code's telemetry and error reports off and empties ponytail's webhook. Its hook commands run the scripts under `${HARNESS_DIR:-/opt/my-harness-wrapper}`. |
 | `config/plugins.tsv` | The plugins bootstrap installs. |
 | `.claude-plugin/marketplace.json` | The plugin marketplace `my-harness-wrapper`. It lists the one plugin under `plugins/`. `claude plugin marketplace add` reads it. |
 | `plugins/my-harness/` | The `my-harness` plugin: the `task-delegation`, `python-property-model-tests`, `edit-russian-technical-text`, `quick-human-readable-review` and `python-fp-refactor` skills, the `executor` and `analyst` agents, a `UserPromptSubmit` hook, and an eval suite under `evals/`. `plugins/my-harness/README.md` describes it. |

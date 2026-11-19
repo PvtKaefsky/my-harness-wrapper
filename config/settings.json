@@ -4,6 +4,19 @@
     "pr": "",
     "sessionUrl": false
   },
+  "env": {
+    "DISABLE_TELEMETRY": "1",
+    "DO_NOT_TRACK": "1",
+    "DISABLE_ERROR_REPORTING": "1"
+  },
+  "pluginConfigs": {
+    "ponytail@ponytail": {
+      "options": {
+        "webhookUrl": "",
+        "sendNames": false
+      }
+    }
+  },
   "hooks": {
     "UserPromptSubmit": [
       {

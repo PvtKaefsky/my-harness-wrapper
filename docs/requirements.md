@@ -1,6 +1,6 @@
 # Requirements
 
-One testable line per behavior a user or caller can observe. The live probe on pull request #107, recorded in `docs/environment.md` under Pull request activity, tests the rows marked probe; the repository's test scripts cannot drive a session.
+One testable line per behavior a user or caller can observe. The live probe on pull request #107, recorded in `docs/environment.md` under Pull request activity, tests the rows marked probe under Pull request comments; the repository's test scripts cannot drive a session.
 
 ## Pull request comments
 
@@ -27,3 +27,10 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A question about anything but the pull request's code and structure, tools and their versions included, or an answer disclosing a secret or its name or location, is held: the session writes an `answer-check -> held: <category>` line, its reply names the category and asks for confirmation in the session, and only a confirmation typed in the session releases it. | probe |
 | Every answer the `answer-check` clears goes to `ecc:security-reviewer` before it is given, and where the reviewer cannot run or returns no verdict the answer is held under `reviewer unavailable`. | probe |
 | A session deletes only a comment its own post call returned, for a listed reason, a held notice after the user releases or rejects it among them, reads the deletion back, and lists each deleted ID with its reason. | probe, held notices and a duplicate only |
+
+## Telemetry
+
+| Requirement | Test |
+| --- | --- |
+| A harness Claude Code session, cloud or local, runs its hooks and tools with `DISABLE_TELEMETRY`, `DO_NOT_TRACK` and `DISABLE_ERROR_REPORTING` set to `1`. | `scripts/verify.sh`, the `settings.env` comparison, for the live file; for the process environment, a headless session's `Bash` call printing the three variables, not yet recorded |
+| A harness Claude Code session's ponytail has `webhookUrl` empty and `sendNames` false, so it sends no turn row and no task name to a webhook. | `scripts/verify.sh`, the `settings.pluginConfigs` comparison, for the live file; ponytail's own reading of the options not probed |

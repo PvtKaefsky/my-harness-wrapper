@@ -1887,6 +1887,22 @@ skipped.
 
 `UNMATCHED` lines do not set the exit status.
 
+## config/settings.json
+
+Both installers merge this file over the live `settings.json`, as their
+settings steps above describe.
+
+| Key | Value | Effect |
+| --- | --- | --- |
+| `attribution` | empty `commit` and `pr`, `sessionUrl` false | Claude Code adds no attribution line to commits or pull requests. |
+| `env` | `DISABLE_TELEMETRY`, `DO_NOT_TRACK` and `DISABLE_ERROR_REPORTING`, each `"1"` | Claude Code's telemetry and error reporting are off. Update checks, feature flags and Remote Control still use the network. The CLI sets each `env` key in the environment of every session and its subprocesses, by the Claude Code docs, "All settings", `env`, so a tool a hook or the `Bash` tool starts reads the same values. |
+| `pluginConfigs` | `ponytail@ponytail` options `webhookUrl` `""` and `sendNames` false | Ponytail sends no turn row and no task name to any webhook. The table under `config/plugins.tsv` lists ponytail's options. |
+| `hooks` | `UserPromptSubmit`, `PreToolUse`, `PostToolUse` and `SessionStart` entries | The per-prompt reminder, the attribution guard and the session-start check. |
+
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is not set, because it also turns
+off auto-updates, feature flags and Remote Control, by the Claude Code docs,
+"Environment variables".
+
 ## config/plugins.tsv
 
 `README.md` carries the format.
@@ -1914,14 +1930,19 @@ root and in local sessions. `npm ci --ignore-scripts` in the dependency step
 does not cover hook or module code. The releases installed at issue #88 were
 ponytail 5.3.3 at `96608e0` and humanizer 4.0.0 at `b48c832`.
 
-| Ponytail `userConfig` key | Default | Effect at that default |
-| --- | --- | --- |
-| `ledger` | true | After every turn, writes `$HOME/.config/ponytail/band/<project>.csv` and `board.html` beside it. The CSV's `name` column holds the session name or the first prompt line. |
-| `webhookUrl` | empty | Nothing is sent. Once set, it receives each turn's row as JSON, over https, or over http to `localhost`, `127.0.0.1` or `[::1]`. |
-| `webhookToken` | none | Sent as a Bearer header once `webhookUrl` is set. |
-| `sendNames` | true | A set `webhookUrl` receives the `name` field. |
+| Ponytail `userConfig` key | Default | Delivered value | Effect of the value in force |
+| --- | --- | --- | --- |
+| `ledger` | true | not set | After every turn, writes `$HOME/.config/ponytail/band/<project>.csv` and `board.html` beside it. The CSV's `name` column holds the session name or the first prompt line. |
+| `webhookUrl` | empty | empty | Nothing is sent. A set URL receives each turn's row as JSON, over https, or over http to `localhost`, `127.0.0.1` or `[::1]`. |
+| `webhookToken` | none | not set | Sent as a Bearer header once `webhookUrl` is set. |
+| `sendNames` | true | false | A set `webhookUrl` receives no `name` field. |
 
-The installers set no `pluginConfigs`, so these defaults hold.
+`config/settings.json` delivers `webhookUrl` and `sendNames` under
+`pluginConfigs["ponytail@ponytail"].options`. Each installer run merges them
+over the live file, so a webhook URL saved in ponytail's dialog is emptied on
+the next run. A Cowork session reads no `config/settings.json`, so these
+values do not reach it; `docs/runbook.md` has the user leave the webhook URL
+empty there.
 
 `claude plugin marketplace add PvtKaefsky/my-harness-wrapper` clones
 `https://github.com/PvtKaefsky/my-harness-wrapper.git` under the config
