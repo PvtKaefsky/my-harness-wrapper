@@ -46,3 +46,11 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | Otherwise such a `Bash` call is denied, with a line giving the command prefixed by `export DISABLE_TELEMETRY=1;`, unless the hook's environment has `DISABLE_TELEMETRY` set to `1` or `true`, or each package run carries that assignment directly before its runner or follows an `export` of it that the shell runs unconditionally. | `scripts/test-web-guidance-gate.sh` |
 | No marker is written where `CLAUDE_PLUGIN_DATA` is unset or the `session_id` holds a character other than letters, digits, `-` and `_`. | `scripts/test-web-guidance-gate.sh` |
 | Every other `Skill` or `Bash` call, and input that is not a JSON object, exits 0. | `scripts/test-web-guidance-gate.sh` |
+
+## Modern Web Guidance
+
+| Requirement | Test |
+| --- | --- |
+| A harness Claude Code session, cloud or local, has `modern-web-guidance@googlechrome` installed and enabled. | `scripts/verify.sh`, the plugin checks for each `config/plugins.tsv` row |
+| A harness Claude Code session's settings set `skillListingBudgetFraction` to `0.05`. | `scripts/verify.sh`, the `settings.skillListingBudgetFraction` comparison |
+| A session writes no `### Modern Web Guidance` reply section. | not probed |

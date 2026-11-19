@@ -2094,6 +2094,7 @@ settings steps above describe.
 | `attribution` | empty `commit` and `pr`, `sessionUrl` false | Claude Code adds no attribution line to commits or pull requests. |
 | `env` | `DISABLE_TELEMETRY`, `DO_NOT_TRACK` and `DISABLE_ERROR_REPORTING`, each `"1"` | Claude Code's telemetry and error reporting are off. Update checks, feature flags and Remote Control still use the network. The CLI sets each `env` key in the environment of every session and its subprocesses, by the Claude Code docs, "All settings", `env`, so a tool a hook or the `Bash` tool starts reads the same values. |
 | `pluginConfigs` | `ponytail@ponytail` options `webhookUrl` `""` and `sendNames` false | Ponytail sends no turn row and no task name to any webhook. The table under `config/plugins.tsv` lists ponytail's options. |
+| `skillListingBudgetFraction` | `0.05` | The share of the context window the skill listing may fill. The paragraph on issue #95 under `config/plugins.tsv` gives the value's source. |
 | `hooks` | `UserPromptSubmit`, `PreToolUse`, `PostToolUse` and `SessionStart` entries | The per-prompt reminder, the attribution guard and the session-start check. |
 
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is not set, because it also turns
@@ -2110,22 +2111,37 @@ off auto-updates, feature flags and Remote Control, by the Claude Code docs,
 | `DietrichGebert/ponytail` | `ponytail@ponytail` | Ponytail. Its `SessionStart` and `SubagentStart` hooks inject its rule set into each session and subagent, and it loads an in-process band module, `hooks/band/register.tsx`. |
 | `blader/humanizer` | `humanizer@humanizer` | Humanizer, one skill and no hooks. |
 | `PvtKaefsky/my-harness-wrapper` | `my-harness@my-harness-wrapper` | This repository's own plugin, `plugins/my-harness/`, listed by `.claude-plugin/marketplace.json`. |
+| `GoogleChrome/modern-web-guidance` | `modern-web-guidance@googlechrome` | Modern Web Guidance, the skills `modern-web-guidance` and `chrome-extensions` and no hooks. Its skill runs `npx -y modern-web-guidance@latest search` and `retrieve`, which need Node 22 or later. The `my-harness` gate, `plugins/my-harness/hooks/web-guidance-gate.sh`, limits both. |
 
 `config/CLAUDE.md` ranks ponytail and humanizer below itself and the
-`my-harness` skills. That rank is an instruction to the session, and a hook
-still runs and its text still reaches context.
+`my-harness` skills, and Modern Web Guidance below all of those and ECC. That
+rank is an instruction to the session, and a hook still runs and its text
+still reaches context.
 
 With ECC installed, the skill listing exceeds the CLI's budget and gives the
 `my-harness` skills by name only (issue #95). `config/CLAUDE.md`'s Harness
 section therefore names the four general `my-harness` skills with their
-triggers.
+triggers. `config/settings.json` sets `skillListingBudgetFraction` to `0.05`,
+the value at which issue #95's two failing `my-harness` skills were invoked.
 
-Each installer run updates ponytail and humanizer to upstream's latest release,
-unpinned. A new release replaces ponytail's hook code, its band module and the
-rule text it injects into every session and subagent, in cloud sessions as
-root and in local sessions. `npm ci --ignore-scripts` in the dependency step
+Each installer run updates ponytail, humanizer and Modern Web Guidance to
+upstream's latest release, unpinned. A new release replaces ponytail's hook
+code, its band module and the rule text it injects into every session and
+subagent, in cloud sessions as root and in local sessions, and replaces Modern
+Web Guidance's skill text, which instructs the session and can name commands
+the gate does not match. `npm ci --ignore-scripts` in the dependency step
 does not cover hook or module code. The releases installed at issue #88 were
-ponytail 5.3.3 at `96608e0` and humanizer 4.0.0 at `b48c832`.
+ponytail 5.3.3 at `96608e0` and humanizer 4.0.0 at `b48c832`. Modern Web
+Guidance 1.0.1 is at `64a6d70`. Its skill runs the CLI at `@latest`, so each
+package run executes the version npm serves at that moment, as root in cloud
+sessions, without an installer run; neither the installers nor the gate pin
+it.
+
+The `my-harness` row precedes the Modern Web Guidance row, so a run installs
+the gate first. A failed `my-harness` install or update does not stop the
+loop: Modern Web Guidance is still installed, without the gate, and
+`scripts/verify.sh` reports the `my-harness` failure. The settings `env`
+still keeps telemetry off in that state.
 
 | Ponytail `userConfig` key | Default | Delivered value | Effect of the value in force |
 | --- | --- | --- | --- |

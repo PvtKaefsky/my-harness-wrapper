@@ -10,10 +10,12 @@ The repository holds one payload, `config/`, and the scripts that deliver it
 into a session's Claude config directory. It also holds one plugin,
 `plugins/my-harness/`, which those scripts install from `config/plugins.tsv`
 and which is packaged for upload to claude.ai for Cowork sessions.
-`config/plugins.tsv` also names three third-party plugins, ECC, ponytail and
-humanizer, which those scripts install from their upstream marketplaces.
-Ponytail and humanizer are also packaged for upload to claude.ai for Cowork
-sessions, as `ponytail.plugin` and `humanizer.plugin`, from upstream commits.
+`config/plugins.tsv` also names four third-party plugins, ECC, ponytail,
+humanizer and Modern Web Guidance, which those scripts install from their
+upstream marketplaces. Ponytail and humanizer are packaged for upload to
+claude.ai for Cowork sessions, as `ponytail.plugin` and `humanizer.plugin`,
+from upstream commits. `modern-web-guidance.plugin` is packaged the same way.
+Whether Cowork loads it is not verified.
 `docs/runbook.md` carries the steps.
 
 ## How delivery works

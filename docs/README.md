@@ -8,5 +8,5 @@ The index of `docs/`. One row per document.
 | `docs/environment.md` | What the sandbox is, and what has been established about it. |
 | `docs/requirements.md` | The behaviors a user or caller can observe, one testable line each, with the test behind each. |
 | `docs/repository-layouts.md` | The top-level layout of a new repository holding application or library source, per module count and toolchain, with the sources behind it. |
-| `docs/runbook.md` | Deploying a change, moving delivery to `main`, installing and removing a local install, packaging plugins for claude.ai, ponytail and humanizer among them, verifying a session, checking the hook matchers, reading a git hook's output, and the before-commit procedure. |
+| `docs/runbook.md` | Deploying a change, moving delivery to `main`, installing and removing a local install, packaging plugins for claude.ai, ponytail, humanizer and Modern Web Guidance among them, verifying a session, checking the hook matchers, reading a git hook's output, and the before-commit procedure. |
 | `docs/scripts.md` | What each script does, and the facts behind the shape of each step. |

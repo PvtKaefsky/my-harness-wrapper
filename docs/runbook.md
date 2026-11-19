@@ -357,10 +357,10 @@ the session-start check needs no setting.
 
 ## Packaging plugins for claude.ai
 
-Cowork chat sessions get ponytail and humanizer through claude.ai. The
-`config/plugins.tsv` rows install them in Claude Code sessions. Issue #72
-records what was observed in a Cowork session: no `CLAUDE.md`, no harness
-manifest, and ECC present under `~/.claude/plugins/synced/`.
+Cowork chat sessions get ponytail, humanizer and Modern Web Guidance through
+claude.ai. The `config/plugins.tsv` rows install them in Claude Code sessions.
+Issue #72 records what was observed in a Cowork session: no `CLAUDE.md`, no
+harness manifest, and ECC present under `~/.claude/plugins/synced/`.
 
 ### my-harness
 
@@ -409,6 +409,30 @@ accepts each package in claude.ai, as for `my-harness.plugin`.
    at a new commit when that plugin is to be updated in Cowork.
 
 Neither package is committed to this repository.
+
+### Modern Web Guidance
+
+The package is made the same way, from a clone of
+`GoogleChrome/modern-web-guidance` at a named commit, after Cowork has
+accepted a `my-harness.plugin` carrying `hooks/web-guidance-gate.sh`, so
+Cowork never holds the plugin without the gate.
+
+1. In the clone, write the package. It holds only `.claude-plugin/`,
+   `skills/`, `LICENSE` and `README.md`, its Claude plugin:
+
+   ```
+   git archive --format=zip --output=modern-web-guidance.plugin <commit> .claude-plugin skills LICENSE README.md
+   ```
+
+2. Upload it through claude.ai and accept it there.
+
+The package is not committed to this repository. Whether Cowork loads it is
+not verified, and neither is whether Cowork enforces a plugin `PreToolUse`
+hook's deny. A Cowork session reads no `config/settings.json`, by the user's
+observation recorded in issue #109, so there the gate passes a package run
+only where the command itself sets `DISABLE_TELEMETRY=1`. Where the gate does
+not run, a package run without that assignment sends its search query to
+`play.googleapis.com/log`.
 
 ### Ranking and hooks in Cowork
 

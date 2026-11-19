@@ -17,6 +17,7 @@
       }
     }
   },
+  "skillListingBudgetFraction": 0.05,
   "hooks": {
     "UserPromptSubmit": [
       {
