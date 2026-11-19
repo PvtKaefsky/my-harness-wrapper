@@ -55,4 +55,5 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | --- | --- |
 | A harness Claude Code session, cloud or local, has `modern-web-guidance@googlechrome` installed and enabled. | `scripts/verify.sh`, the plugin checks for each `config/plugins.tsv` row |
 | A harness Claude Code session's settings set `skillListingBudgetFraction` to `0.05`. | `scripts/verify.sh`, the `settings.skillListingBudgetFraction` comparison |
-| A session writes no `### Modern Web Guidance` reply section. | not probed |
+| A session writes no `### Modern Web Guidance` reply section. | probe, recorded in pull request #110: the section in 0 of 2 replies with the plugin's `PostToolUse` hook, where 1 of 3 runs ended at its budget cap before a reply, and in 3 of 3 replies without it |
+| A session invokes `modern-web-guidance:modern-web-guidance` for a task that creates or changes a web front-end file without the prompt naming the skill. | probe, recorded in pull request #110: invoked in 2 of 3 runs with `config/CLAUDE.md`'s invoke-by-name sentence and 0 of 3 without it |

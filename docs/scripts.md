@@ -2134,7 +2134,12 @@ off auto-updates, feature flags and Remote Control, by the Claude Code docs,
 `config/CLAUDE.md` ranks ponytail and humanizer below itself and the
 `my-harness` skills, and Modern Web Guidance below all of those and ECC. That
 rank is an instruction to the session, and a hook still runs and its text
-still reaches context.
+still reaches context. `config/CLAUDE.md` also tells a session to invoke
+`modern-web-guidance:modern-web-guidance` by name for every task that creates
+or changes a web front-end file. In a headless run on PR #110's branch, at
+`skillListingBudgetFraction` `0.05`, the skill's listing line carried its full
+description. On an unprompted dialog task the skill was invoked in 2 of 3 runs
+with that sentence and 0 of 3 without it.
 
 With ECC installed, the skill listing exceeds the CLI's budget and gives the
 `my-harness` skills by name only (issue #95). `config/CLAUDE.md`'s Harness
