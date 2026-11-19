@@ -32,7 +32,8 @@ One testable line per behavior a user or caller can observe. The live probe on p
 
 | Requirement | Test |
 | --- | --- |
-| A harness Claude Code session, cloud or local, runs its hooks and tools with `DISABLE_TELEMETRY`, `DO_NOT_TRACK` and `DISABLE_ERROR_REPORTING` set to `1`. | `scripts/verify.sh`, the `settings.env` comparison, for the live file; for the process environment, a headless session's `Bash` call printing the three variables, not yet recorded |
+| A harness Claude Code session, cloud or local, runs its hooks and tools with `DISABLE_TELEMETRY`, `DO_NOT_TRACK` and `DISABLE_ERROR_REPORTING` set to `1`. | `scripts/verify.sh`, the `settings.env` comparison, for the live file; probe, a headless session's `Bash` call printing the three variables, recorded in pull request #110 |
+| A harness Claude Code session's `chrome-devtools-mcp` server starts with `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` set to `1`, and its telemetry watchdog process does not run. | `scripts/verify.sh`, the `settings.env` comparison, for the live file; probe, a headless session with `CI` unset watched for `chrome-devtools-mcp`'s `watchdog/main.js`, recorded in pull request #110 |
 | A harness Claude Code session's ponytail has `webhookUrl` empty and `sendNames` false, so it sends no turn row and no task name to a webhook. | `scripts/verify.sh`, the `settings.pluginConfigs` comparison, for the live file; ponytail's own reading of the options not probed |
 
 ## Modern Web Guidance gate

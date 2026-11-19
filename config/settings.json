@@ -7,7 +7,8 @@
   "env": {
     "DISABLE_TELEMETRY": "1",
     "DO_NOT_TRACK": "1",
-    "DISABLE_ERROR_REPORTING": "1"
+    "DISABLE_ERROR_REPORTING": "1",
+    "CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1"
   },
   "pluginConfigs": {
     "ponytail@ponytail": {
