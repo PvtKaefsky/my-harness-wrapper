@@ -13,6 +13,7 @@ EXPORT_RE="^[[:space:]{]*export[[:space:]]+([^[:space:]]+[[:space:]]+)*${OFF_RE}
 UNSET_RE='(unset|-u|--unset)[[:space:]=]+([^;&|]*[[:space:]])?DISABLE_TELEMETRY|(^|[^[:alnum:]_-])env[[:space:]]+([^;&|]*[[:space:]])?(-i|--ignore-environment)([[:space:]]|$)'
 SEP_RE='(&&|\|\||[;&|])$'
 WEB_DENY='modern-web-guidance applies only to web front-end work. In a repository without web files, call the skill again with args naming the web file the task creates or changes.'
+REPLY_CONTEXT='This harness does not write the `### Modern Web Guidance` reply section that the skill asks for. The Writing text section of the harness instructions decides the reply.'
 
 say() { printf 'web-guidance-gate: %s\n' "$1" >&2; }
 sanitize() { printf '%s' "$1" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/; /g' | LC_ALL=C tr '\000-\037\177' '?'; }
@@ -34,7 +35,11 @@ CMD=""
 case "$TOOL" in
   Skill)
     SKILL=$(field .tool_input.skill)
-    case "$SKILL" in modern-web-guidance:*) ;; *) exit 0 ;; esac ;;
+    case "$SKILL" in modern-web-guidance:*) ;; *) exit 0 ;; esac
+    if [ "$(field .hook_event_name)" = PostToolUse ]; then
+      jq -n -c --arg c "$REPLY_CONTEXT" '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $c}}'
+      exit 0
+    fi ;;
   Bash)
     CMD=$(field .tool_input.command)
     case "$CMD" in *modern-web-guidance*) ;; *) exit 0 ;; esac

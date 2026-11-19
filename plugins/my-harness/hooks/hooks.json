@@ -21,6 +21,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/web-guidance-gate.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

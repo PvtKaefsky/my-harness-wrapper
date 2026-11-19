@@ -147,5 +147,18 @@ run_case 'npx in the .py repository through the plugin hook' 2 "$(bash_in "$NPX"
 run_case 'npx in the web repository through the plugin hook' 0 "$(bash_in "$NPX" "$WORK/web" s8)" '' run_hook
 run_case 'skill in the .py repository through the plugin hook' 2 "$(skill_in modern-web-guidance:modern-web-guidance "$WORK/py" s9)" "$WEB_MARK" run_hook
 
+POST_MATCHER=$(jq -r '[.hooks.PostToolUse[]? | select(any(.hooks[]?; (.command | type) == "string" and (.command | contains("web-guidance-gate.sh")))) | .matcher] | first // "none"' "$HOOKS" 2>/dev/null)
+check 'PostToolUse matcher naming web-guidance-gate.sh is Skill' test "$POST_MATCHER" = Skill
+post_in() { skill_in "$1" "$WORK/py" p1 | jq -c '.hook_event_name = "PostToolUse" | .tool_response = "skill text"'; }
+post_out() { printf '%s' "$1" | run_gate 2>/dev/null; }
+CONTEXT=$(post_out "$(post_in modern-web-guidance:modern-web-guidance)"); rc=$?
+check 'PostToolUse after modern-web-guidance:modern-web-guidance, exit 0' test "$rc" -eq 0
+check 'PostToolUse after modern-web-guidance:modern-web-guidance gives the reply-section context' test "$(printf '%s' "$CONTEXT" | jq -r '.hookSpecificOutput | select(.hookEventName == "PostToolUse") | .additionalContext' 2>/dev/null | grep -c -F '### Modern Web Guidance')" = 1
+check 'PostToolUse after modern-web-guidance:chrome-extensions gives the context' test -n "$(post_out "$(post_in modern-web-guidance:chrome-extensions)")"
+OUT=$(post_out "$(post_in humanizer:humanizer)"); rc=$?
+check 'PostToolUse after humanizer:humanizer gives no stdout and exit 0' test -z "$OUT" -a "$rc" -eq 0
+OUT=$(post_out 'not json'); rc=$?
+check 'PostToolUse with input that is not valid JSON gives no stdout and exit 0' test -z "$OUT" -a "$rc" -eq 0
+
 echo "fail -> $fails"
 [ "$fails" -eq 0 ]

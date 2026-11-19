@@ -47,6 +47,7 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | Otherwise such a `Bash` call is denied, with a line giving the command prefixed by `export DISABLE_TELEMETRY=1;`, unless the hook's environment has `DISABLE_TELEMETRY` set to `1` or `true`, or each package run carries that assignment directly before its runner or follows an `export` of it that the shell runs unconditionally. | `scripts/test-web-guidance-gate.sh` |
 | No marker is written where `CLAUDE_PLUGIN_DATA` is unset or the `session_id` holds a character other than letters, digits, `-` and `_`. | `scripts/test-web-guidance-gate.sh` |
 | Every other `Skill` or `Bash` call, and input that is not a JSON object, exits 0. | `scripts/test-web-guidance-gate.sh` |
+| After a `modern-web-guidance:` skill call, the plugin's `PostToolUse` hook adds context stating that the `### Modern Web Guidance` reply section is not written; after any other skill call it adds none. | `scripts/test-web-guidance-gate.sh` |
 
 ## Modern Web Guidance
 

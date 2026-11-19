@@ -1889,8 +1889,9 @@ skipped.
 
 ## plugins/my-harness/hooks/web-guidance-gate.sh
 
-The `PreToolUse` hook of the `my-harness` plugin, matcher `Skill|Bash`, runs
-it with a 10-second timeout. It reads the hook input from stdin. A plugin hook
+The `PreToolUse` hook of the `my-harness` plugin, matcher `Skill|Bash`, and
+its `PostToolUse` hook, matcher `Skill`, run it with a 10-second timeout. It
+reads the hook input from stdin. A plugin hook
 runs in every session that loads the plugin, so the gate reaches cloud, local
 and Cowork sessions, where a hook in `config/settings.json` reaches only the
 first two.
@@ -1975,6 +1976,19 @@ character as `?`. A Cowork session has no settings `env`, so there only the
 in-command forms pass. The gate never rewrites a command, because
 `updatedInput` is documented only with an `allow` decision, which skips the
 permission prompt.
+
+### The reply-section context
+
+On a `PostToolUse` event after a `Skill` call whose skill starts with
+`modern-web-guidance:`, the gate prints
+`{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"<text>"}}`
+and exits 0. Claude Code places `additionalContext` next to the tool result,
+which holds the skill's text (Claude Code docs, "Hooks", Add context).
+The text is:
+
+> This harness does not write the `### Modern Web Guidance` reply section that the skill asks for. The Writing text section of the harness instructions decides the reply.
+
+Every other `PostToolUse` call the hook receives under its `Skill` matcher prints nothing on stdout and exits 0.
 
 ### Known limits
 
@@ -2083,6 +2097,10 @@ The script exits 0 where every case and check passed, and 1 otherwise.
 | `npx` in `py`, through the plugin hook | denied |
 | `npx` in `web`, through the plugin hook | allowed |
 | Skill in `py`, through the plugin hook | denied |
+| The plugin's `PostToolUse` matcher | `Skill` |
+| `PostToolUse` after `modern-web-guidance:modern-web-guidance` | exit 0, the context naming `### Modern Web Guidance` |
+| `PostToolUse` after `modern-web-guidance:chrome-extensions` | the context |
+| `PostToolUse` after `humanizer:humanizer`, and on input that is not valid JSON | no stdout, exit 0 |
 
 ## config/settings.json
 

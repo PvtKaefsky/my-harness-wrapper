@@ -19,8 +19,8 @@ Modern Web Guidance plugin to web front-end work. The marketplace
 | `skills/python-fp-refactor/SKILL.md` | Steps for moving the decisions in Python code that mixes them with I/O or state into functions on values, keeping its behaviour. |
 | `agents/executor.md` | The agent for a coding subtask no specialist matches. |
 | `agents/analyst.md` | The agent for an analysis subtask no specialist matches. |
-| `hooks/hooks.json` | A `UserPromptSubmit` hook printing one line that points every prompt at the `task-delegation` skill, and a `PreToolUse` hook with matcher `Skill\|Bash` that runs `hooks/web-guidance-gate.sh` with a 10-second timeout. |
-| `hooks/web-guidance-gate.sh` | The gate: denies a `modern-web-guidance:` skill call or a run of the `modern-web-guidance` package outside web front-end work, and a package run with telemetry on. |
+| `hooks/hooks.json` | A `UserPromptSubmit` hook printing one line that points every prompt at the `task-delegation` skill, a `PreToolUse` hook with matcher `Skill\|Bash`, and a `PostToolUse` hook with matcher `Skill`, each running `hooks/web-guidance-gate.sh` with a 10-second timeout. |
+| `hooks/web-guidance-gate.sh` | The gate: denies a `modern-web-guidance:` skill call or a run of the `modern-web-guidance` package outside web front-end work, and a package run with telemetry on; after a `modern-web-guidance:` skill call, adds context stating that the skill's reply section is not written. |
 | `evals/` | The eval suite: one case directory per row of the table under "Eval suite", each with a `prompt.md` and `graders/skill.md`. |
 | `evals/.gitignore` | Keeps `results/`, which each eval run writes, out of git. |
 
@@ -44,7 +44,9 @@ The `PreToolUse` hook command is
 session that loads this plugin, Cowork included, and needs `bash`, `jq` and
 `git` there. The gate exits 2 with one stderr line to deny a call, and 0 for
 every other call. Its marker files are under
-`${CLAUDE_PLUGIN_DATA}/web-guidance-sessions/`. `docs/scripts.md`, under
+`${CLAUDE_PLUGIN_DATA}/web-guidance-sessions/`. The `PostToolUse` hook runs
+the same command; after a `modern-web-guidance:` skill call it prints one
+`additionalContext` object and exits 0. `docs/scripts.md`, under
 `plugins/my-harness/hooks/web-guidance-gate.sh`, carries its rules, and
 `scripts/test-web-guidance-gate.sh` tests it.
 
