@@ -702,6 +702,21 @@ After the user made the second account a collaborator, its conversation comment 
 
 Not probed: a bot's comment, the seven-day stop, the ten-comment cap, `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
 
+### Scheduled polling in the Claude desktop app
+
+A session in the Claude desktop app reported on 2026-11-20 that "this app forbids scheduled polling of a PR". The source is the user's evidence, recorded in pull request #112's `docs/environment.md` at `0c0f518`.
+
+A desktop app Code session on Windows 11 at `178eaf7`, on 2026-11-21, showed where that rule sits:
+
+| Fact | Observed |
+| --- | --- |
+| `mcp__claude-code-remote__subscribe_pr_activity` | not in the session's tool list |
+| The app's instruction on pull requests | "never schedule or poll CI checks yourself (CronCreate, ScheduleWakeup, /loop, Monitor, `gh` polling)" |
+| `ScheduleWakeup`'s description | allows polling "external work the harness cannot track (a CI run, a deploy, a remote queue)", and names no pull request |
+| `gh api repos/<owner>/<repo>/pulls/112` | `"mergeable":true,"mergeable_state":"clean"`, with `state` `closed` |
+
+The scheduling tool's description in that session does not forbid polling a pull request; the app's instructions do.
+
 ## Issues
 
 `mcp__github__issue_write` with `method` `create` returns two fields, `id` and

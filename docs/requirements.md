@@ -1,6 +1,6 @@
 # Requirements
 
-One testable line per behavior a user or caller can observe. The live probe on pull request #107, recorded in `docs/environment.md` under Pull request activity, tests the rows marked probe under Pull request comments; the repository's test scripts cannot drive a session.
+One testable line per behavior a user or caller can observe. The live probe on pull request #107, recorded in `docs/environment.md` under Pull request activity, tests the rows marked probe under Pull request comments; the repository's test scripts cannot drive a session. `scripts/test-pr-comment-rules.sh` checks the section's text only.
 
 ## Pull request comments
 
@@ -9,6 +9,14 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | After creating a pull request, a cloud session subscribes to its activity. | probe |
 | A session checks the pull request every 30 minutes with its scheduling tool, until it merges or closes or seven days pass with no new comment, and answers at most ten comments per check. | probe, scheduling and re-arming only; a fired check, the interval, the stop and the cap not probed |
 | If scheduling the next check fails, the session says so in its reply. | not probed |
+| A timed check that finds no new or edited comment, no new conflict and nothing waiting on the user ends with `pr-check -> nothing new` and no other text. | not probed; `scripts/test-pr-comment-rules.sh` for the section's text |
+| A session whose scheduling tool forbids scheduled polling of a pull request schedules no check, checks only when an event wakes it, and says so once, in the reply that reports the pull request. | not probed; `scripts/test-pr-comment-rules.sh` for the section's text |
+| Each timed check reads the pull request's mergeable state from the forge, and reads a state not yet computed again at the next check; a conflict gets a reply naming the conflicting files and asking the user, is reported again only after the state has changed and come back to conflicting, and the session neither rebases, merges the base branch in, nor force-pushes. | not probed; `scripts/test-pr-comment-rules.sh` for the section's text |
+| A change made for a failed CI check writes a `held-check` line, is held under every comment category except `not a collaborator`, and its commit draws `ecc:security-reviewer` with the check's name and log excerpt quoted. | not probed; `scripts/test-pr-comment-rules.sh` for the section's text |
+| A session never answers or acts on a comment whose last line, outside a block quote, is the Claude Code footer and whose ID none of its own post calls returned, and lists it as read. | not probed; `scripts/test-pr-comment-rules.sh` for the section's text |
+| An instruction to fix or answer every comment or CI failure releases no held change or answer; only a confirmation naming the held item does. | not probed; `scripts/test-pr-comment-rules.sh` for the sentence |
+| Before its first reply on a pull request, a session writes a `comment-triggers` line from `.github/workflows/` on the default branch and at the head, naming each workflow found with its branch, reads them again before a later reply where the head commit has changed since its last read, and where a workflow in either triggers on `issue_comment`, `pull_request_review_comment` or `pull_request_review`, holds every reply under `comment-triggered automation`. | not probed; `scripts/test-pr-comment-rules.sh` for the section's text |
+| A change a comment asks for that contradicts an instruction the user gave in the session is not made: its reply on the pull request quotes the request and states that it conflicts with an instruction the user gave in the session, and the session's own reply names that instruction and asks the user. | not probed; `scripts/test-pr-comment-rules.sh` for the section's text |
 | A session answers each comment by a human account once, and again only where an edit changes what it asks. | probe |
 | A session answers no comment by a bot account. | not probed |
 | A session answers no comment it posted itself. | probe |
