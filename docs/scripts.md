@@ -2036,7 +2036,7 @@ check every 30 minutes`.
 | the quiet line is in the timer bullet | has the timer bullet end a quiet check with `pr-check -> nothing new` and no other text |
 | the conflict read is in the timer bullet | has the timer bullet read the mergeable state from the forge on each timed check |
 | a conflict is reported once per return to conflicting | has the timer bullet report a conflict again only after the mergeable state has changed and come back to conflicting |
-| the polling rule is in the timer bullet | has the timer bullet treat a session whose scheduling tool forbids polling a pull request as one without a scheduling tool |
+| the polling rule is in the timer bullet | has the timer bullet treat a session whose scheduling tool's description or app's instructions forbid polling a pull request as one without a scheduling tool |
 | the CI-failure rule | puts a change made for a failed CI check on the held path, with every held category except `not a collaborator` |
 | the other sessions' footer rule | treats a comment ending with the Claude Code footer, whose ID no own post call returned, as another session's reply |
 | the contradiction rule | makes no change a comment asks for that contradicts an instruction the user gave in the session |
