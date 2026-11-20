@@ -700,7 +700,54 @@ The table does not show that the second account's comments are never delivered a
 
 After the user made the second account a collaborator, its conversation comment 6983884772, posted at 15:58:37Z, read back with association `COLLABORATOR` and arrived as an `issue_comment.created` event by 15:58:46Z. It asked a question and a heading rename, both handled as the user's own: the rename was pushed as `cf0264f` before reply 6983913335, which quotes both. One comment does not show that delivery depends on the association.
 
-Not probed: a bot's comment, the seven-day stop, the ten-comment cap, `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
+Not probed: a bot's comment, `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
+
+### Scheduled polling where Auto-fix is on
+
+A session with Auto-fix enabled reported on 2026-11-20, as quoted by the user:
+
+> Subscribe to PR activity: this session has no subscribe_pr_activity tool.
+> Schedule the 30-minute comment checks, because this app forbids scheduled
+> polling of a PR. Comments arrive here only if you turn on the app's PR
+> monitoring.
+
+### A local desktop session on 2026-11-20
+
+Observed in a Claude desktop app Code session on Windows 11 at `178eaf7`, CLI 2.1.328.
+
+| Fact | Observed |
+| --- | --- |
+| `mcp__claude-code-remote__subscribe_pr_activity` | not in the session's tool list |
+| Scheduling tools | `ScheduleWakeup` loaded; `CronCreate`, `mcp__scheduled-tasks__create_scheduled_task` and `RemoteTrigger` deferred |
+| Monitoring tool | `mcp__ccd_pr__set_monitor`, deferred, with `mcp__ccd_pr__get_status` and `mcp__ccd_pr__bind_pr` |
+| The app's instruction on pull requests | "After opening a PR, use the ccd_pr tools: call `get_status` and, if it does not report that PR, bind it with `bind_pr`; then read its CI and offer Auto-fix, and never schedule or poll CI checks yourself (CronCreate, ScheduleWakeup, /loop, Monitor, `gh` polling)" |
+| `ScheduleWakeup`'s description | "Do NOT schedule a short-interval wakeup to poll for background work you started" |
+| `CronCreate`'s description | "Not for live watching", "cron polls on a schedule" |
+| `claude` on `PATH` | absent; the app's copy is `claude-code/2.1.328/<build>/claude.exe` under its data directory |
+| That copy run with `-p` from the session's shell | `Not logged in · Please run /login`, with the default config directory and with a scratch one |
+
+`mcp__ccd_pr__set_monitor`'s description, quoted:
+
+> Set this session's CI monitor switches for its bound, open PR. auto_fix: the app wakes this session with a `<ci-monitor-event>` on CI failures, merge conflicts and review comments; it can be turned on only for a PR that the user's GitHub account (the one gh is signed in with) opened and whose base repository that account can push to. address_comments must equal auto_fix on this machine. auto_archive_on_close: archive this session once the PR merges or closes. Pass only the switches to change, and the PR's url with auto_fix. The user is asked to approve each call (in auto mode the app may approve without asking, and in bypass permissions mode it does not ask), so only call it when the user asked for that switch.
+
+| Parameter | Description |
+| --- | --- |
+| `auto_fix` | "Wake this session on CI failures, merge conflicts and review comments." |
+| `address_comments` | "Review-comment delivery. On this machine it is the same switch as auto_fix and must equal it when passed." |
+| `auto_archive_on_close` | "Archive this session once its PR merges or closes." |
+| `url` | "The bound pull request's URL, as get_status reports it. Required with auto_fix." |
+
+The description does not state whether monitoring continues while the desktop app or the computer is off.
+
+### The headless hand-off probe
+
+Run from branch `chore/probe-change` of a scratch repository with an open pull request, with stdin closed:
+
+```
+claude.exe -p '/autofix-pr Handle this pull request'"'"'s CI failures and comments under the "Pull request comments" section of your instructions. This instruction releases no held change or answer.' --max-budget-usd 1 --output-format json < /dev/null
+```
+
+It exited 0 after 105 ms with `num_turns` 0, `total_cost_usd` 0 and the result `/autofix-pr isn't available in this environment.` No cloud session was spawned. The same copy of the CLI reports `Not logged in` for any prompt from that shell, so the result does not separate a headless refusal of `/autofix-pr` from a CLI that is not signed in. The payload therefore gives the user the command instead of running it.
 
 ## Issues
 

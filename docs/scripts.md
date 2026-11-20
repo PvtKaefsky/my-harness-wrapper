@@ -2020,6 +2020,23 @@ An absent `jq` exits 0 with
 session without `jq` runs the package unchecked; there, telemetry stays off
 only where `DISABLE_TELEMETRY` reaches the package's environment.
 
+## scripts/test-pr-comment-rules.sh
+
+Reads the `## Pull request comments` section of `config/CLAUDE.md` in its own
+tree and prints one line per check. It takes no arguments and is run by hand
+only. It exits 0 only where every check passes, and exits 1 with `fail -> not
+run` where the file or the section is absent.
+
+| Check | Passes where the section |
+| --- | --- |
+| the hand-off command | holds the `/autofix-pr` command, in backticks, verbatim |
+| the blanket-instruction sentence | holds the sentence stating that an instruction to fix or answer every comment or CI failure releases no held change or answer, verbatim |
+| `mcp__ccd_pr__set_monitor` | names the tool |
+| no 30-minute check | matches no `30 minute` or `30-minute` |
+| no seven-day stop | matches no `seven days` or `seven-day` |
+| no ten-comment cap | matches no `ten comments` or `ten-comment` |
+| no scheduling instruction | matches no `schedul`, `timer` or `timed check`, in any case |
+
 ## scripts/test-web-guidance-gate.sh
 
 Runs `plugins/my-harness/hooks/web-guidance-gate.sh` of its own tree against a

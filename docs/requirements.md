@@ -6,9 +6,17 @@ One testable line per behavior a user or caller can observe. The live probe on p
 
 | Requirement | Test |
 | --- | --- |
-| After creating a pull request, a cloud session subscribes to its activity. | probe |
-| A session checks the pull request every 30 minutes with its scheduling tool, until it merges or closes or seven days pass with no new comment, and answers at most ten comments per check. | probe, scheduling and re-arming only; a fired check, the interval, the stop and the cap not probed |
-| If scheduling the next check fails, the session says so in its reply. | not probed |
+| After creating a pull request, a session with `mcp__claude-code-remote__subscribe_pr_activity` subscribes to its activity, names itself the watcher, and unsubscribes when the pull request merges or closes. | probe, subscribing only; unsubscribing not probed |
+| After creating a pull request, a session with `mcp__ccd_pr__set_monitor` and no subscription tool calls it once with `auto_fix: true`, `address_comments: true` and the pull request's url, passes no `auto_archive_on_close`, names itself the watcher, and calls it with both switches false when the pull request merges or closes. | not probed |
+| A session with neither tool, or whose `set_monitor` call is refused, hands off by giving the user the hand-off command instead of running it, and answers no comment on that pull request. | not probed |
+| The command the user is given where the hand-off is due is `/autofix-pr Handle this pull request's CI failures and comments under the "Pull request comments" section of your instructions. This instruction releases no held change or answer.`, to be run from the pull request's branch. | `scripts/test-pr-comment-rules.sh` |
+| The reply that reports a pull request states that a comment by an account outside the repository is seen only if the watcher's events deliver it. | not probed |
+| A session schedules no timed check of a pull request. | `scripts/test-pr-comment-rules.sh` for the section's text; the behavior not probed |
+| A session never answers or acts on a comment whose last line, outside a block quote, is the Claude Code footer and whose ID none of its own post calls returned, and lists it as read. | not probed |
+| An instruction to fix or answer every comment or CI failure releases no held change or answer; only a confirmation naming the held item does. | `scripts/test-pr-comment-rules.sh` for the sentence; the behavior not probed |
+| Before its first reply on a pull request, a session writes a `comment-triggers` line from `.github/workflows/` at the head, and where a workflow triggers on `issue_comment`, `pull_request_review_comment` or `pull_request_review`, holds every reply under `comment-triggered automation`. | not probed |
+| A change made for a failed CI check writes a `held-check` line, is held under every comment category except `not a collaborator`, and its commit draws `ecc:security-reviewer` with the check's name and log excerpt quoted. | not probed |
+| A merge-conflict event gets a reply in the session naming the conflicting files and asking the user, and the session neither rebases, merges the base branch in, nor force-pushes. | not probed |
 | A session answers each comment by a human account once, and again only where an edit changes what it asks. | probe |
 | A session answers no comment by a bot account. | not probed |
 | A session answers no comment it posted itself. | probe |

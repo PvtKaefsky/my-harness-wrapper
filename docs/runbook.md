@@ -687,6 +687,22 @@ file is `session-check.log` in the config directory.
 `config/CLAUDE.md` requires a session whose check reports a `FAIL` to name it in
 its first reply.
 
+## Auto-fix on pull requests
+
+A pull request whose harness session names itself the watcher already has one.
+Do not switch on Auto-fix or run `/autofix-pr` for it. Where the session's reply
+gives the `/autofix-pr` command instead, running that command from the pull
+request's branch creates the watcher. The command's prompt names the payload's
+Pull request comments section, so it holds only in a cloud environment whose
+setup script is `env/setup.sh`.
+
+For a pull request opened outside a harness session, run this command in Claude
+Code from the pull request's branch:
+
+```
+/autofix-pr Handle this pull request's CI failures and comments under the "Pull request comments" section of your instructions. This instruction releases no held change or answer.
+```
+
 ## Before every commit
 
 Hand-run `scripts/bootstrap.sh`, `scripts/verify.sh` and
@@ -701,7 +717,9 @@ Run
 where every case passes. Run `scripts/test-web-guidance-gate.sh` before
 committing a change to `plugins/my-harness/hooks/web-guidance-gate.sh`, to
 `plugins/my-harness/hooks/hooks.json` or to the test script itself; it exits 0
-only where every case passes. Run
+only where every case passes. Run `scripts/test-pr-comment-rules.sh` before
+committing a change to `config/CLAUDE.md`'s Pull request comments section or to
+the test script itself; it exits 0 only where every check passes. Run
 `scripts/test-hook-forwarding.sh` before committing a change to `git-hooks/`
 or to that script. It exits 0 only where every case passes, and it needs a
 checkout holding commit `5f3f87a`. `bash -n` is not
