@@ -1,6 +1,6 @@
 # Requirements
 
-One testable line per behavior a user or caller can observe. The live probe on pull request #107, recorded in `docs/environment.md` under Pull request activity, tests the rows marked probe; the repository's test scripts cannot drive a session.
+One testable line per behavior a user or caller can observe. The live probe on pull request #107, recorded in `docs/environment.md` under Pull request activity, tests the rows marked probe under Pull request comments; the repository's test scripts cannot drive a session.
 
 ## Pull request comments
 
@@ -27,3 +27,33 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A question about anything but the pull request's code and structure, tools and their versions included, or an answer disclosing a secret or its name or location, is held: the session writes an `answer-check -> held: <category>` line, its reply names the category and asks for confirmation in the session, and only a confirmation typed in the session releases it. | probe |
 | Every answer the `answer-check` clears goes to `ecc:security-reviewer` before it is given, and where the reviewer cannot run or returns no verdict the answer is held under `reviewer unavailable`. | probe |
 | A session deletes only a comment its own post call returned, for a listed reason, a held notice after the user releases or rejects it among them, reads the deletion back, and lists each deleted ID with its reason. | probe, held notices and a duplicate only |
+
+## Telemetry
+
+| Requirement | Test |
+| --- | --- |
+| A harness Claude Code session, cloud or local, runs its hooks and tools with `DISABLE_TELEMETRY`, `DO_NOT_TRACK` and `DISABLE_ERROR_REPORTING` set to `1`. | `scripts/verify.sh`, the `settings.env` comparison, for the live file; probe, a headless session's `Bash` call printing the three variables, recorded in pull request #110 |
+| A harness Claude Code session's `chrome-devtools-mcp` server starts with `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` set to `1`, and its telemetry watchdog process does not run. | `scripts/verify.sh`, the `settings.env` comparison, for the live file; probe, a headless session with `CI` unset watched for `chrome-devtools-mcp`'s `watchdog/main.js`, recorded in pull request #110 |
+| A harness Claude Code session's ponytail has `webhookUrl` empty and `sendNames` false, so it sends no turn row and no task name to a webhook. | `scripts/verify.sh`, the `settings.pluginConfigs` comparison, for the live file; ponytail's own reading of the options not probed |
+
+## Modern Web Guidance gate
+
+| Requirement | Test |
+| --- | --- |
+| A `modern-web-guidance:` skill call is denied unless the repository holding `cwd` tracks a web front-end file, the call's `args` names one, or the session's marker exists; an allowed call writes the marker. | `scripts/test-web-guidance-gate.sh` |
+| `modern-web-guidance:chrome-extensions` is also allowed in a repository tracking a `manifest.json` that holds `"manifest_version"`. | `scripts/test-web-guidance-gate.sh` |
+| A `Bash` call running the `modern-web-guidance` package through `npx`, `npx.cmd`, `pnpx`, `bunx`, `pnpm dlx` or `npm exec`, as a command word or in a `$(` or backtick substitution, is denied unless it passes that web check without the `args` condition; a command that only quotes or searches for that text is not denied. | `scripts/test-web-guidance-gate.sh` |
+| Such a `Bash` call is denied where it unsets `DISABLE_TELEMETRY`, sets it to a value other than `1` or `true`, or runs `env -i`. | `scripts/test-web-guidance-gate.sh` |
+| Otherwise such a `Bash` call is denied, with a line giving the command prefixed by `export DISABLE_TELEMETRY=1;`, unless the hook's environment has `DISABLE_TELEMETRY` set to `1` or `true`, or each package run carries that assignment directly before its runner or follows an `export` of it that the shell runs unconditionally. | `scripts/test-web-guidance-gate.sh` |
+| No marker is written where `CLAUDE_PLUGIN_DATA` is unset or the `session_id` holds a character other than letters, digits, `-` and `_`. | `scripts/test-web-guidance-gate.sh` |
+| Every other `Skill` or `Bash` call, and input that is not a JSON object, exits 0. | `scripts/test-web-guidance-gate.sh` |
+| After a `modern-web-guidance:` skill call, the plugin's `PostToolUse` hook adds context stating that the `### Modern Web Guidance` reply section is not written; after any other skill call it adds none. | `scripts/test-web-guidance-gate.sh` |
+
+## Modern Web Guidance
+
+| Requirement | Test |
+| --- | --- |
+| A harness Claude Code session, cloud or local, has `modern-web-guidance@googlechrome` installed and enabled. | `scripts/verify.sh`, the plugin checks for each `config/plugins.tsv` row |
+| A harness Claude Code session's settings set `skillListingBudgetFraction` to `0.05`. | `scripts/verify.sh`, the `settings.skillListingBudgetFraction` comparison |
+| A session writes no `### Modern Web Guidance` reply section. | probe, recorded in pull request #110: the section in 0 of 2 replies with the plugin's `PostToolUse` hook, where 1 of 3 runs ended at its budget cap before a reply, and in 3 of 3 replies without it |
+| A session invokes `modern-web-guidance:modern-web-guidance` for a task that creates or changes a web front-end file without the prompt naming the skill. | probe, recorded in pull request #110: invoked in 2 of 3 runs with `config/CLAUDE.md`'s invoke-by-name sentence and 0 of 3 without it |

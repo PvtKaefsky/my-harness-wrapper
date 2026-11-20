@@ -2,7 +2,8 @@
 
 A Claude Code plugin. It ships the task-delegation procedure, which makes a
 session analyze each task for decomposition and delegate each subtask to a
-routed subagent. It also ships four general skills. The marketplace
+routed subagent. It also ships four general skills, and a gate that limits the
+Modern Web Guidance plugin to web front-end work. The marketplace
 `my-harness-wrapper`, at the repository root, lists it.
 
 ## Contents
@@ -18,7 +19,8 @@ routed subagent. It also ships four general skills. The marketplace
 | `skills/python-fp-refactor/SKILL.md` | Steps for moving the decisions in Python code that mixes them with I/O or state into functions on values, keeping its behaviour. |
 | `agents/executor.md` | The agent for a coding subtask no specialist matches. |
 | `agents/analyst.md` | The agent for an analysis subtask no specialist matches. |
-| `hooks/hooks.json` | A `UserPromptSubmit` hook printing one line that points every prompt at the `task-delegation` skill. |
+| `hooks/hooks.json` | A `UserPromptSubmit` hook printing one line that points every prompt at the `task-delegation` skill, a `PreToolUse` hook with matcher `Skill\|Bash`, and a `PostToolUse` hook with matcher `Skill`, each running `hooks/web-guidance-gate.sh` with a 10-second timeout. |
+| `hooks/web-guidance-gate.sh` | The gate: denies a `modern-web-guidance:` skill call or a run of the `modern-web-guidance` package outside web front-end work, and a package run with telemetry on; after a `modern-web-guidance:` skill call, adds context stating that the skill's reply section is not written. |
 | `evals/` | The eval suite: one case directory per row of the table under "Eval suite", each with a `prompt.md` and `graders/skill.md`. |
 | `evals/.gitignore` | Keeps `results/`, which each eval run writes, out of git. |
 
@@ -31,11 +33,22 @@ routed subagent. It also ships four general skills. The marketplace
 
 Neither tool list carries `Agent`, so neither agent can start a subagent.
 
-## The hook
+## The hooks
 
-The hook command is `printf '%s\n' '<line>'`, run by the shell Claude Code
-runs hook commands in. A hook command that fails prints nothing, and the
-prompt goes on without the line.
+The `UserPromptSubmit` hook command is `printf '%s\n' '<line>'`, run by the
+shell Claude Code runs hook commands in. A hook command that fails prints
+nothing, and the prompt goes on without the line.
+
+The `PreToolUse` hook command is
+`bash "${CLAUDE_PLUGIN_ROOT}/hooks/web-guidance-gate.sh"`. It runs in every
+session that loads this plugin, Cowork included, and needs `bash`, `jq` and
+`git` there. The gate exits 2 with one stderr line to deny a call, and 0 for
+every other call. Its marker files are under
+`${CLAUDE_PLUGIN_DATA}/web-guidance-sessions/`. The `PostToolUse` hook runs
+the same command; after a `modern-web-guidance:` skill call it prints one
+`additionalContext` object and exits 0. `docs/scripts.md`, under
+`plugins/my-harness/hooks/web-guidance-gate.sh`, carries its rules, and
+`scripts/test-web-guidance-gate.sh` tests it.
 
 ## Eval suite
 

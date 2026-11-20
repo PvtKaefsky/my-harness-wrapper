@@ -4,6 +4,21 @@
     "pr": "",
     "sessionUrl": false
   },
+  "env": {
+    "DISABLE_TELEMETRY": "1",
+    "DO_NOT_TRACK": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1"
+  },
+  "pluginConfigs": {
+    "ponytail@ponytail": {
+      "options": {
+        "webhookUrl": "",
+        "sendNames": false
+      }
+    }
+  },
+  "skillListingBudgetFraction": 0.05,
   "hooks": {
     "UserPromptSubmit": [
       {
