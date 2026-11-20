@@ -749,6 +749,17 @@ The session ran in auto mode and saw no approval prompt before the result. Wheth
 
 The session then posted review comment 4645359793 on `config/CLAUDE.md` and conversation comment 7045638591. Whether a `<ci-monitor-event>` for either carries a comment ID is not established.
 
+The user then posted two comments from the GitHub web UI. Both read back as conversation comments.
+
+| Comment | Comment ID | Posted | Event | `answer-check` | `ecc:security-reviewer` | Reply ID |
+| --- | --- | --- | --- | --- | --- | --- |
+| `Which script checks that this bullet names both branches?` | 7045932088 | 17:19:29Z | none before the reply | `clear` | CLEAR | 7045965508 |
+| `Which commit bumps BOOTSTRAP_VERSION to 0.1.47?` | 7045934232 | 17:19:35Z | none before the reply | `clear` | CLEAR | 7045966062 |
+
+With no event, the session answered both after the user said in the session that they were posted, each through `answer-check` and `ecc:security-reviewer` first. The `comment-triggers` line was `none`: `.github/workflows/` returned 404 on `main` and on `feat/111-autofix-comments`. This session has no `mcp__github__add_issue_comment`, so both replies went through `gh api` `issues/112/comments`, and each read back as the text sent with no footer.
+
+No `<ci-monitor-event>` arrived for any of the four comments on #112, review comment 4645359793 among them, so whether such an event names a comment by its ID is not established.
+
 ### The headless hand-off probe
 
 Run from branch `chore/probe-change` of a scratch repository with an open pull request, with stdin closed:
