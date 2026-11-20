@@ -27,7 +27,7 @@ TRIGGERS=$(printf '%s\n' "$SECTION" | grep -F -- 'comment-triggers ->')
 
 check 'the subscription remains' has 'subscribes to its activity with `mcp__claude-code-remote__subscribe_pr_activity`'
 check 'the 30-minute check remains' has 'schedules a check every 30 minutes with its scheduling tool'
-check 'the quiet line is in the timer bullet' in_timer 'ends with `pr-check -> nothing new` and no other text'
+check 'the quiet line is in the timer bullet' in_timer 'nothing newly waiting on the user ends with `pr-check -> nothing new` and no other text'
 check 'the conflict read is in the timer bullet' in_timer "Each timed check also reads the pull request's mergeable state from the forge;"
 check 'a conflict is reported once per return to conflicting' in_timer 'again only after the mergeable state has changed and come back to conflicting'
 check 'the polling rule is in the timer bullet' in_timer "whose scheduling tool's description, or whose app's instructions, forbid scheduled polling of a pull request treats itself as one without a scheduling tool"

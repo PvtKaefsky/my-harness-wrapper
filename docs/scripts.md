@@ -2033,7 +2033,7 @@ check every 30 minutes`.
 | --- | --- |
 | the subscription remains | names `mcp__claude-code-remote__subscribe_pr_activity` as the subscription tool |
 | the 30-minute check remains | holds `schedules a check every 30 minutes with its scheduling tool` |
-| the quiet line is in the timer bullet | has the timer bullet end a quiet check with `pr-check -> nothing new` and no other text |
+| the quiet line is in the timer bullet | has the timer bullet end a check with nothing new, nothing newly waiting on the user included, with `pr-check -> nothing new` and no other text |
 | the conflict read is in the timer bullet | has the timer bullet read the mergeable state from the forge on each timed check |
 | a conflict is reported once per return to conflicting | has the timer bullet report a conflict again only after the mergeable state has changed and come back to conflicting |
 | the polling rule is in the timer bullet | has the timer bullet treat a session whose scheduling tool's description or app's instructions forbid polling a pull request as one without a scheduling tool |
