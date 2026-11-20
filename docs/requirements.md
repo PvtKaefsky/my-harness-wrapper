@@ -1,13 +1,13 @@
 # Requirements
 
-One testable line per behavior a user or caller can observe. The live probe on pull request #107, recorded in `docs/environment.md` under Pull request activity, tests the rows marked probe under Pull request comments; the repository's test scripts cannot drive a session.
+One testable line per behavior a user or caller can observe. The live probes on pull requests #107 and #112, recorded in `docs/environment.md` under Pull request activity, test the rows marked probe under Pull request comments; the repository's test scripts cannot drive a session.
 
 ## Pull request comments
 
 | Requirement | Test |
 | --- | --- |
 | After creating a pull request, a session with `mcp__claude-code-remote__subscribe_pr_activity` subscribes to its activity, names itself the watcher, and unsubscribes when the pull request merges or closes. | probe, subscribing only; unsubscribing not probed |
-| After creating a pull request, a session with `mcp__ccd_pr__set_monitor` and no subscription tool calls it once with `auto_fix: true`, `address_comments: true` and the pull request's url, passes no `auto_archive_on_close`, names itself the watcher, and calls it with both switches false when the pull request merges or closes. | not probed |
+| After creating a pull request, a session with `mcp__ccd_pr__set_monitor` and no subscription tool calls it once with `auto_fix: true`, `address_comments: true` and the pull request's url, passes no `auto_archive_on_close`, names itself the watcher, and calls it with both switches false when the pull request merges or closes. | probe on pull request #112, the call only; switching off not probed |
 | A session with neither tool, or whose `set_monitor` call is refused, hands off by giving the user the hand-off command instead of running it, and answers no comment on that pull request. | not probed |
 | The command the user is given where the hand-off is due is `/autofix-pr Handle this pull request's CI failures and comments under the "Pull request comments" section of your instructions. This instruction releases no held change or answer.`, to be run from the pull request's branch. | `scripts/test-pr-comment-rules.sh` |
 | The reply that reports a pull request states that a comment by an account outside the repository is seen only if the watcher's events deliver it. | not probed |

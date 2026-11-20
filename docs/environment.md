@@ -739,6 +739,16 @@ Observed in a Claude desktop app Code session on Windows 11 at `178eaf7`, CLI 2.
 
 The description does not state whether monitoring continues while the desktop app or the computer is off.
 
+### The set_monitor probe on pull request #112
+
+`mcp__ccd_pr__get_status` reported pull request #112 bound to the session, with every monitor switch false. The session then called `mcp__ccd_pr__set_monitor` with `auto_fix: true`, `address_comments: true` and the pull request's url, and no `auto_archive_on_close`. The call returned:
+
+> Auto-fix is on for PvtKaefsky/my-harness-wrapper#112: the app will wake this session with a `<ci-monitor-event>` on CI failures, merge conflicts and new review comments. No need to poll CI.
+
+The session ran in auto mode and saw no approval prompt before the result. Whether the app showed the user one is not visible to the session. A `<ci-monitor-event>` arrived right after, stating that Auto-fix was enabled and telling the session to fix CI or merge state and "commit, and push without asking first". That text releases no held change: `config/CLAUDE.md`'s Pull request comments section governs, with its held paths, its CI-failure rule and its merge-conflict rule.
+
+The session then posted review comment 4645359793 on `config/CLAUDE.md` and conversation comment 7045638591. Whether a `<ci-monitor-event>` for either carries a comment ID is not established.
+
 ### The headless hand-off probe
 
 Run from branch `chore/probe-change` of a scratch repository with an open pull request, with stdin closed:
