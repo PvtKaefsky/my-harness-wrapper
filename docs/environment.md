@@ -758,7 +758,9 @@ The user then posted two comments from the GitHub web UI. Both read back as conv
 
 With no event, the session answered both after the user said in the session that they were posted, each through `answer-check` and `ecc:security-reviewer` first. The `comment-triggers` line was `none`: `.github/workflows/` returned 404 on `main` and on `feat/111-autofix-comments`. This session has no `mcp__github__add_issue_comment`, so both replies went through `gh api` `issues/112/comments`, and each read back as the text sent with no footer.
 
-No `<ci-monitor-event>` arrived for any of the four comments on #112, review comment 4645359793 among them, so whether such an event names a comment by its ID is not established.
+The user then posted review comment 4645575442 from the GitHub web UI's Files changed tab, on `config/CLAUDE.md` line 121, at 17:25:53Z: `Which requirements row covers this merge-conflict rule?`. Its `answer-check` was `clear` and `ecc:security-reviewer` returned CLEAR. The reply went through `gh api` `pulls/112/comments/4645575442/replies` as review comment 4645588349, with `in_reply_to_id` 4645575442, and read back as the text sent with no footer.
+
+No `<ci-monitor-event>` arrived for any comment on #112 as of 17:27:13Z, when the session read back reply 4645588349. That covers the session's probes 4645359793 and 7045638591, the user's 7045932088, 7045934232 and 4645575442, and the session's three replies. Two of those comments, the session's 4645359793 and the user's 4645575442, are review comments that start a thread. Whether such an event names a comment by its ID is not established.
 
 ### The headless hand-off probe
 
