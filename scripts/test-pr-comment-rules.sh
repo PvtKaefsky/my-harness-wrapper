@@ -26,6 +26,9 @@ lacks() { ! printf '%s\n' "$SECTION" | grep -q -i -E -- "$1"; }
 check 'the hand-off command appears verbatim' has "$HANDOFF"
 check 'the blanket-instruction sentence appears verbatim' has "$BLANKET"
 check 'mcp__ccd_pr__set_monitor is named' has 'mcp__ccd_pr__set_monitor'
+TRIGGERS=$(printf '%s\n' "$SECTION" | grep -F -- 'comment-triggers ->')
+check 'the comment-triggers bullet names the default branch' grep -q -F -- "on the repository's default branch" <<<"$TRIGGERS"
+check "the comment-triggers bullet names the pull request's head" grep -q -F -- "at the pull request's head" <<<"$TRIGGERS"
 check 'no 30-minute check' lacks '30[ -]minute'
 check 'no seven-day stop' lacks 'seven days|seven-day'
 check 'no ten-comment cap' lacks 'ten comments|ten-comment'

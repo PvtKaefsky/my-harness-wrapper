@@ -2032,6 +2032,8 @@ run` where the file or the section is absent.
 | the hand-off command | holds the `/autofix-pr` command, in backticks, verbatim |
 | the blanket-instruction sentence | holds the sentence stating that an instruction to fix or answer every comment or CI failure releases no held change or answer, verbatim |
 | `mcp__ccd_pr__set_monitor` | names the tool |
+| the comment-triggers bullet names the default branch | has a line holding `comment-triggers ->` and `on the repository's default branch` |
+| the comment-triggers bullet names the pull request's head | has a line holding `comment-triggers ->` and `at the pull request's head` |
 | no 30-minute check | matches no `30 minute` or `30-minute` |
 | no seven-day stop | matches no `seven days` or `seven-day` |
 | no ten-comment cap | matches no `ten comments` or `ten-comment` |
