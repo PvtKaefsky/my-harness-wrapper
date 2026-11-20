@@ -691,7 +691,9 @@ its first reply.
 
 Do not switch on Claude Code's Auto-fix or run `/autofix-pr` for a pull request
 a harness session created: that session already watches it, and a second
-watcher answers the same comments.
+watcher answers the same comments. This does not hold where that session's
+reply says it has no subscription tool and schedules no check: nothing watches
+that pull request.
 
 ## Before every commit
 
