@@ -54,6 +54,11 @@ jq -n --arg b "$CLEAN" '{body:$b}' > clean.json
 printf '%s\n\n%s\n' "$CLEAN" "$TRAILER_CLAUDE" > trailer.txt
 { printf '%20000s' '' | tr ' ' '['; jq -cn --arg b "$CLEAN" '$b'; printf '%20000s' '' | tr ' ' ']'; } > deep.json
 { printf '\357\273\277'; cat by.json; } > bom.json
+printf '%s\r%s\n' 'ok' "$TRAILER_CLAUDE" > cr.md
+printf '%s\r\n\r\n%s\r\n' "$CLEAN" "$TRAILER_CLAUDE" > crlf.md
+printf '%s\r%s\r\n' 'ok' "$CLEAN" > cr-clean.md
+printf -v CR_BODY 'ok\r%s' "$TRAILER_CLAUDE"
+jq -n --arg b "$CR_BODY" '{body:$b}' > cr.json
 { printf '{"a":1}'; printf '%1100000s' ''; cat by.json; } > big.json
 
 bash_in() { jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}'; }
@@ -164,6 +169,11 @@ run_case 'gh api .../comments --input by.json, Co-Authored-By in a JSON string' 
 run_case 'gh api .../comments --input=by.json, Co-Authored-By in a JSON string' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input=by.json')"
 run_case 'gh api .../comments --input with.json, Generated with in a JSON string' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input with.json')"
 run_case 'gh api .../comments --input trailer.txt, text that is not JSON' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input trailer.txt')"
+run_case 'gh api .../comments -F body=@cr.md, Co-Authored-By after a bare carriage return' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments -F body=@cr.md')"
+run_case 'gh api .../comments --input cr.json, Co-Authored-By after a bare carriage return in a JSON string' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input cr.json')"
+run_case 'mcp__github__add_issue_comment body through the delivered hook, Co-Authored-By after a bare carriage return' 2 "$(mcp_in mcp__github__add_issue_comment "$CR_BODY" '{"owner":"o","repo":"r","issue_number":1}')" "$MARK" run_hook
+run_case 'gh api .../comments -F body=@crlf.md, Co-Authored-By on its own CRLF line' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments -F body=@crlf.md')"
+run_case 'gh api .../comments -F body=@cr-clean.md, bare carriage returns and no attribution' 0 "$(bash_in 'gh api repos/o/r/issues/1/comments -F body=@cr-clean.md')"
 run_case 'gh api .../comments --input clean.json' 0 "$(bash_in 'gh api repos/o/r/issues/1/comments --input clean.json')"
 run_case 'gh api .../comments --input -, standard input' 0 "$(bash_in 'gh api repos/o/r/issues/1/comments --input -')"
 run_case 'gh api .../comments --input bom.json, Co-Authored-By in a JSON string after a UTF-8 BOM' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input bom.json')"
@@ -256,6 +266,7 @@ run_case 'create response with a body carrying the marker' 2 "$(post_in "$(jq -n
 
 ---
 $FOOT_SERVER" '{number:3,html_url:"https://github.com/o/r/pull/3",body:$b}')")" "$RESEND"
+run_case 'create response with a body carrying Co-Authored-By after a bare carriage return' 2 "$(post_in "$(jq -n --arg b "$CR_BODY" '{number:3,html_url:"https://github.com/o/r/pull/3",body:$b}')")" "$RESEND"
 run_case 'create response with a clean body' 0 "$(post_in "$(jq -n --arg b "$CLEAN" '{number:3,html_url:"https://github.com/o/r/pull/3",body:$b}')")"
 run_case 'create response with no body' 2 "$(post_in '{"id":"1","url":"https://github.com/o/r/pull/3"}')" "$RESEND"
 run_case 'create error response' 0 "$(post_in '{"isError":true,"content":[{"type":"text","text":"failed to create pull request"}]}')"

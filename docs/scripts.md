@@ -1596,6 +1596,8 @@ The match is case-insensitive, against the pattern in
 message check" under "git-hooks/" lists its alternatives. The guard finds the
 file from its own path, `${BASH_SOURCE[0]}`, as
 `../git-hooks/lib/attribution.ere`, and removes one trailing carriage return.
+Before matching, every carriage return in the scanned text becomes a line
+feed, so a line after a bare carriage return is matched as a line.
 
 | Outcome | Exit | Output |
 | --- | --- | --- |
@@ -1657,7 +1659,8 @@ The first row that fits decides the outcome.
 
 The depth search covers `tool_response` itself and every string in it that
 parses as JSON, one level deep, so a `body` inside a JSON-encoded text content
-block is found.
+block is found. Every carriage return in the bodies becomes a line feed before
+matching.
 
 The instruction line is
 `attribution-guard: resend the description this create call sent, unchanged, through mcp__github__update_pull_request.`

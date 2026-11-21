@@ -67,6 +67,8 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | --- | --- |
 | A `gh api` write to a `/pulls` or `/issues` endpoint whose `--input <path>` or `--input=<path>` file carries an attribution line, in its raw text or in a decoded JSON string value, is blocked with exit 2 and the matched line; `--input -` reads no file. | `scripts/test-attribution-guard.sh`, the `--input` cases |
 | An `--input` file over 1 MiB, or one starting with `{` or `[` that `jq` cannot parse, is blocked with exit 2 as not checked. | `scripts/test-attribution-guard.sh`, the depth-limit and over-1-MiB `--input` cases |
+| An attribution line that follows a bare carriage return, in a command, a body file, a decoded `--input` string or an MCP tool string, is blocked with exit 2 and the matched line. | `scripts/test-attribution-guard.sh`, the carriage-return cases |
+| A `mcp__github__create_pull_request` response body whose attribution line follows a bare carriage return exits 2 with the resend instruction. | `scripts/test-attribution-guard.sh`, the create-response carriage-return case |
 
 ## Telemetry
 

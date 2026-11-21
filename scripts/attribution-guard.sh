@@ -41,7 +41,7 @@ resend() {
 scan() {
   local hit rc
   need_re
-  hit=$(printf '%s\n' "$1" | grep -a -i -E -m1 -- "$RE" 2>/dev/null); rc=$?
+  hit=$(printf '%s\n' "$1" | tr '\r' '\n' | grep -a -i -E -m1 -- "$RE" 2>/dev/null); rc=$?
   if [ "$rc" -gt 1 ]; then unchecked "grep could not apply the pattern (exit=$rc)"; fi
   if [ -n "$hit" ]; then block "$hit"; fi
 }
@@ -61,7 +61,7 @@ if [ "$EVENT" = PostToolUse ]; then
   fi
   BODIES='[.tool_response | ., (.. | strings | try fromjson catch empty)] | [.[] | .. | objects | select(has("body")) | .body | strings]'
   need_re
-  hit=$(printf '%s' "$INPUT" | jq -r "$BODIES | .[]" 2>/dev/null | grep -a -i -o -E -m1 -- "$RE" 2>/dev/null | head -n 1)
+  hit=$(printf '%s' "$INPUT" | jq -r "$BODIES | .[]" 2>/dev/null | tr '\r' '\n' | grep -a -i -o -E -m1 -- "$RE" 2>/dev/null | head -n 1)
   if [ -n "$hit" ]; then resend "matched line in the response body -> $(sanitize "$hit")"; fi
   COUNT=$(printf '%s' "$INPUT" | jq -r "$BODIES | length" 2>/dev/null)
   if [ -n "$COUNT" ] && [ "$COUNT" != 0 ]; then exit 0; fi
