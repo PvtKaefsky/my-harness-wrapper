@@ -791,6 +791,29 @@ Comments 7054284121, 7054286374 and 7054290632 were absent from the forge by 00:
 
 Every comment by `KrylovViktor` raised an event, as a collaborator and as a non-collaborator, in conversation and in review threads. No comment by `PvtKaefsky` raised one, which matches the earlier record on #112. `PvtKaefsky` is at once the pull request's author, the repository's owner and the account `gh` is signed in with, so this probe does not distinguish which of those excludes a comment. A conversation comment's event carries no ID, so the session finds it by listing the pull request's comments.
 
+#### The live reply probe
+
+Observed on 2026-11-21 in a second local Claude desktop app Code session on Windows 11, with `CLAUDE_CODE_REMOTE` unset, on #112 at head `4e81840`. `mcp__ccd_pr__get_status` reported the pull request already bound, with `auto_fix: false`. `mcp__ccd_pr__set_monitor` with `auto_fix: true`, `address_comments: true` and the url returned that Auto-fix was on. The Auto-fix-enabled `<ci-monitor-event>` followed; it told the session to commit and push without asking first, and the session did not.
+
+| Step | Result |
+| --- | --- |
+| Before-binding listing | 8 conversation and 8 review comments listed once as read, none answered, the earlier session's replies 4649460432, 7054616892 and 4649460792 among them |
+| Record | created at `<repo>/.git/pr-comments-PvtKaefsky-my-harness-wrapper-112.record`, under the directory `git rev-parse --git-common-dir` gives, with one `handled` line per comment, `reply` lines for the posted replies and `last_read` lines |
+| `comment-triggers` | `none`: `.github/workflows` returns 404 on `main` (`1a201ae`) and at `4e81840` |
+| Review comment `[test-d]` 4649873034 by `KrylovViktor`, `COLLABORATOR`, `config/CLAUDE.md` line 133, posted 02:05:09Z | found by the listing made when the user said in the session that the comments were posted; no `<ci-monitor-event>` and no queued notification as of 02:07:39Z; a `<ci-monitor-event>` carrying `comment_id=4649873034` arrived by 02:09:34Z, after the reply was posted |
+| The late event | the record held 4649873034 as handled with an unchanged `updated_at`, so the session posted no second reply; the event told the session to push a fix, end a reply with `_🤖 Addressed by [Claude Code](https://claude.com/claude-code)_` and resolve the thread, and the session did none of them; the thread read `isResolved: false` and the head `4e81840` afterwards |
+| Conversation comment `[test-e]` 7055623102 by `PvtKaefsky`, `OWNER`, posted 02:05:22Z | no event; found by the same listing |
+| `answer-check` and review | `clear` for both; `ecc:security-reviewer` returned `VERDICT: clear` for each before posting |
+| Attribution guard | `scripts/attribution-guard.sh` on the planned command with the real body exits 0; with a copy carrying `Co-Authored-By: Claude <noreply@anthropic.com>` it exits 2 and prints `attribution-guard: matched line -> Co-Authored-By: Claude <noreply@anthropic.com>`; nothing was posted from the copy |
+| Reply in the review thread | `gh api -X POST repos/PvtKaefsky/my-harness-wrapper/pulls/112/comments/4649873034/replies -F body=@<literal absolute path>` returned 4649878801, `in_reply_to_id` 4649873034; the stored body equals the file byte for byte after line-ending normalisation, with no footer and no line crediting Claude Code |
+| Conversation reply | `gh api -X POST repos/PvtKaefsky/my-harness-wrapper/issues/112/comments -F body=@<literal absolute path>` returned 7055638450; the stored body equals the file, with no footer |
+| Thread state | `gh api graphql` `reviewThreads { isResolved }` reads `false` for the thread of 4649873034 |
+| Push | local `HEAD`, `origin/feat/111-autofix-comments` and the pull request's head all read `4e81840` after the replies |
+| Own reply in a later listing | 4649878801 was listed as updated since the last read and was counted as the session's own from the record |
+| Deletion | `gh api -X DELETE repos/PvtKaefsky/my-harness-wrapper/issues/comments/7055638450` exited 0; reading it back returned HTTP 404 |
+
+The deletion was made for this probe; none of the section's listed deletion reasons applied to 7055638450. The review comment's event arrived between 2.5 and 4.5 minutes after the comment, against under 2 minutes in the earlier probe. This probe does not show whether the delay came from the app or from the session being busy in a turn the user's message started.
+
 ### The headless hand-off probe
 
 Run from branch `chore/probe-change` of a scratch repository with an open pull request, with stdin closed:
