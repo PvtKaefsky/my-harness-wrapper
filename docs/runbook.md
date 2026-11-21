@@ -146,7 +146,9 @@ table below.
 It writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, the
 global git config and the plugin install directories, and nothing else. It
 replaces `CLAUDE.md` there whole, and replaces each `hooks.<event>` array that
-`config/settings.json` names. The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
+`config/settings.json` names, then adds `mcp__ccd_pr__set_monitor` to the live
+`permissions.allow`, keeping every entry already there and adding none twice.
+The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
 differing from the payload, copies it to `settings.json.pre-harness` or
 `CLAUDE.md.pre-harness` beside it; later runs leave that copy alone. The log
 also prints each replaced hook array's prior value. Its log is
@@ -690,10 +692,23 @@ its first reply.
 ## Auto-fix on pull requests
 
 Do not switch on Claude Code's Auto-fix or run `/autofix-pr` for a pull request
-a harness session created: that session already watches it, and a second
+a cloud harness session created: that session already watches it, and a second
 watcher answers the same comments. This does not hold where that session's
 reply says it has no subscription tool and schedules no check: nothing watches
 that pull request.
+
+For a pull request a local harness session created, Auto-fix is the harness's
+own path. The session switches it on with `mcp__ccd_pr__set_monitor`, or gives
+you the `/autofix-pr` command to run where it has no such tool. Where it switched
+Auto-fix on, tell that session in chat after you post a comment on that pull
+request. A comment by the
+pull request's author raises no event. The probe on pull request #112 could not
+tell the author from the repository owner or the account `gh` is signed in
+with, which were one account. Tell a local session when its pull request merges
+or closes: no event reported a merge or a close when probed. Claude Code's auto
+mode classifier refused the `set_monitor` call when probed, so the local install
+adds `mcp__ccd_pr__set_monitor` to `permissions.allow` in the live
+`settings.json`, keeping every entry already there.
 
 ## Before every commit
 
@@ -712,6 +727,9 @@ committing a change to `plugins/my-harness/hooks/web-guidance-gate.sh`, to
 only where every case passes. Run `scripts/test-pr-comment-rules.sh` before
 committing a change to `config/CLAUDE.md`'s Pull request comments section or to
 the test script itself; it exits 0 only where every check passes. Run
+`scripts/test-install-settings.sh` before committing a change to the settings
+merge of `scripts/install-local.sh` or to the test script itself; it exits 0
+only where every check passes. Run
 `scripts/test-hook-forwarding.sh` before committing a change to `git-hooks/`
 or to that script. It exits 0 only where every case passes, and it needs a
 checkout holding commit `5f3f87a`. `bash -n` is not

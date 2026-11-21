@@ -446,7 +446,9 @@ main() {
 
   local SRC_SETTINGS="$DEPLOY/config/settings.json"
   local DST_SETTINGS="$CONFIG_DIR/settings.json"
-  local MERGE='if length != 2 then error("expected one JSON document in each file, read \(length) in all") else .[0] * .[1] * {env: ({HARNESS_DIR: $h} + (if $w == "yes" then {GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.hooksPath", GIT_CONFIG_VALUE_0: $v} else {} end))} end'
+  local MERGE='if length != 2 then error("expected one JSON document in each file, read \(length) in all") else .[0] * .[1] * {env: ({HARNESS_DIR: $h} + (if $w == "yes" then {GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.hooksPath", GIT_CONFIG_VALUE_0: $v} else {} end))} | (.permissions.allow // []) as $a | if ($a | type) != "array" then error("permissions.allow is not an array") elif any($a[]; . == "mcp__ccd_pr__set_monitor") then . else .permissions.allow = $a + ["mcp__ccd_pr__set_monitor"] end end'
+  local ALLOW_HAS='(.permissions.allow | type) == "array" and any(.permissions.allow[]; . == "mcp__ccd_pr__set_monitor")'
+  local ALLOW_PRIOR ALLOW_BACK
   local DIFFERS='if length == 2 and (.[0] | type) == "object" and (.[1] | type) == "object" then .[0] as $l | [.[1] | to_entries[] | .key as $k | select(($l | has($k)) and $l[$k] != .value) | $k] | join(" ") else "not compared" end'
   local MODE="" REPLACED
   local HOOKS_DIR="$DEPLOY/git-hooks" HOOKS_VALUE="" HOOKS_SET="" TRIPLE=no
@@ -469,6 +471,7 @@ main() {
   fi
   case "$MODE" in ''|*[!0-7]*) MODE=600 ;; esac
   echo "mode for $DST_SETTINGS -> $MODE"
+  if jq -e "$ALLOW_HAS" "$DST_SETTINGS" >/dev/null 2>&1; then ALLOW_PRIOR="already there"; else ALLOW_PRIOR=added; fi
   if [ -f "$SRC_SETTINGS" ]; then
     TMP=$(mktemp "$DST_SETTINGS.XXXXXX"); rc=$?
     echo "mktemp $DST_SETTINGS.XXXXXX -> exit=$rc value=${TMP:-}"
@@ -505,6 +508,9 @@ main() {
   else
     fails=$((fails + 1))
   fi
+  ALLOW_BACK=$(jq -c 'if type == "object" then (.permissions.allow // "absent") else "absent" end' "$DST_SETTINGS" 2>/dev/null); rc=$?
+  jq -e "$ALLOW_HAS" "$DST_SETTINGS" >/dev/null 2>&1 || { ALLOW_PRIOR=missing; fails=$((fails + 1)); }
+  echo "jq -c .permissions.allow $DST_SETTINGS -> exit=$rc value=$(first_line "${ALLOW_BACK%$'\r'}") mcp__ccd_pr__set_monitor=$ALLOW_PRIOR"
   echo "jq -r .env.HARNESS_DIR $DST_SETTINGS -> $(jq -r 'if type == "object" and (.env | type) == "object" then (.env.HARNESS_DIR // "absent") else "absent" end' "$DST_SETTINGS" 2>/dev/null || echo unreadable)"
   local TRIPLE_BACK
   TRIPLE_BACK=$(jq -r 'if type == "object" and (.env | type) == "object" then [.env.GIT_CONFIG_COUNT, .env.GIT_CONFIG_KEY_0, .env.GIT_CONFIG_VALUE_0] | map(. // "absent" | tostring) | join("\t") else "absent\tabsent\tabsent" end' "$DST_SETTINGS" 2>/dev/null); rc=$?

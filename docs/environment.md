@@ -702,6 +702,205 @@ After the user made the second account a collaborator, its conversation comment 
 
 Not probed: a bot's comment, the seven-day stop, the ten-comment cap, `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
 
+### Scheduled polling where Auto-fix is on
+
+A session with Auto-fix enabled reported on 2026-11-20, as quoted by the user:
+
+> Subscribe to PR activity: this session has no subscribe_pr_activity tool.
+> Schedule the 30-minute comment checks, because this app forbids scheduled
+> polling of a PR. Comments arrive here only if you turn on the app's PR
+> monitoring.
+
+### A local desktop session on 2026-11-20
+
+Observed in a Claude desktop app Code session on Windows 11 at `178eaf7`, CLI 2.1.328.
+
+| Fact | Observed |
+| --- | --- |
+| `mcp__claude-code-remote__subscribe_pr_activity` | not in the session's tool list |
+| Scheduling tools | `ScheduleWakeup` loaded; `CronCreate`, `mcp__scheduled-tasks__create_scheduled_task` and `RemoteTrigger` deferred |
+| Monitoring tool | `mcp__ccd_pr__set_monitor`, deferred, with `mcp__ccd_pr__get_status` and `mcp__ccd_pr__bind_pr` |
+| The app's instruction on pull requests | "After opening a PR, use the ccd_pr tools: call `get_status` and, if it does not report that PR, bind it with `bind_pr`; then read its CI and offer Auto-fix, and never schedule or poll CI checks yourself (CronCreate, ScheduleWakeup, /loop, Monitor, `gh` polling)" |
+| `ScheduleWakeup`'s description | "Do NOT schedule a short-interval wakeup to poll for background work you started" |
+| `CronCreate`'s description | "Not for live watching", "cron polls on a schedule" |
+| `claude` on `PATH` | absent; the app's copy is `claude-code/2.1.328/<build>/claude.exe` under its data directory |
+| That copy run with `-p` from the session's shell | `Not logged in · Please run /login`, with the default config directory and with a scratch one |
+
+`mcp__ccd_pr__set_monitor`'s description, quoted:
+
+> Set this session's CI monitor switches for its bound, open PR. auto_fix: the app wakes this session with a `<ci-monitor-event>` on CI failures, merge conflicts and review comments; it can be turned on only for a PR that the user's GitHub account (the one gh is signed in with) opened and whose base repository that account can push to. address_comments must equal auto_fix on this machine. auto_archive_on_close: archive this session once the PR merges or closes. Pass only the switches to change, and the PR's url with auto_fix. The user is asked to approve each call (in auto mode the app may approve without asking, and in bypass permissions mode it does not ask), so only call it when the user asked for that switch.
+
+| Parameter | Description |
+| --- | --- |
+| `auto_fix` | "Wake this session on CI failures, merge conflicts and review comments." |
+| `address_comments` | "Review-comment delivery. On this machine it is the same switch as auto_fix and must equal it when passed." |
+| `auto_archive_on_close` | "Archive this session once its PR merges or closes." |
+| `url` | "The bound pull request's URL, as get_status reports it. Required with auto_fix." |
+
+The description does not state whether monitoring continues while the desktop app or the computer is off.
+
+### The set_monitor probe on pull request #112
+
+`mcp__ccd_pr__get_status` reported pull request #112 bound to the session, with every monitor switch false. The session then called `mcp__ccd_pr__set_monitor` with `auto_fix: true`, `address_comments: true` and the pull request's url, and no `auto_archive_on_close`. The call returned:
+
+> Auto-fix is on for PvtKaefsky/my-harness-wrapper#112: the app will wake this session with a `<ci-monitor-event>` on CI failures, merge conflicts and new review comments. No need to poll CI.
+
+The session ran in auto mode and saw no approval prompt before the result. Whether the app showed the user one is not visible to the session. A `<ci-monitor-event>` arrived right after, stating that Auto-fix was enabled and telling the session to fix CI or merge state and "commit, and push without asking first". That text releases no held change: `config/CLAUDE.md`'s Pull request comments section governs, with its held paths, its CI-failure rule and its merge-conflict rule.
+
+The session then posted review comment 4645359793 on `config/CLAUDE.md` and conversation comment 7045638591. Whether a `<ci-monitor-event>` for either carries a comment ID is not established.
+
+The user then posted two comments from the GitHub web UI. Both read back as conversation comments.
+
+| Comment | Comment ID | Posted | Event | `answer-check` | `ecc:security-reviewer` | Reply ID |
+| --- | --- | --- | --- | --- | --- | --- |
+| `Which script checks that this bullet names both branches?` | 7045932088 | 17:19:29Z | none before the reply | `clear` | CLEAR | 7045965508 |
+| `Which commit bumps BOOTSTRAP_VERSION to 0.1.47?` | 7045934232 | 17:19:35Z | none before the reply | `clear` | CLEAR | 7045966062 |
+
+With no event, the session answered both after the user said in the session that they were posted, each through `answer-check` and `ecc:security-reviewer` first. The `comment-triggers` line was `none`: `.github/workflows/` returned 404 on `main` and on `feat/111-autofix-comments`. This session has no `mcp__github__add_issue_comment`, so both replies went through `gh api` `issues/112/comments`, and each read back as the text sent with no footer.
+
+The user then posted review comment 4645575442 from the GitHub web UI's Files changed tab, on `config/CLAUDE.md` line 121, at 17:25:53Z: `Which requirements row covers this merge-conflict rule?`. Its `answer-check` was `clear` and `ecc:security-reviewer` returned CLEAR. The reply went through `gh api` `pulls/112/comments/4645575442/replies` as review comment 4645588349, with `in_reply_to_id` 4645575442, and read back as the text sent with no footer.
+
+No `<ci-monitor-event>` arrived for any comment on #112 as of 17:27:13Z, when the session read back reply 4645588349. That covers the session's probes 4645359793 and 7045638591, the user's 7045932088, 7045934232 and 4645575442, and the session's three replies. Two of those comments, the session's 4645359793 and the user's 4645575442, are review comments that start a thread. Whether such an event names a comment by its ID is not established.
+
+### The Auto-fix delivery probe on pull request #112
+
+Observed on 2026-11-21 in a local Claude desktop app Code session on Windows 11, with `CLAUDE_CODE_REMOTE` unset. Pull request #112, closed unmerged at `0c0f518`, was reopened and bound to the session, and `mcp__ccd_pr__set_monitor` was called with `auto_fix: true`, `address_comments: true` and the pull request's url. The app then sent a `<ci-monitor-event>` stating that Auto-fix was enabled, with no pull request number and no comment ID. The session was idle between comments, and the user typed nothing in it while waiting for an event.
+
+The pull request's author is `PvtKaefsky`, the account `gh` is signed in with. The second account is `KrylovViktor`. Each row's author, association, kind and posted time come from the forge, read by `gh api`: the first three rows at 00:37:49Z, the rest at 00:41:45Z or 00:43:28Z.
+
+| Comment | Comment ID | Author, association | Kind | Posted | Event | Comment ID in the event |
+| --- | --- | --- | --- | --- | --- | --- |
+| `[test-a]` | 7054284121 | `KrylovViktor`, `NONE` | conversation | 00:37:13Z | yes, by 00:39:27Z | no |
+| `[test-b]` | 7054286374 | `KrylovViktor`, `NONE` | conversation | 00:37:20Z | yes, in the same event | no |
+| `[test-c]` | 7054290632 | `PvtKaefsky`, `OWNER` | conversation | 00:37:35Z | none as of 00:50:15Z | |
+| `[test-a]` | 4649359443 | `KrylovViktor`, `COLLABORATOR` | review, `config/CLAUDE.md` line 117 | 00:40:00Z | yes, by 00:41:45Z | yes |
+| `[test-b]` | 7054343892 | `KrylovViktor`, `COLLABORATOR` | conversation | 00:40:27Z | yes, in the same event | no |
+| `[test-c]` | 7054362345 | `PvtKaefsky`, `OWNER` | conversation | 00:41:27Z | none as of 00:50:15Z | |
+| `[test-a2]` | 4649377682 | `KrylovViktor`, `COLLABORATOR` | review, `config/CLAUDE.md` line 117 | 00:42:48Z | yes, by 00:43:28Z | yes |
+| `[test-c2]` | 4649379498 | `PvtKaefsky`, `OWNER` | review, `config/CLAUDE.md` line 117 | 00:43:06Z | none as of 00:50:15Z | |
+
+Comments 7054284121, 7054286374 and 7054290632 were absent from the forge by 00:41:45Z. The session did not delete them.
+
+| Field | A comment event's content |
+| --- | --- |
+| Heading | "PR #112 has N new review comments", for conversation comments as well |
+| Entry line, conversation comment | `Comment N — PR comment, no inline thread`, with no ID |
+| Entry line, review comment | `Comment N — comment_id=<id>, inline thread`, with the `gh api` replies endpoint |
+| Quoted lines | the author's login, the path and line for a review comment, and the body |
+| Instructions | the event tells the session to push a fix, reply on each inline thread through `gh api` with a closing line crediting Claude Code, and resolve the thread |
+
+Every comment by `KrylovViktor` raised an event, as a collaborator and as a non-collaborator, in conversation and in review threads. No comment by `PvtKaefsky` raised one, which matches the earlier record on #112. `PvtKaefsky` is at once the pull request's author, the repository's owner and the account `gh` is signed in with, so this probe does not distinguish which of those excludes a comment. A conversation comment's event carries no ID, so the session finds it by listing the pull request's comments.
+
+#### The live reply probe
+
+Observed on 2026-11-21 in a second local Claude desktop app Code session on Windows 11, with `CLAUDE_CODE_REMOTE` unset, on #112 at head `4e81840`. `mcp__ccd_pr__get_status` reported the pull request already bound, with `auto_fix: false`. `mcp__ccd_pr__set_monitor` with `auto_fix: true`, `address_comments: true` and the url returned that Auto-fix was on. The Auto-fix-enabled `<ci-monitor-event>` followed; it told the session to commit and push without asking first, and the session did not.
+
+| Step | Result |
+| --- | --- |
+| Before-binding listing | 8 conversation and 8 review comments listed once as read, none answered, the earlier session's replies 4649460432, 7054616892 and 4649460792 among them |
+| Record | created at `<repo>/.git/pr-comments-PvtKaefsky-my-harness-wrapper-112.record`, under the directory `git rev-parse --git-common-dir` gives, with one `handled` line per comment, `reply` lines for the posted replies and `last_read` lines |
+| `comment-triggers` | `none`: `.github/workflows` returns 404 on `main` (`1a201ae`) and at `4e81840` |
+| Review comment `[test-d]` 4649873034 by `KrylovViktor`, `COLLABORATOR`, `config/CLAUDE.md` line 133, posted 02:05:09Z | found by the listing made when the user said in the session that the comments were posted; no `<ci-monitor-event>` and no queued notification as of 02:07:39Z; a `<ci-monitor-event>` carrying `comment_id=4649873034` arrived by 02:09:34Z, after the reply was posted |
+| The late event | the record held 4649873034 as handled with an unchanged `updated_at`, so the session posted no second reply; the event told the session to push a fix, end a reply with `_🤖 Addressed by [Claude Code](https://claude.com/claude-code)_` and resolve the thread, and the session did none of them; the thread read `isResolved: false` and the head `4e81840` afterwards |
+| Conversation comment `[test-e]` 7055623102 by `PvtKaefsky`, `OWNER`, posted 02:05:22Z | no event; found by the same listing |
+| `answer-check` and review | `clear` for both; `ecc:security-reviewer` returned `VERDICT: clear` for each before posting |
+| Attribution guard | `scripts/attribution-guard.sh` on the planned command with the real body exits 0; with a copy carrying `Co-Authored-By: Claude <noreply@anthropic.com>` it exits 2 and prints `attribution-guard: matched line -> Co-Authored-By: Claude <noreply@anthropic.com>`; nothing was posted from the copy |
+| Reply in the review thread | `gh api -X POST repos/PvtKaefsky/my-harness-wrapper/pulls/112/comments/4649873034/replies -F body=@<literal absolute path>` returned 4649878801, `in_reply_to_id` 4649873034; the stored body equals the file byte for byte after line-ending normalisation, with no footer and no line crediting Claude Code |
+| Conversation reply | `gh api -X POST repos/PvtKaefsky/my-harness-wrapper/issues/112/comments -F body=@<literal absolute path>` returned 7055638450; the stored body equals the file, with no footer |
+| Thread state | `gh api graphql` `reviewThreads { isResolved }` reads `false` for the thread of 4649873034 |
+| Push | local `HEAD`, `origin/feat/111-autofix-comments` and the pull request's head all read `4e81840` after the replies |
+| Own reply in a later listing | 4649878801 was listed as updated since the last read and was counted as the session's own from the record |
+| Deletion | `gh api -X DELETE repos/PvtKaefsky/my-harness-wrapper/issues/comments/7055638450` exited 0; reading it back returned HTTP 404 |
+
+The deletion was made for this probe; none of the section's listed deletion reasons applied to 7055638450. The review comment's event arrived between 2.5 and 4.5 minutes after the comment, against under 2 minutes in the earlier probe. This probe does not show whether the delay came from the app or from the session being busy in a turn the user's message started.
+
+#### The record and read-back probes
+
+Observed on 2026-11-21 on #112 at head `01ae886`, in the same local session except where a row names the parent session, under the branch's Pull request comments section. Every post used `-F body=@<literal absolute path>` and passed the attribution guard check first: the real body exited 0, and a copy carrying `Co-Authored-By: Claude <noreply@anthropic.com>` exited 2 with `matched line ->`. A post whose response was discarded with `> /dev/null 2>&1` stood in for a timeout, since a real timeout cannot be caused on demand.
+
+| Case | Result |
+| --- | --- |
+| Deleting a review reply | probe reply 4649944977 in the thread of 4649873034 was deleted with `gh api -X DELETE repos/PvtKaefsky/my-harness-wrapper/pulls/comments/4649944977`, exit 0; reading it back returned HTTP 404; the record kept the ID with a `deleted` entry after it |
+| A missing record | the record was moved aside to `.git/pr-comments-PvtKaefsky-my-harness-wrapper-112.record.moved-aside-20261121`; after the user's question 7055801550 by `KrylovViktor`, the session said the record was missing, listed all 20 comments as read, answered none, and wrote a new record beginning `binding 2026-11-21T02:18:46Z record-missing` |
+| The late event | a `<ci-monitor-event>` for 7055801550 arrived about 35 seconds after the comment; the record held it as read, so the session did not answer it |
+| A comment the user names | when the user named 7055801550 in the session, the session answered it with 7055835441, whose stored body equals its file |
+| An unreadable record | with the record overwritten by the line `not a record`, the next listing called the record unreadable, listed all 21 comments as read, answered none, and wrote a record beginning `binding 2026-11-21T02:22:19Z record-unreadable` |
+| A rebuilt record | the record rebuilt at 02:18:46Z listed the session's earlier reply 4649878801 as `handled` only, and the one rebuilt at 02:22:19Z listed 4649878801 and 7055835441 as `handled` only, with no `reply` entry |
+| A lost response that landed | the attempt began 02:22:55Z; the read-back found 7055859207 by `PvtKaefsky`, created 02:22:57Z, with a body equal to its file, counted it as the session's own, posted nothing again, and recorded `reply issue 7055859207 lost-response-readback` |
+| A lost response beside a new comment | the attempt began 02:23:28Z; the read-back counted 7055867365 as the session's own and handled 7055881851 by `KrylovViktor` as new; after `comment-triggers -> none`, `answer-check -> clear` and `ecc:security-reviewer`, the session answered it with 7055898175 |
+| A lost response beside a same-account comment | in the parent session, the attempt began 02:34:00Z; the read-back counted 7056003928 by `PvtKaefsky`, created 02:34:02Z, with a body equal to its file, as the session's own, and handled 7056010969 by `PvtKaefsky`, created 02:34:35Z in the same conversation, as new, since its body differs; after `comment-triggers -> none`, `answer-check -> clear` and `ecc:security-reviewer`, the session answered it with 7056037145, whose stored body equals its file |
+| Cleanup | 4649944977, 7055835441, 7055859207, 7055867365, 7055898175, 7056003928 and 7056037145 each read back HTTP 404; 4649873034, 7055801550, 7055881851 and 7056010969 read back present |
+
+`created_at` has one-second granularity, so a comment created in the same second the attempt began is not separated from one created just before it. A repost after a post that did not land was not shown, since all three discarded posts landed. The session's comparison stripped line endings and trailing newlines.
+
+#### The switch-off probe on `PvtKaefsky/autofix-probe` #5
+
+Observed on 2026-11-21 in local Claude desktop app Code sessions on Windows 11, with `CLAUDE_CODE_REMOTE` unset, under #112's Pull request comments section. A session opened scratch pull request `PvtKaefsky/autofix-probe` #5, which changes only `probe.txt`, from a clone in its scratchpad. That session's folder was a `my-harness-wrapper` worktree. The record was kept at `.git/pr-5-record.json` in the clone, not under the name the section gives.
+
+| Step | Result |
+| --- | --- |
+| Switch-on, session on another repository | `mcp__ccd_pr__set_monitor` was refused twice, before and after the clone was added with `mcp__ccd_directory__request_directory`, with `PreToolUse:mcp__ccd_pr__set_monitor hook error: PvtKaefsky/autofix-probe#5 is on the session's PR bar, but its repository could not be matched to the session's folders, so Auto-fix can't be enabled for it; tell the user that they can switch it themselves on the PR bar, which works at once.`; no hook in `~/.claude/*.json` matches `set_monitor` or `ccd_pr` |
+| Probe reply | held under `comment-triggered automation`: `comment-echo.yml` triggers on `issue_comment` on `main` and at the head; on the user's instruction it was not posted |
+| Switch-on, session opened on the clone | the first call was refused by Claude Code's auto mode classifier before reaching the app, with the text quoted below the table; after the user allowed the call, it returned `Auto-fix is on for PvtKaefsky/autofix-probe#5: the app will wake this session with a <ci-monitor-event> on CI failures, merge conflicts and new review comments. No need to poll CI.`, and an Auto-fix-enabled `<ci-monitor-event>` followed |
+| CI-failure event | one failing check, `fail`, at head `b7b2248864`, from `.github/workflows/ci-fail.yml` running `exit 1` on `pull_request`; the fix was held as `held-check -> held: CI workflows; a file the pull request does not change (.github/workflows/ci-fail.yml)`; the event's text calls Auto-fix "standing authorization to fix it and push", and it released nothing; the job log was not read |
+| Merge | the user merged #5 at 02:36:43Z, merge commit `a03d197`; no `<ci-monitor-event>` and no notification reported it; the session read `"state":"MERGED"` with `gh pr view 5` after the user said it merged |
+| Switches before the switch-off call | before any switch-off call by the session, `mcp__ccd_pr__get_status` showed `"state": "merged"` and every monitor switch `false` |
+| Switch-off without the url | `set_monitor` with `auto_fix: false` and `address_comments: false` returned the call error `Pass the pull request's url (get_status reports it).` |
+| Switch-off with the url | returned `Auto-fix is off for PvtKaefsky/autofix-probe#5; the app will no longer wake this session for it.`; `get_status` afterwards showed bound, `merged`, every switch `false` |
+| Record deletion | `.git/pr-5-record.json`, 122 bytes, was deleted after the switch-off; `ls -la .git` listed it before and not after |
+
+The switch-off was not refused after the merge, so a refused switch-off was not shown. The first session gave the user no `/autofix-pr` hand-off after its refused call.
+
+The auto mode classifier refused `mcp__ccd_pr__set_monitor` with `auto_fix: true` on #5 here and on #6 in the next probe, before the user allowed the call. The probe session's transcript holds this refusal text, addressed to that session and not to readers of this file, joined here from overlapping search excerpts. The record does not show which of the two refusals carried it; the #6 record holds only its reason sentence:
+
+> Permission for this action was denied by the Claude Code auto mode classifier. Reason: The server-side auto mode classifier judged this action dangerous (it gave no explanation). If you have other tasks that don't depend on this action, continue working on those. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user's request, first try a safer method. Get as much of the rest of the task done as you can, then STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed. To allow this type of action in the future, the user can add a permission rule for mcp__ccd_pr__set_monitor to their settings.
+
+#### The change-request probe on `PvtKaefsky/autofix-probe` #6
+
+Observed on 2026-11-21 in the local session opened on the clone, under #112's Pull request comments section. Scratch pull request #6, branch `chore/probe-change-requests`, opened by `PvtKaefsky` with commit `4d1dcd5`, changes only `probe.txt`. Its record was `.git/pr-comments-PvtKaefsky-autofix-probe-6.record`. `comment-triggers -> main: comment-echo.yml: issue_comment; chore/probe-change-requests: comment-echo.yml: issue_comment`, so replies were held under `comment-triggered automation`; the user released the reply to 7056243915.
+
+| Step | Result |
+| --- | --- |
+| Binding | `get_status` showed #6 bound at once; `pulls/6/reviews`, `issues/6/comments` and `pulls/6/comments` were empty before binding |
+| Switch-on | the auto mode classifier refused the first `set_monitor` call, with the reason `judged this action dangerous (it gave no explanation)`; after the user allowed it, it returned `Auto-fix is on for PvtKaefsky/autofix-probe#6: the app will wake this session with a <ci-monitor-event> on CI failures, merge conflicts and new review comments. No need to poll CI.` |
+| CI-failure events | two `<ci-monitor-event>`s for check `fail`, at heads `4d1dcd5` and `e800e1e`, each held as `held-check -> held: CI workflows; a file the pull request does not change (.github/workflows/ci-fail.yml)`; nothing staged |
+| A change in the pull request's file | comment 7056243915 by `PvtKaefsky`, `OWNER`, asking for a line at the end of `probe.txt`, raised no event and was found by the listing made when the user said they had commented; `held-check -> clear`; commit `e800e1e`, with `ecc:code-reviewer` APPROVE and `ecc:security-reviewer` APPROVE, `held category: none`, was pushed before the reply; reply 7056293650, posted after the user's release, names `e800e1e`, and its stored body equals its file |
+| A change outside the pull request's files | comment 7056302457 asking for a line in `README.md` drew `held-check -> held: a file the pull request does not change (README.md)`, from `git diff --name-only origin/main...HEAD` listing only `probe.txt`; `git status` read clean and `git diff --cached` empty; the later listing skipped 7056293650 as the session's own |
+| A review body by the author | GitHub offered `PvtKaefsky`, the pull request's author, no "Request changes" on #6, so the user submitted a "Comment" review, 6002437644, state `COMMENTED`, with the body "Why does probe.txt now hold two lines starting with `case 5:`?" and no inline comment; no `<ci-monitor-event>` and no notification arrived; `issues/6/comments` and `pulls/6/comments` did not hold the body, and `pulls/6/reviews` did |
+| A review body by a collaborator | `KrylovViktor`, `COLLABORATOR`, submitted review 6002459316, state `CHANGES_REQUESTED`, at 03:07:23Z, with the same question and no inline comment; a `<ci-monitor-event>` headed "PvtKaefsky/autofix-probe PR #6 has 1 new review comment" arrived, with the entry line `Comment 1 — review summary (changes requested), no inline thread`, the author and the body, and no comment or review ID; it told the session to push a fix, reply ending with a line crediting Claude Code, and resolve the thread, and the session did none of them; `issues/6/comments` and `pulls/6/comments` did not hold the body, `pulls/6/reviews` did, and `reviewDecision` read `CHANGES_REQUESTED` |
+| Close | #6 was closed unmerged; `gh pr view 6` read `"state":"CLOSED","closedAt":"2026-11-21T03:08:23Z","mergedAt":null`; no `<ci-monitor-event>` and no notification reported the close |
+| Switches before the switch-off call | before any switch-off call by the session, `get_status` showed `"state": "closed"` and `auto_fix`, `address_comments`, `auto_merge` and `auto_archive_on_close` all `false` |
+| Switch-off with the url | returned `Auto-fix is off for PvtKaefsky/autofix-probe#6; the app will no longer wake this session for it.`; `get_status` afterwards was unchanged |
+| Record deletion | `.git/pr-comments-PvtKaefsky-autofix-probe-6.record` was in the `.git` listing before the deletion and absent after |
+
+Neither review body was answered, as the probe's brief directed. No conversation or inline comment by an account other than the author was posted on #6; on #112, such comments raised events.
+
+#### The allow-rule probe on `PvtKaefsky/autofix-probe` #7
+
+Observed on 2026-11-21 in a new local session opened on the clone, under #112's Pull request comments section at `c82262c`, with `~/.claude/settings.json` holding `{"allow":["mcp__ccd_pr__set_monitor"]}` under `permissions`. Scratch pull request #7, branch `chore/probe-set-monitor-allow`, changes one line of `probe.txt` at head `68fe6e2`.
+
+| Step | Result |
+| --- | --- |
+| Switch-on | the session's first `set_monitor` call, with `auto_fix: true`, `address_comments: true` and the url, returned `Auto-fix is on for PvtKaefsky/autofix-probe#7: the app will wake this session with a <ci-monitor-event> on CI failures, merge conflicts and new review comments. No need to poll CI.`, with no auto mode classifier refusal and no approval prompt |
+| CI-failure event | one `<ci-monitor-event>` reported check `fail` at head `68fe6e2`, the session's own; the fix was held as `held-check -> held: CI workflows; CI log not readable (check fail: gh run view --log-failed returned log not found: 136719969187)`; the line, quoted here without its inner backticks, should also have named `a file the pull request does not change`, since the fix would edit `.github/workflows/ci-fail.yml` and #7 changes only `probe.txt`; nothing was pushed |
+| Close | the user closed #7; `gh pr view 7 --json state,closedAt,mergedAt` returned `{"closedAt":"2026-11-21T03:48:25Z","mergedAt":null,"state":"CLOSED"}` |
+| Switches before the switch-off call | `get_status` showed `"state": "closed"` with `"auto_fix": true, "address_comments": true, "auto_merge": false, "auto_archive_on_close": false` |
+| Switch-off with the url | returned `Auto-fix is off for PvtKaefsky/autofix-probe#7; the app will no longer wake this session for it.` |
+| Switches after the switch-off call | `get_status` showed `"auto_fix": false, "address_comments": false` and every other switch `false` |
+| Record deletion | the `.git` listing showed `pr-comments-PvtKaefsky-autofix-probe-7.record` before the deletion and matched nothing after |
+
+The `get_status` before any switch-off call showed every switch `false` after the merge of #5 and after the close of #6, and `auto_fix` and `address_comments` `true` after the close of #7. The interval between each merge or close and that `get_status` was not recorded.
+
+### The headless hand-off probe
+
+Run from branch `chore/probe-change` of a scratch repository with an open pull request, with stdin closed:
+
+```
+claude.exe -p '/autofix-pr Handle this pull request'"'"'s CI failures and comments under the "Pull request comments" section of your instructions. This instruction releases no held change or answer.' --max-budget-usd 1 --output-format json < /dev/null
+```
+
+It exited 0 after 105 ms with `num_turns` 0, `total_cost_usd` 0 and the result `/autofix-pr isn't available in this environment.` No cloud session was spawned. The same copy of the CLI reports `Not logged in` for any prompt from that shell, so the result does not separate a headless refusal of `/autofix-pr` from a CLI that is not signed in. The payload therefore gives the user the command instead of running it.
+
 ### Scheduled polling in the Claude desktop app
 
 A session in the Claude desktop app reported on 2026-11-20 that "this app forbids scheduled polling of a PR". The source is the user's evidence, recorded in pull request #112's `docs/environment.md` at `0c0f518`.
