@@ -690,10 +690,19 @@ its first reply.
 ## Auto-fix on pull requests
 
 Do not switch on Claude Code's Auto-fix or run `/autofix-pr` for a pull request
-a harness session created: that session already watches it, and a second
+a cloud harness session created: that session already watches it, and a second
 watcher answers the same comments. This does not hold where that session's
 reply says it has no subscription tool and schedules no check: nothing watches
 that pull request.
+
+For a pull request a local harness session created, Auto-fix is the harness's
+own path. The session switches it on with `mcp__ccd_pr__set_monitor`, or gives
+you the `/autofix-pr` command to run where it has no such tool. Where it switched
+Auto-fix on, tell that session in chat after you post a comment on that pull
+request. A comment by the
+pull request's author raises no event. The probe on pull request #112 could not
+tell the author from the repository owner or the account `gh` is signed in
+with, which were one account.
 
 ## Before every commit
 
