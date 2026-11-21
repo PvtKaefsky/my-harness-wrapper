@@ -50,7 +50,7 @@ check 'the timer is pinned to cloud sessions' has 'A cloud session also checks t
 check "the local Auto-fix standing request" has 'the user'"'"'s standing request is Auto-fix on every pull request a local harness session creates'
 check 'the local set_monitor call' has 'A local session with `mcp__ccd_pr__set_monitor` calls it once, with `auto_fix: true`, `address_comments: true` and the pull request'"'"'s url'
 check 'no auto_archive_on_close' has 'passes no `auto_archive_on_close`'
-check 'the harness allows the set_monitor call' has 'the harness allows the call through `permissions.allow` in its `settings.json`.'
+check 'the local install allows the set_monitor call' has 'the local install allows the call with an allow rule for `mcp__ccd_pr__set_monitor`.'
 check 'both switches off at merge or close, with the url' has 'it calls the tool again with `auto_fix: false`, `address_comments: false` and the pull request'"'"'s url.'
 check 'the app clears the switches at merge' has 'When probed, the app had already cleared both switches at a merge and at a close, and the call still succeeded afterwards.'
 check 'the record is deleted after the switch-off' has 'After that call, the session deletes that pull request'"'"'s record file and says so in its reply.'

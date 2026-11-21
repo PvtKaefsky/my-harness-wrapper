@@ -320,6 +320,16 @@ value of each `hooks.<event>` the delivered file
 names, or `"absent"`. Where the live file is absent or empty, the delivered file is
 merged over an empty object.
 
+The same program then adds `mcp__ccd_pr__set_monitor` to the merged
+`permissions.allow`, keeping every entry already there and adding none twice;
+a `permissions.allow` that is neither absent, `null` nor an array, or a
+`permissions` that is neither absent, `null` nor an object, fails the merge.
+After the write the
+step prints `jq -c .permissions.allow <file> -> exit=N value=<array>
+mcp__ccd_pr__set_monitor=added`, `=already there`, read from the live file before
+the merge, or `=missing` with one failure where the written file lacks the entry.
+`scripts/test-install-settings.sh` runs this program.
+
 The program reads every document in both files and fails unless it read
 exactly two, so a live file holding more than one document fails the step
 instead of displacing the delivered file.
@@ -2020,6 +2030,28 @@ An absent `jq` exits 0 with
 session without `jq` runs the package unchecked; there, telemetry stays off
 only where `DISABLE_TELEMETRY` reaches the package's environment.
 
+## scripts/test-install-settings.sh
+
+Reads the `local MERGE=` line of `scripts/install-local.sh` in its own tree, or
+of the file its one optional argument names, and runs that program with
+`config/settings.json` of its own tree as the delivered file, in a `mktemp -d`
+directory removed on exit. It prints one line per check, is run by hand only,
+and exits 0 only where every check passes. It exits 1 with `fail -> not run`
+where the `local MERGE=` line is absent.
+
+| Check | Passes where |
+| --- | --- |
+| the merge runs on a live file holding another allow entry | the program exits 0 on a live file with `permissions.allow` `["Bash(ls:*)"]` and a `permissions.deny` |
+| the existing allow entry survives | the result still holds `Bash(ls:*)` |
+| mcp__ccd_pr__set_monitor is added once | the result holds `mcp__ccd_pr__set_monitor` exactly once |
+| the deny list survives | the result's `permissions.deny` is unchanged |
+| a second run changes nothing | running the program on the first result gives the same document |
+| a live file with no permissions gains the entry | a live file without `permissions` gives `["mcp__ccd_pr__set_monitor"]` |
+| no live file gives the entry | the program merged over an empty object gives `["mcp__ccd_pr__set_monitor"]` |
+| a string permissions.allow fails the merge | the program exits non-zero on a live `permissions.allow` that is a string |
+| an object permissions.allow fails the merge | the program exits non-zero on a live `permissions.allow` that is an object |
+| a string permissions fails the merge | the program exits non-zero on a live `permissions` that is a string |
+
 ## scripts/test-pr-comment-rules.sh
 
 Reads the `## Pull request comments` section of the file its one optional
@@ -2055,7 +2087,7 @@ check every 30 minutes`.
 | the local Auto-fix standing request | states the user's standing request for Auto-fix on every pull request a local harness session creates |
 | the local set_monitor call | has a local session call `mcp__ccd_pr__set_monitor` once with `auto_fix: true`, `address_comments: true` and the pull request's url |
 | no auto_archive_on_close | has that call pass no `auto_archive_on_close` |
-| the harness allows the set_monitor call | states that the harness allows the `set_monitor` call through `permissions.allow` in its `settings.json` |
+| the local install allows the set_monitor call | states that the local install allows the `set_monitor` call with an allow rule |
 | both switches off at merge or close, with the url | has the session call the tool again with both switches false and the pull request's url |
 | the app clears the switches at merge | states that, when probed, the app had already cleared both switches at a merge and at a close, and that the call still succeeded afterwards |
 | the record is deleted after the switch-off | has the session delete the pull request's record file after that call and say so |

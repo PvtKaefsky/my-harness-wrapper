@@ -145,14 +145,10 @@ table below.
 
 It writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, the
 global git config and the plugin install directories, and nothing else. It
-replaces `CLAUDE.md` there whole, and replaces each `hooks.<event>` array and
-the `permissions.allow` array that `config/settings.json` names. Allow entries
-the live `settings.json` already holds are dropped and not logged; only the
-first run's `settings.json.pre-harness` copy keeps them. The payload's allow
-entry `mcp__ccd_pr__set_monitor` is meant to let a session switch Auto-fix without asking
-the user; that effect is not probed. `scripts/verify.sh` reports `FAIL settings.permissions` wherever the
-live `permissions.allow` differs from the payload's, an entry added later at
-user scope included. The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
+replaces `CLAUDE.md` there whole, and replaces each `hooks.<event>` array that
+`config/settings.json` names, then adds `mcp__ccd_pr__set_monitor` to the live
+`permissions.allow`, keeping every entry already there and adding none twice.
+The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
 differing from the payload, copies it to `settings.json.pre-harness` or
 `CLAUDE.md.pre-harness` beside it; later runs leave that copy alone. The log
 also prints each replaced hook array's prior value. Its log is
@@ -709,7 +705,10 @@ request. A comment by the
 pull request's author raises no event. The probe on pull request #112 could not
 tell the author from the repository owner or the account `gh` is signed in
 with, which were one account. Tell a local session when its pull request merges
-or closes: no event reported a merge or a close when probed.
+or closes: no event reported a merge or a close when probed. Claude Code's auto
+mode classifier refused the `set_monitor` call when probed, so the local install
+adds `mcp__ccd_pr__set_monitor` to `permissions.allow` in the live
+`settings.json`, keeping every entry already there.
 
 ## Before every commit
 
@@ -728,6 +727,9 @@ committing a change to `plugins/my-harness/hooks/web-guidance-gate.sh`, to
 only where every case passes. Run `scripts/test-pr-comment-rules.sh` before
 committing a change to `config/CLAUDE.md`'s Pull request comments section or to
 the test script itself; it exits 0 only where every check passes. Run
+`scripts/test-install-settings.sh` before committing a change to the settings
+merge of `scripts/install-local.sh` or to the test script itself; it exits 0
+only where every check passes. Run
 `scripts/test-hook-forwarding.sh` before committing a change to `git-hooks/`
 or to that script. It exits 0 only where every case passes, and it needs a
 checkout holding commit `5f3f87a`. `bash -n` is not
