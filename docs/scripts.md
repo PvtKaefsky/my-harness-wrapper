@@ -1562,10 +1562,19 @@ among them, takes the `PreToolUse` path this table describes.
 | `mcp__github__push_files`, `mcp__github__create_or_update_file`, `mcp__github__delete_file`, `mcp__github__merge_pull_request`, `mcp__github__enable_pr_auto_merge` | Every string in `tool_input`, at any depth, except file contents: a `content` key at the top level and in each object of a `files` array. A document whose contents quote the footer stays writable. An input carrying no message, as `enable_pr_auto_merge`'s may, passes. |
 | Anything else | Every string in `tool_input`, at any depth. |
 
-A body file is taken from four token forms: `--body-file <path>`,
-`--body-file=<path>`, `-F <name>=@<path>` for any field name, and
-`body=@<path>` after any flag spelling. A field named anything but `body` is
-recognised only after `-F`.
+A body file is taken from five token forms: `--body-file <path>`,
+`--body-file=<path>`, `-F <name>=@<path>` for any field name,
+`body=@<path>` after any flag spelling, and `--input <path>` or
+`--input=<path>`, the file `gh api` sends as the request body. A field named
+anything but `body` is recognised only after `-F`. An `--input` file is
+scanned as raw text and, where `jq` parses it as JSON, also as every string
+value it holds, decoded, as `jq -r '.. | strings'` returns them, so a
+trailer written as `\n` inside a JSON string starts a line. A leading UTF-8
+byte order mark is removed before the decoded scan. An `--input` file
+over 1 MiB, or one whose first non-blank character is `{` or `[` and that `jq`
+cannot parse, exits 2 with `attribution-guard: --input file <path> <cause>, so
+the body was not checked.` on stderr. Any other `--input` file `jq` cannot
+parse is scanned as raw text only.
 
 In a command that runs `gh pr create`, `gh pr edit`, `gh pr comment`,
 `gh pr review`, `gh issue create`, `gh issue edit` or `gh issue comment`, `-F`
@@ -1621,7 +1630,7 @@ being scanned. Each is accepted, not handled.
 | A `--body-file` flag and its path on different lines of a continued command | Each token form is matched within one line. |
 | A `Co-Authored-By:` or `Claude-Session:` trailer written inside a one-line command, as in `--body $'x\n\nCo-Authored-By: ...'` | The trailer alternatives are anchored at a line start, and the command text carries `\n` literally, so the trailer starts no line. |
 | `-F` clustered behind another short flag, as in `-dF <path>` or `-dF<path>` | Only a `-F` token standing alone is recognised. |
-| A body read from standard input, `-F -` or `--body-file -` | The path `-` is not a regular file, so it is skipped. |
+| A body read from standard input, `-F -`, `--body-file -` or `--input -` | The path `-` is not a regular file, so it is skipped. |
 | A body-file path carrying a variable, a `~` or another shell expansion | The hook receives the command before the shell expands it, so the path is read literally and skipped where no such file exists. |
 | A relative body-file path after a `cd` in the same command | The path is resolved against the hook's working directory, not the directory the command changes to. |
 | An issue created or edited through any tool but `mcp__github__issue_write` and `Bash` | The `PreToolUse` matcher names no other issue tool, so the guard does not run. |
@@ -1766,6 +1775,14 @@ passed, and 1 otherwise.
 | `gh issue edit --body-file <file>` and `-F <file>` | The same file | 2 |
 | `gh issue comment --body-file <file>` and `-F <file>` | The same file | 2 |
 | `gh api repos/o/r/issues -F body=@<file>` | The same file | 2 |
+| `gh api repos/o/r/issues/1/comments --input <file>` and `--input=<file>` | A JSON file whose `body` string ends in a `Co-Authored-By` trailer naming Claude | 2 |
+| `gh api repos/o/r/issues/1/comments --input <file>`, `Generated with` | A JSON file whose `body` string ends in the `Generated with` footer | 2 |
+| `gh api repos/o/r/issues/1/comments --input <file>`, not JSON | A text file ending in a `Co-Authored-By` trailer naming Claude on its own line | 2 |
+| `gh api repos/o/r/issues/1/comments --input <file>`, clean | A JSON file whose `body` has no footer | 0 |
+| `gh api repos/o/r/issues/1/comments --input -` | Standard input, no file read | 0 |
+| `gh api repos/o/r/issues/1/comments --input <file>`, UTF-8 byte order mark | The `Co-Authored-By` JSON file behind a leading byte order mark | 2 |
+| `gh api repos/o/r/issues/1/comments --input <file>`, past the `jq` depth limit | A clean string nested in 20,000 arrays; passes on the marker `so the body was not checked` | 2 |
+| `gh api repos/o/r/issues/1/comments --input <file>`, over 1 MiB | A JSON file with a 1,100,000-byte field and a clean `body`; passes on the same marker | 2 |
 | Issue tool `body`, three cases | An `mcp__github__issue_write` create whose `body` ends in each footer form | 2 |
 | `gh issue create --body`, clean | A body with no footer | 0 |
 | Issue tool `body`, clean | A body with no footer | 0 |

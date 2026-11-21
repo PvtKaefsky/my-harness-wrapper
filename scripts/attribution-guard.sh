@@ -20,6 +20,12 @@ need_re() {
   fi
 }
 
+undecoded() {
+  printf 'attribution-guard: --input file %s %s, so the body was not checked.\n' "$(sanitize "$1")" "$2" >&2
+  printf 'attribution-guard: send a JSON body of at most 1 MiB that jq can parse, then retry.\n' >&2
+  exit 2
+}
+
 block() {
   printf 'attribution-guard: matched line -> %s\n' "$(sanitize "$1")" >&2
   printf 'attribution-guard: remove that attribution line from the body, then retry.\n' >&2
@@ -76,19 +82,34 @@ if [ "$TOOL" = Bash ]; then
   if [ "$WRITE_OP" != yes ]; then exit 0; fi
   scan "$CMD"
   while IFS= read -r BODY_FILE; do
+    KIND=${BODY_FILE%%:*}
+    BODY_FILE=${BODY_FILE#*:}
     if [ -z "$BODY_FILE" ]; then continue; fi
     if [ ! -f "$BODY_FILE" ] || [ ! -r "$BODY_FILE" ]; then continue; fi
-    scan "$(head -c 1048576 -- "$BODY_FILE" 2>/dev/null)"
+    BODY=$(head -c 1048576 -- "$BODY_FILE" 2>/dev/null)
+    scan "$BODY"
+    if [ "$KIND" = J ]; then
+      if [ "$(LC_ALL=C wc -c < "$BODY_FILE")" -gt 1048576 ]; then undecoded "$BODY_FILE" 'exceeds 1 MiB'; fi
+      BODY=${BODY#$'\xef\xbb\xbf'}
+      DECODED=$(printf '%s' "$BODY" | jq -r '.. | strings' 2>/dev/null); JQ_RC=$?
+      case "${BODY#"${BODY%%[![:space:]]*}"}" in
+        [\{\[]*) if [ "$JQ_RC" -ne 0 ]; then undecoded "$BODY_FILE" "is not JSON jq can parse (jq exit=$JQ_RC)"; fi ;;
+      esac
+      scan "$DECODED"
+    fi
   done < <({
       printf '%s\n' "$CMD" \
         | grep -a -o -E -- '--body-file[=[:space:]]+[^[:space:]]+|-F[=[:space:]]+[^[:space:]]+=@[^[:space:]]+|body=@[^[:space:]]+' \
-        | sed -E 's/^--body-file[=[:space:]]+//; s/^.*=@//'
+        | sed -E 's/^--body-file[=[:space:]]+//; s/^.*=@//; s/^/R:/'
+      printf '%s\n' "$CMD" \
+        | grep -a -o -E -- '--input[=[:space:]]+[^[:space:]]+' \
+        | sed -E 's/^--input[=[:space:]]+//; s/^/J:/'
       if [ "$SHORT_F" = yes ]; then
         printf '%s\n' "$CMD" \
           | grep -a -o -E -- '(^|[[:space:]])-F[=[:space:]]*[^[:space:]]+' \
-          | sed -E 's/^[[:space:]]*-F[=[:space:]]*//'
+          | sed -E 's/^[[:space:]]*-F[=[:space:]]*//; s/^/R:/'
       fi
-    } | sed -E 's/^["'"'"']+//; s/["'"'"']+$//')
+    } | sed -E 's/^([RJ]:)["'"'"']+/\1/; s/["'"'"']+$//')
 else
   case "$TOOL" in
     mcp__github__push_files|mcp__github__create_or_update_file|mcp__github__delete_file|mcp__github__merge_pull_request|mcp__github__enable_pr_auto_merge)
