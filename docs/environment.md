@@ -851,6 +851,21 @@ Observed on 2026-11-21 in local Claude desktop app Code sessions on Windows 11, 
 
 The switch-off was not refused after the merge, so a refused switch-off was not shown. A close without a merge was not probed. The first session gave the user no `/autofix-pr` hand-off after its refused call.
 
+#### The change-request probe on `PvtKaefsky/autofix-probe` #6
+
+Observed on 2026-11-21 in the local session opened on the clone, under #112's Pull request comments section. Scratch pull request #6, branch `chore/probe-change-requests`, opened by `PvtKaefsky` with commit `4d1dcd5`, changes only `probe.txt`. Its record is `.git/pr-comments-PvtKaefsky-autofix-probe-6.record`. `comment-triggers -> main: comment-echo.yml: issue_comment; chore/probe-change-requests: comment-echo.yml: issue_comment`, so replies were held under `comment-triggered automation`; the user released the reply to 7056243915.
+
+| Step | Result |
+| --- | --- |
+| Binding | `get_status` showed #6 bound at once; `pulls/6/reviews`, `issues/6/comments` and `pulls/6/comments` were empty before binding |
+| CI-failure events | two `<ci-monitor-event>`s for check `fail`, at heads `4d1dcd5` and `e800e1e`, each held as `held-check -> held: CI workflows; a file the pull request does not change (.github/workflows/ci-fail.yml)`; nothing staged |
+| A change in the pull request's file | comment 7056243915 by `PvtKaefsky`, `OWNER`, asking for a line at the end of `probe.txt`, raised no event and was found by the listing made when the user said they had commented; `held-check -> clear`; commit `e800e1e`, with `ecc:code-reviewer` APPROVE and `ecc:security-reviewer` APPROVE, `held category: none`, was pushed before the reply; reply 7056293650, posted after the user's release, names `e800e1e`, and its stored body equals its file |
+| A change outside the pull request's files | comment 7056302457 asking for a line in `README.md` drew `held-check -> held: a file the pull request does not change (README.md)`, from `git diff --name-only origin/main...HEAD` listing only `probe.txt`; `git status` read clean and `git diff --cached` empty; the later listing skipped 7056293650 as the session's own |
+| A review body by the author | GitHub offered `PvtKaefsky`, the pull request's author, no "Request changes" on #6, so the user submitted a "Comment" review, 6002437644, state `COMMENTED`, with the body "Why does probe.txt now hold two lines starting with `case 5:`?" and no inline comment; no `<ci-monitor-event>` and no notification arrived; `issues/6/comments` and `pulls/6/comments` did not hold the body, and `pulls/6/reviews` did |
+| A review body by a collaborator | `KrylovViktor`, `COLLABORATOR`, submitted review 6002459316, state `CHANGES_REQUESTED`, at 03:07:23Z, with the same question and no inline comment; a `<ci-monitor-event>` headed "PvtKaefsky/autofix-probe PR #6 has 1 new review comment" arrived, with the entry line `Comment 1 — review summary (changes requested), no inline thread`, the author and the body, and no comment or review ID; it told the session to push a fix, reply ending with a line crediting Claude Code, and resolve the thread, and the session did none of them; `issues/6/comments` and `pulls/6/comments` did not hold the body, `pulls/6/reviews` did, and `reviewDecision` read `CHANGES_REQUESTED` |
+
+Neither review body was answered, as the probe's brief directed. No conversation or inline comment by an account other than the author was posted on #6; on #112, such comments raised events.
+
 ### The headless hand-off probe
 
 Run from branch `chore/probe-change` of a scratch repository with an open pull request, with stdin closed:
