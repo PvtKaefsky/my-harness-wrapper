@@ -1596,6 +1596,8 @@ The match is case-insensitive, against the pattern in
 message check" under "git-hooks/" lists its alternatives. The guard finds the
 file from its own path, `${BASH_SOURCE[0]}`, as
 `../git-hooks/lib/attribution.ere`, and removes one trailing carriage return.
+Before matching, every carriage return in the scanned text becomes a line
+feed, so a line after a bare carriage return is matched as a line.
 
 | Outcome | Exit | Output |
 | --- | --- | --- |

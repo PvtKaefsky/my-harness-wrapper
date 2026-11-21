@@ -41,7 +41,7 @@ resend() {
 scan() {
   local hit rc
   need_re
-  hit=$(printf '%s\n' "$1" | grep -a -i -E -m1 -- "$RE" 2>/dev/null); rc=$?
+  hit=$(printf '%s\n' "$1" | tr '\r' '\n' | grep -a -i -E -m1 -- "$RE" 2>/dev/null); rc=$?
   if [ "$rc" -gt 1 ]; then unchecked "grep could not apply the pattern (exit=$rc)"; fi
   if [ -n "$hit" ]; then block "$hit"; fi
 }
