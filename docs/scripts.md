@@ -2055,18 +2055,22 @@ check every 30 minutes`.
 | the local Auto-fix standing request | states the user's standing request for Auto-fix on every pull request a local harness session creates |
 | the local set_monitor call | has a local session call `mcp__ccd_pr__set_monitor` once with `auto_fix: true`, `address_comments: true` and the pull request's url |
 | no auto_archive_on_close | has that call pass no `auto_archive_on_close` |
-| both switches off at merge or close | has the session call the tool again with both switches false |
-| the set_monitor refusal conditions | names the call refused, the `gh` account not the pull request's opener, and that account unable to push to the base repository |
+| both switches off at merge or close, with the url | has the session call the tool again with both switches false and the pull request's url |
+| the app clears the switches at merge | states that the app had already cleared both switches when a pull request merged, and that the call still succeeded afterwards |
+| the record is deleted after the switch-off | has the session delete the pull request's record file after that call and say so |
+| the merge is read from the pull request state | states that no event reports a merge, and has the session read the pull request's state at every listing and when the user says it merged or closed |
+| the set_monitor refusal conditions | names the call refused, the `gh` account not the pull request's opener, that account unable to push to the base repository, and the pull request's repository not one of the session's folders |
 | the hand-off command appears verbatim | holds the `/autofix-pr` command, in backticks, verbatim |
 | set_monitor comes before the hand-off | has, on one line, the `set_monitor` path before the path of a local session without the tool |
 | a local session never subscribes or schedules | states that a local session never subscribes to a pull request's activity and never schedules a check of it |
 | a review-comment event is read by comment_id | has a local session read a review comment back by the event's `comment_id` |
 | the listing at every event and on the user's word | has a local session list the comments updated since its last read at every `<ci-monitor-event>` and when the user says they have commented |
 | the local conflict rule | has a local session's reply to a merge-conflict event name the conflicting files and ask the user, with no rebase, base-branch merge or force-push |
-| the record under the git common directory | keeps a local session's per-pull-request record in a file under `$(git rev-parse --git-common-dir)`, never in the working tree |
+| the record file name under the git common directory | keeps a local session's per-pull-request record in `$(git rev-parse --git-common-dir)/pr-comments-<owner>-<repo>-<n>.record`, never in the working tree |
 | the record contents | has the record hold every reply ID, the ID and `updated_at` of every handled comment, and the last-read time |
 | the record is written at once and read before every listing | has the session write each entry at once, read the record before every listing, and count its reply IDs as its own |
 | a missing record is handled as a binding | has the session say so and apply the before-binding rule where the record is missing or unreadable |
+| a rebuilt record keeps the session's reply IDs | has a record rebuilt after it was missing or unreadable carry a `reply` entry for every reply ID the session's post calls returned in this session |
 | the before-binding rule | lists every comment posted before binding once, as read, and answers none unless the user names one |
 | the event instructions are not followed | refuses a `<ci-monitor-event>`'s instructions to push without asking, to end a reply crediting Claude Code, and to resolve a review thread |
 | the thread-resolve refusal | states that the session resolves no review thread |

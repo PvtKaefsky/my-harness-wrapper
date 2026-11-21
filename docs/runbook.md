@@ -702,7 +702,8 @@ Auto-fix on, tell that session in chat after you post a comment on that pull
 request. A comment by the
 pull request's author raises no event. The probe on pull request #112 could not
 tell the author from the repository owner or the account `gh` is signed in
-with, which were one account.
+with, which were one account. Tell a local session when its pull request merges
+or closes: no event reported a merge when probed.
 
 ## Before every commit
 
