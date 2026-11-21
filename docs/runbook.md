@@ -703,7 +703,7 @@ request. A comment by the
 pull request's author raises no event. The probe on pull request #112 could not
 tell the author from the repository owner or the account `gh` is signed in
 with, which were one account. Tell a local session when its pull request merges
-or closes: no event reported a merge when probed.
+or closes: no event reported a merge or a close when probed.
 
 ## Before every commit
 
