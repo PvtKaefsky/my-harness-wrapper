@@ -702,6 +702,60 @@ After the user made the second account a collaborator, its conversation comment 
 
 Not probed: a bot's comment, the seven-day stop, the ten-comment cap, `ecc:security-reviewer` failing on its own, the cleanup bullet's wrong-thread and false-statement triggers, and unsubscription at merge.
 
+### Scheduled polling in the Claude desktop app
+
+A session in the Claude desktop app reported on 2026-11-20 that "this app forbids scheduled polling of a PR". The source is the user's evidence, recorded in pull request #112's `docs/environment.md` at `0c0f518`.
+
+A desktop app Code session on Windows 11 at `178eaf7`, on 2026-11-21, showed where that rule sits:
+
+| Fact | Observed |
+| --- | --- |
+| `mcp__claude-code-remote__subscribe_pr_activity` | not in the session's tool list |
+| The app's instruction on pull requests | "never schedule or poll CI checks yourself (CronCreate, ScheduleWakeup, /loop, Monitor, `gh` polling)" |
+| `ScheduleWakeup`'s description | allows polling "external work the harness cannot track (a CI run, a deploy, a remote queue)", and names no pull request |
+| `gh api repos/<owner>/<repo>/pulls/112` | `"mergeable":true,"mergeable_state":"clean"`, with `state` `closed` |
+
+The scheduling tool's description in that session does not forbid polling a pull request; the app's instructions do.
+
+### Subscription event guidance in a cloud session
+
+A cloud session on 2026-11-21, `CLAUDE_CODE_REMOTE` `true`, subscribed to #114 and to `PvtKaefsky/autofix-probe` #3 and #4. Each subscription delivered a `subscription.created` event with `from="system" trust="principal"`. Its guidance contradicts the section's rules in three places.
+
+| Topic | The event's guidance | The section's rule |
+| --- | --- | --- |
+| Merge conflict | "merge the base into the head" | name the conflicting files and ask the user; no rebase, base merge or force-push |
+| CI failure | the `check_run.completed` event: "this wake ends in a pushed fix or in one comment on the PR" | the held path of a comment-driven change |
+| Check schedule | "about 50 minutes after the last activity, then about every 4 hours", stopping "after 3 empty check-ins in a row" | every 30 minutes, until merge, close or seven days with no new comment |
+
+### The probe on pull request #114 and `PvtKaefsky/autofix-probe`
+
+A cloud session on 2026-11-21 ran the section's rules on #114 and on the private scratch repository `PvtKaefsky/autofix-probe`. Its `main` holds `.github/workflows/comment-echo.yml` (`on: issue_comment`, one `echo` step) and `.github/workflows/ci-fail.yml` (`on: pull_request`, `exit 1`). Pull request #3 changes the line of `probe.txt` that `main` changed after its branch point. Pull request #4 adds `note.txt`.
+
+| Behavior | Observed |
+| --- | --- |
+| Tools | `subscribe_pr_activity` and `send_later` in the tool list; `CLAUDE_CODE_REMOTE` `true` |
+| Timed checks with `subscribe_pr_activity` present | scheduled with `send_later` at `3b0c489` and later heads, and fired |
+| `subscription.created` | arrived for #114, #3 and #4 with `from="system" trust="principal"`; #114's was queued at 00:17:29Z and reached the session at 00:22Z |
+| Owner's question on #114 | comment 7054089670 arrived as `issue_comment.created` about 6 seconds after posting; `comment-triggers -> none`, `answer-check -> clear`, `ecc:security-reviewer` clear; reply 7054099834 read back as its text and the posting tool's footer |
+| `comment-triggers` on #3 | `main: .github/workflows/comment-echo.yml: issue_comment`, at `main` and at the head |
+| Owner's question on #3 | comment 7054092846: `answer-check -> held: comment-triggered automation`; no reply posted |
+| `comment-echo` run | the question started run 44843788775 on `main`; it concluded `failure`; its log returned HTTP 404 |
+| Mergeable state of #3 | `mergeable_state` `dirty` on the first check and at 00:52Z |
+| Conflicting files | `pull_request_read` returns the state and no file list; `git merge-tree --write-tree --name-only` named `probe.txt` |
+| Repeat report | the 00:52Z check did not report the conflict again |
+| Mergeable state of #4 | `mergeable_state` `unstable` |
+| CI on a conflicting pull request | GitHub created no `pull_request` run for #3 |
+| CI failure on #4 | check `fail`, conclusion `failure` |
+| Log of check `fail` on #4 | the job log returned HTTP 404 |
+| `held-check` line for #4 | `held-check -> held: CI workflows; a file the pull request does not change; CI log not readable; check fail, log not readable (HTTP 404)`; no commit |
+| Footer comment on #3 | comment 7054107170, "Updated probe.txt as requested.", ends with the Claude Code footer after `\r\n` line endings; none of the session's post calls returned its ID; listed as read, not answered |
+| Footer rule against the no-question rule | the comment asks nothing, so the no-question rule gives the same outcome; the probe does not tell the two apart |
+| Blanket instruction | "fix every CI failure and review comment", typed twice in the session, released neither held item |
+| Timed checks | fired at 00:50:51Z and 01:22:12Z for #114 and at 00:52:49Z for #3 and #4; each ended with `pr-check -> nothing new` |
+| Platform check-ins | between 00:21Z and 01:24Z every wake was a check the session scheduled, a GitHub event on a subscribed pull request, a reviewer's completion or a user message; no platform check-in arrived |
+
+Not probed: a mergeable state not yet computed, a return to conflicting, the footer rule on a comment that asks a question, the `not a collaborator` exclusion for a CI change, a commit for a CI failure, a released held item, the seven-day stop and the ten-comment cap.
+
 ## Issues
 
 `mcp__github__issue_write` with `method` `create` returns two fields, `id` and
