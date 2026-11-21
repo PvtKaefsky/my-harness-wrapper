@@ -1782,7 +1782,7 @@ passed, and 1 otherwise.
 | `gh api repos/o/r/issues/1/comments --input -` | Standard input, no file read | 0 |
 | `gh api repos/o/r/issues/1/comments --input <file>`, UTF-8 byte order mark | The `Co-Authored-By` JSON file behind a leading byte order mark | 2 |
 | `gh api repos/o/r/issues/1/comments --input <file>`, past the `jq` depth limit | A clean string nested in 20,000 arrays; passes on the marker `so the body was not checked` | 2 |
-| `gh api repos/o/r/issues/1/comments --input <file>`, over 1 MiB | A JSON file with a 1,100,000-byte field and a clean `body`; passes on the same marker | 2 |
+| `gh api repos/o/r/issues/1/comments --input <file>`, over 1 MiB | A complete JSON object, 1,100,000 spaces, then the `Co-Authored-By` JSON object, so the first mebibyte parses cleanly; passes on the same marker | 2 |
 | Issue tool `body`, three cases | An `mcp__github__issue_write` create whose `body` ends in each footer form | 2 |
 | `gh issue create --body`, clean | A body with no footer | 0 |
 | Issue tool `body`, clean | A body with no footer | 0 |

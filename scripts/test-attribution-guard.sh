@@ -54,7 +54,7 @@ jq -n --arg b "$CLEAN" '{body:$b}' > clean.json
 printf '%s\n\n%s\n' "$CLEAN" "$TRAILER_CLAUDE" > trailer.txt
 { printf '%20000s' '' | tr ' ' '['; jq -cn --arg b "$CLEAN" '$b'; printf '%20000s' '' | tr ' ' ']'; } > deep.json
 { printf '\357\273\277'; cat by.json; } > bom.json
-jq -cn --rawfile p big.txt --arg b "$CLEAN" '{pad:$p,body:$b}' > big.json
+{ printf '{"a":1}'; printf '%1100000s' ''; cat by.json; } > big.json
 
 bash_in() { jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}'; }
 post_in() { jq -n --arg b "$CLEAN" --argjson r "$1" '{hook_event_name:"PostToolUse",tool_name:"mcp__github__create_pull_request",tool_input:{owner:"o",repo:"r",title:"t",head:"h",base:"main",body:$b},tool_response:$r}'; }
