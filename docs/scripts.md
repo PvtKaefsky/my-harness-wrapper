@@ -2089,7 +2089,6 @@ check every 30 minutes`.
 | no auto_archive_on_close | has that call pass no `auto_archive_on_close` |
 | the local install allows the set_monitor call | states that the local install allows the `set_monitor` call with an allow rule |
 | both switches off at merge or close, with the url | has the session call the tool again with both switches false and the pull request's url |
-| the app clears the switches at merge | states that, when probed, the app had already cleared both switches at a merge and at a close, and that the call still succeeded afterwards |
 | the record is deleted after the switch-off | has the session delete the pull request's record file after that call and say so |
 | the merge is read from the pull request state | states that no event reported a merge or a close when probed, and has the session read the pull request's state at every listing and when the user says it merged or closed |
 | the set_monitor refusal conditions | names the call refused, the `gh` account not the pull request's opener, that account unable to push to the base repository, and a session not opened on the pull request's repository folder, adding the folder during the session not having helped when probed |

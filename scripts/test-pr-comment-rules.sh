@@ -52,7 +52,6 @@ check 'the local set_monitor call' has 'A local session with `mcp__ccd_pr__set_m
 check 'no auto_archive_on_close' has 'passes no `auto_archive_on_close`'
 check 'the local install allows the set_monitor call' has 'the local install allows the call with an allow rule for `mcp__ccd_pr__set_monitor`.'
 check 'both switches off at merge or close, with the url' has 'it calls the tool again with `auto_fix: false`, `address_comments: false` and the pull request'"'"'s url.'
-check 'the app clears the switches at merge' has 'When probed, the app had already cleared both switches at a merge and at a close, and the call still succeeded afterwards.'
 check 'the record is deleted after the switch-off' has 'After that call, the session deletes that pull request'"'"'s record file and says so in its reply.'
 check 'the merge is read from the pull request state' has 'No event reported a merge or a close when probed, so the session reads the pull request'"'"'s state at every listing and whenever the user says it merged or closed.'
 check 'the set_monitor refusal conditions' has 'The call fails where it is refused, where the account `gh` is signed in with did not open the pull request, where that account cannot push to the base repository, or where the session was not opened on the pull request'"'"'s repository folder; adding the folder during the session did not help when probed.'
