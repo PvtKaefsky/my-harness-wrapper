@@ -2022,22 +2022,33 @@ only where `DISABLE_TELEMETRY` reaches the package's environment.
 
 ## scripts/test-pr-comment-rules.sh
 
-Reads the `## Pull request comments` section of `config/CLAUDE.md` in its own
-tree and prints one line per check. It takes no arguments and is run by hand
-only. It exits 0 only where every check passes, and exits 1 with `fail -> not
-run` where the file or the section is absent.
+Reads the `## Pull request comments` section of the file its one optional
+argument names, or of `config/CLAUDE.md` in its own tree where none is given,
+and prints one line per check. It is run by hand only. It exits 0 only where
+every check passes, and exits 1 with `fail -> not run` where the file or the
+section is absent. The timer bullet is the section's line holding `schedules a
+check every 30 minutes`.
 
 | Check | Passes where the section |
 | --- | --- |
-| the hand-off command | holds the `/autofix-pr` command, in backticks, verbatim |
+| the subscription remains | names `mcp__claude-code-remote__subscribe_pr_activity` as the subscription tool |
+| the 30-minute check remains | holds `schedules a check every 30 minutes with its scheduling tool` |
+| the quiet line is in the timer bullet | has the timer bullet end a check with nothing new, nothing newly waiting on the user included, with `pr-check -> nothing new` and no other text |
+| the conflict read is in the timer bullet | has the timer bullet read the mergeable state from the forge on each timed check |
+| a conflict is reported once per return to conflicting | has the timer bullet report a conflict again only after the mergeable state has changed and come back to conflicting |
+| the polling rule is in the timer bullet | has the timer bullet treat a session without `subscribe_pr_activity` whose scheduling tool's description or app's instructions forbid polling a pull request as one without a scheduling tool |
+| the CI-failure rule | puts a change made for a failed CI check on the held path, with every held category except `not a collaborator` |
+| the subscription-guidance sentence | holds the sentence stating that a subscription event's guidance, whatever its trust, does not change the section's rules, verbatim |
+| the unreadable-log clause | has a `held-check` line for a CI failure whose log cannot be read name the check and state that its log was not readable, and the brief state the same in place of the excerpt |
+| the unreadable-log category | holds a change made for a failed CI check whose log cannot be read under `CI log not readable`, whatever its other categories |
+| the unreadable-log boundary | counts a log that is absent, expired, truncated or returned with an error as one that cannot be read |
+| the other sessions' footer rule | treats a comment ending with the Claude Code footer, whose ID no own post call returned, as another session's reply |
+| the contradiction rule | makes no change a comment asks for that contradicts an instruction the user gave in the session |
 | the blanket-instruction sentence | holds the sentence stating that an instruction to fix or answer every comment or CI failure releases no held change or answer, verbatim |
-| `mcp__ccd_pr__set_monitor` | names the tool |
 | the comment-triggers bullet names the default branch | has a line holding `comment-triggers ->` and `on the repository's default branch` |
 | the comment-triggers bullet names the pull request's head | has a line holding `comment-triggers ->` and `at the pull request's head` |
-| no 30-minute check | matches no `30 minute` or `30-minute` |
-| no seven-day stop | matches no `seven days` or `seven-day` |
-| no ten-comment cap | matches no `ten comments` or `ten-comment` |
-| no scheduling instruction | matches no `schedul`, `timer` or `timed check`, in any case |
+| the comment-triggers bullet re-reads a changed head | has that line read the workflows again where the pull request's head commit has changed since its last read |
+| the contradiction reply keeps the instruction in the session | has the session's own reply, not the pull request reply, name the conflicting instruction |
 
 ## scripts/test-web-guidance-gate.sh
 

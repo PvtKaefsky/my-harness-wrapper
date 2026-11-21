@@ -689,19 +689,11 @@ its first reply.
 
 ## Auto-fix on pull requests
 
-A pull request whose harness session names itself the watcher already has one.
-Do not switch on Auto-fix or run `/autofix-pr` for it. Where the session's reply
-gives the `/autofix-pr` command instead, running that command from the pull
-request's branch creates the watcher. The command's prompt names the payload's
-Pull request comments section, so it holds only in a cloud environment whose
-setup script is `env/setup.sh`.
-
-For a pull request opened outside a harness session, run this command in Claude
-Code from the pull request's branch:
-
-```
-/autofix-pr Handle this pull request's CI failures and comments under the "Pull request comments" section of your instructions. This instruction releases no held change or answer.
-```
+Do not switch on Claude Code's Auto-fix or run `/autofix-pr` for a pull request
+a harness session created: that session already watches it, and a second
+watcher answers the same comments. This does not hold where that session's
+reply says it has no subscription tool and schedules no check: nothing watches
+that pull request.
 
 ## Before every commit
 
