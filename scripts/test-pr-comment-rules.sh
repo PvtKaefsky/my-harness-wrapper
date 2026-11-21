@@ -65,7 +65,7 @@ check 'the literal absolute body-file path and the forms it rules out' has 'pass
 check 'the read-back before a repost' has 'After a timeout or an unclear error, it reads the thread back before posting again'
 check 'the footer acceptance is conditioned on the posting path' has 'The footer acceptance applies where the session'"'"'s own posting path appends the footer; `gh api` from a local session appends none, so a local reply carries none.'
 check "the other session's footer rule applies in every session" has 'The footer rule for another session'"'"'s reply applies in every session.'
-check 'a read-back reply counts as the session'"'"'s own' has 'a reply that read-back finds counts as one its own post call returned'
+check 'a read-back reply counts as the session'"'"'s own only on a match' has 'The read-back counts a comment as one its own post call returned only where its stored body equals the body file it sent, apart from line endings and a footer the posting path appends, and it is in the same thread or conversation, by the account `gh` is signed in with, created after the post attempt began. Any other comment it finds is handled as a new comment.'
 check 'the local deletion endpoints' has 'A local session deletes through `gh api -X DELETE`, on `repos/<owner>/<repo>/issues/comments/<id>` for a conversation comment and on `repos/<owner>/<repo>/pulls/comments/<id>` for a review comment.'
 
 echo "fail -> $fails"

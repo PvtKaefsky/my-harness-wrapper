@@ -2070,7 +2070,7 @@ check every 30 minutes`.
 | the read-back before a repost | reads the thread back after a timeout or an unclear error before posting again |
 | the footer acceptance is conditioned on the posting path | applies the footer acceptance only where the session's own posting path appends the footer, and states a local reply carries none |
 | the other session's footer rule applies in every session | applies the footer rule for another session's reply in every session |
-| a read-back reply counts as the session's own | counts a reply the read-back after a timeout finds as one the session's own post call returned |
+| a read-back reply counts as the session's own only on a match | counts a comment the read-back after a timeout finds as the session's own only where its body equals the body file sent, apart from line endings and an appended footer, in the same thread or conversation, by the `gh` account, created after the post attempt began, and handles any other as a new comment |
 | the local deletion endpoints | names `gh api -X DELETE` on the issue comment and review comment endpoints |
 
 ## scripts/test-web-guidance-gate.sh
