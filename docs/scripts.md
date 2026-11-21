@@ -1659,7 +1659,8 @@ The first row that fits decides the outcome.
 
 The depth search covers `tool_response` itself and every string in it that
 parses as JSON, one level deep, so a `body` inside a JSON-encoded text content
-block is found.
+block is found. Every carriage return in the bodies becomes a line feed before
+matching.
 
 The instruction line is
 `attribution-guard: resend the description this create call sent, unchanged, through mcp__github__update_pull_request.`

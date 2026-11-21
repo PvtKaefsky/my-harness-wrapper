@@ -266,6 +266,7 @@ run_case 'create response with a body carrying the marker' 2 "$(post_in "$(jq -n
 
 ---
 $FOOT_SERVER" '{number:3,html_url:"https://github.com/o/r/pull/3",body:$b}')")" "$RESEND"
+run_case 'create response with a body carrying Co-Authored-By after a bare carriage return' 2 "$(post_in "$(jq -n --arg b "$CR_BODY" '{number:3,html_url:"https://github.com/o/r/pull/3",body:$b}')")" "$RESEND"
 run_case 'create response with a clean body' 0 "$(post_in "$(jq -n --arg b "$CLEAN" '{number:3,html_url:"https://github.com/o/r/pull/3",body:$b}')")"
 run_case 'create response with no body' 2 "$(post_in '{"id":"1","url":"https://github.com/o/r/pull/3"}')" "$RESEND"
 run_case 'create error response' 0 "$(post_in '{"isError":true,"content":[{"type":"text","text":"failed to create pull request"}]}')"
