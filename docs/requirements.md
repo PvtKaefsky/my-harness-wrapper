@@ -69,6 +69,7 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | An `--input` file over 1 MiB, or one starting with `{` or `[` that `jq` cannot parse, is blocked with exit 2 as not checked. | `scripts/test-attribution-guard.sh`, the depth-limit and over-1-MiB `--input` cases |
 | An attribution line that follows a bare carriage return, in a command, a body file, a decoded `--input` string or an MCP tool string, is blocked with exit 2 and the matched line. | `scripts/test-attribution-guard.sh`, the carriage-return cases |
 | A `mcp__github__create_pull_request` response body whose attribution line follows a bare carriage return exits 2 with the resend instruction. | `scripts/test-attribution-guard.sh`, the create-response carriage-return case |
+| A `gh` write command, or a body file, carrying an attribution line is blocked with exit 2 and `matched line ->` at any size, wherever the `gh` line or the match sits; a large command that is not a `gh` write exits 0. | `scripts/test-attribution-guard.sh`, the 140,000-byte, 396 KB and 900,000-byte cases |
 
 ## Telemetry
 
