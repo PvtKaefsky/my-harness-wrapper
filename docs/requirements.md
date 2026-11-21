@@ -61,6 +61,13 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | Every answer the `answer-check` clears goes to `ecc:security-reviewer` before it is given, and where the reviewer cannot run or returns no verdict the answer is held under `reviewer unavailable`. | probe |
 | A session deletes only a comment its own post call returned, for a listed reason, a held notice after the user releases or rejects it among them, reads the deletion back, and lists each deleted ID with its reason. | probe, held notices and a duplicate only |
 
+## Attribution guard
+
+| Requirement | Test |
+| --- | --- |
+| A `gh api` write to a `/pulls` or `/issues` endpoint whose `--input <path>` or `--input=<path>` file carries an attribution line, in its raw text or in a decoded JSON string value, is blocked with exit 2 and the matched line; `--input -` reads no file. | `scripts/test-attribution-guard.sh`, the `--input` cases |
+| An `--input` file over 1 MiB, or one starting with `{` or `[` that `jq` cannot parse, is blocked with exit 2 as not checked. | `scripts/test-attribution-guard.sh`, the depth-limit and over-1-MiB `--input` cases |
+
 ## Telemetry
 
 | Requirement | Test |

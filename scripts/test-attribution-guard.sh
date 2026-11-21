@@ -44,6 +44,17 @@ printf '%s\n\n---\n%s\n' "$CLEAN" "$FOOT_BY" > by.md
 printf '%s\n\n%s\n' "$CLEAN" "$FOOT_LINK" > link.md
 printf '%s\n' "$CLEAN" > clean.md
 printf '%1100000s' '' | tr ' ' a > big.txt
+jq -n --arg b "$CLEAN
+
+$TRAILER_CLAUDE" '{body:$b}' > by.json
+jq -n --arg b "$CLEAN
+
+$FOOT_WITH" '{body:$b}' > with.json
+jq -n --arg b "$CLEAN" '{body:$b}' > clean.json
+printf '%s\n\n%s\n' "$CLEAN" "$TRAILER_CLAUDE" > trailer.txt
+{ printf '%20000s' '' | tr ' ' '['; jq -cn --arg b "$CLEAN" '$b'; printf '%20000s' '' | tr ' ' ']'; } > deep.json
+{ printf '\357\273\277'; cat by.json; } > bom.json
+{ printf '{"a":1}'; printf '%1100000s' ''; cat by.json; } > big.json
 
 bash_in() { jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}'; }
 post_in() { jq -n --arg b "$CLEAN" --argjson r "$1" '{hook_event_name:"PostToolUse",tool_name:"mcp__github__create_pull_request",tool_input:{owner:"o",repo:"r",title:"t",head:"h",base:"main",body:$b},tool_response:$r}'; }
@@ -149,6 +160,15 @@ run_case 'gh issue edit -F by.md' 2 "$(bash_in 'gh issue edit 1 -F by.md')"
 run_case 'gh issue comment --body-file by.md' 2 "$(bash_in 'gh issue comment 1 --body-file by.md')"
 run_case 'gh issue comment -F by.md' 2 "$(bash_in 'gh issue comment 1 -F by.md')"
 run_case 'gh api .../issues -F body=@by.md' 2 "$(bash_in 'gh api repos/o/r/issues -F title=t -F body=@by.md')"
+run_case 'gh api .../comments --input by.json, Co-Authored-By in a JSON string' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input by.json')"
+run_case 'gh api .../comments --input=by.json, Co-Authored-By in a JSON string' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input=by.json')"
+run_case 'gh api .../comments --input with.json, Generated with in a JSON string' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input with.json')"
+run_case 'gh api .../comments --input trailer.txt, text that is not JSON' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input trailer.txt')"
+run_case 'gh api .../comments --input clean.json' 0 "$(bash_in 'gh api repos/o/r/issues/1/comments --input clean.json')"
+run_case 'gh api .../comments --input -, standard input' 0 "$(bash_in 'gh api repos/o/r/issues/1/comments --input -')"
+run_case 'gh api .../comments --input bom.json, Co-Authored-By in a JSON string after a UTF-8 BOM' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input bom.json')"
+run_case 'gh api .../comments --input deep.json, past the jq depth limit' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input deep.json')" 'so the body was not checked'
+run_case 'gh api .../comments --input big.json, over 1 MiB' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input big.json')" 'so the body was not checked'
 run_case 'issue tool body, Generated with' 2 "$(issue_in "$CLEAN
 
 $FOOT_WITH")"
