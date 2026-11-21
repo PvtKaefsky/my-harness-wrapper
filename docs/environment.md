@@ -875,6 +875,22 @@ Observed on 2026-11-21 in the local session opened on the clone, under #112's Pu
 
 Neither review body was answered, as the probe's brief directed. No conversation or inline comment by an account other than the author was posted on #6; on #112, such comments raised events.
 
+#### The allow-rule probe on `PvtKaefsky/autofix-probe` #7
+
+Observed on 2026-11-21 in a new local session opened on the clone, under #112's Pull request comments section at `c82262c`, with `~/.claude/settings.json` holding `{"allow":["mcp__ccd_pr__set_monitor"]}` under `permissions`. Scratch pull request #7, branch `chore/probe-set-monitor-allow`, changes one line of `probe.txt` at head `68fe6e2`.
+
+| Step | Result |
+| --- | --- |
+| Switch-on | the session's first `set_monitor` call, with `auto_fix: true`, `address_comments: true` and the url, returned `Auto-fix is on for PvtKaefsky/autofix-probe#7: the app will wake this session with a <ci-monitor-event> on CI failures, merge conflicts and new review comments. No need to poll CI.`, with no auto mode classifier refusal and no approval prompt |
+| CI-failure event | one `<ci-monitor-event>` reported check `fail` at head `68fe6e2`, the session's own; the fix was held as `held-check -> held: CI workflows; CI log not readable (check fail: gh run view --log-failed returned log not found: 136719969187)`; the line, quoted here without its inner backticks, should also have named `a file the pull request does not change`, since the fix would edit `.github/workflows/ci-fail.yml` and #7 changes only `probe.txt`; nothing was pushed |
+| Close | the user closed #7; `gh pr view 7 --json state,closedAt,mergedAt` returned `{"closedAt":"2026-11-21T03:48:25Z","mergedAt":null,"state":"CLOSED"}` |
+| Switches before the switch-off call | `get_status` showed `"state": "closed"` with `"auto_fix": true, "address_comments": true, "auto_merge": false, "auto_archive_on_close": false` |
+| Switch-off with the url | returned `Auto-fix is off for PvtKaefsky/autofix-probe#7; the app will no longer wake this session for it.` |
+| Switches after the switch-off call | `get_status` showed `"auto_fix": false, "address_comments": false` and every other switch `false` |
+| Record deletion | the `.git` listing showed `pr-comments-PvtKaefsky-autofix-probe-7.record` before the deletion and matched nothing after |
+
+The `get_status` before any switch-off call showed every switch `false` after the merge of #5 and after the close of #6, and `auto_fix` and `address_comments` `true` after the close of #7. The interval between each merge or close and that `get_status` was not recorded.
+
 ### The headless hand-off probe
 
 Run from branch `chore/probe-change` of a scratch repository with an open pull request, with stdin closed:
