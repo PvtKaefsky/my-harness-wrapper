@@ -717,6 +717,16 @@ A desktop app Code session on Windows 11 at `178eaf7`, on 2026-11-21, showed whe
 
 The scheduling tool's description in that session does not forbid polling a pull request; the app's instructions do.
 
+### Subscription event guidance in a cloud session
+
+A cloud session on 2026-11-21, `CLAUDE_CODE_REMOTE` `true`, subscribed to #114 and to `PvtKaefsky/autofix-probe` #3 and #4. Each subscription delivered a `subscription.created` event with `from="system" trust="principal"`. Its guidance contradicts the section's rules in three places.
+
+| Topic | The event's guidance | The section's rule |
+| --- | --- | --- |
+| Merge conflict | "merge the base into the head" | name the conflicting files and ask the user; no rebase, base merge or force-push |
+| CI failure | the `check_run.completed` event: "this wake ends in a pushed fix or in one comment on the PR" | the held path of a comment-driven change |
+| Check schedule | "about 50 minutes after the last activity, then about every 4 hours", stopping "after 3 empty check-ins in a row" | every 30 minutes, until merge, close or seven days with no new comment |
+
 ## Issues
 
 `mcp__github__issue_write` with `method` `create` returns two fields, `id` and
