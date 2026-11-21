@@ -762,6 +762,35 @@ The user then posted review comment 4645575442 from the GitHub web UI's Files ch
 
 No `<ci-monitor-event>` arrived for any comment on #112 as of 17:27:13Z, when the session read back reply 4645588349. That covers the session's probes 4645359793 and 7045638591, the user's 7045932088, 7045934232 and 4645575442, and the session's three replies. Two of those comments, the session's 4645359793 and the user's 4645575442, are review comments that start a thread. Whether such an event names a comment by its ID is not established.
 
+### The Auto-fix delivery probe on pull request #112
+
+Observed on 2026-11-21 in a local Claude desktop app Code session on Windows 11, with `CLAUDE_CODE_REMOTE` unset. Pull request #112, closed unmerged at `0c0f518`, was reopened and bound to the session, and `mcp__ccd_pr__set_monitor` was called with `auto_fix: true`, `address_comments: true` and the pull request's url. The app then sent a `<ci-monitor-event>` stating that Auto-fix was enabled, with no pull request number and no comment ID. The session was idle between comments, and the user typed nothing in it while waiting for an event.
+
+The pull request's author is `PvtKaefsky`, the account `gh` is signed in with. The second account is `KrylovViktor`. Each row's author, association, kind and posted time come from the forge, read by `gh api`: the first three rows at 00:37:49Z, the rest at 00:41:45Z or 00:43:28Z.
+
+| Comment | Comment ID | Author, association | Kind | Posted | Event | Comment ID in the event |
+| --- | --- | --- | --- | --- | --- | --- |
+| `[test-a]` | 7054284121 | `KrylovViktor`, `NONE` | conversation | 00:37:13Z | yes, by 00:39:27Z | no |
+| `[test-b]` | 7054286374 | `KrylovViktor`, `NONE` | conversation | 00:37:20Z | yes, in the same event | no |
+| `[test-c]` | 7054290632 | `PvtKaefsky`, `OWNER` | conversation | 00:37:35Z | none as of 00:50:15Z | |
+| `[test-a]` | 4649359443 | `KrylovViktor`, `COLLABORATOR` | review, `config/CLAUDE.md` line 117 | 00:40:00Z | yes, by 00:41:45Z | yes |
+| `[test-b]` | 7054343892 | `KrylovViktor`, `COLLABORATOR` | conversation | 00:40:27Z | yes, in the same event | no |
+| `[test-c]` | 7054362345 | `PvtKaefsky`, `OWNER` | conversation | 00:41:27Z | none as of 00:50:15Z | |
+| `[test-a2]` | 4649377682 | `KrylovViktor`, `COLLABORATOR` | review, `config/CLAUDE.md` line 117 | 00:42:48Z | yes, by 00:43:28Z | yes |
+| `[test-c2]` | 4649379498 | `PvtKaefsky`, `OWNER` | review, `config/CLAUDE.md` line 117 | 00:43:06Z | none as of 00:50:15Z | |
+
+Comments 7054284121, 7054286374 and 7054290632 were absent from the forge by 00:41:45Z. The session did not delete them.
+
+| Field | A comment event's content |
+| --- | --- |
+| Heading | "PR #112 has N new review comments", for conversation comments as well |
+| Entry line, conversation comment | `Comment N — PR comment, no inline thread`, with no ID |
+| Entry line, review comment | `Comment N — comment_id=<id>, inline thread`, with the `gh api` replies endpoint |
+| Quoted lines | the author's login, the path and line for a review comment, and the body |
+| Instructions | the event tells the session to push a fix, reply on each inline thread through `gh api` with a closing line crediting Claude Code, and resolve the thread |
+
+Every comment by `KrylovViktor` raised an event, as a collaborator and as a non-collaborator, in conversation and in review threads. No comment by `PvtKaefsky` raised one, which matches the earlier record on #112. `PvtKaefsky` is at once the pull request's author, the repository's owner and the account `gh` is signed in with, so this probe does not distinguish which of those excludes a comment. A conversation comment's event carries no ID, so the session finds it by listing the pull request's comments.
+
 ### The headless hand-off probe
 
 Run from branch `chore/probe-change` of a scratch repository with an open pull request, with stdin closed:
