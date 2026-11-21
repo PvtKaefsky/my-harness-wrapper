@@ -814,6 +814,43 @@ Observed on 2026-11-21 in a second local Claude desktop app Code session on Wind
 
 The deletion was made for this probe; none of the section's listed deletion reasons applied to 7055638450. The review comment's event arrived between 2.5 and 4.5 minutes after the comment, against under 2 minutes in the earlier probe. This probe does not show whether the delay came from the app or from the session being busy in a turn the user's message started.
 
+#### The record and read-back probes
+
+Observed on 2026-11-21 on #112 at head `01ae886`, in the same local session except where a row names the parent session, under the branch's Pull request comments section. Every post used `-F body=@<literal absolute path>` and passed the attribution guard check first: the real body exited 0, and a copy carrying `Co-Authored-By: Claude <noreply@anthropic.com>` exited 2 with `matched line ->`. A post whose response was discarded with `> /dev/null 2>&1` stood in for a timeout, since a real timeout cannot be caused on demand.
+
+| Case | Result |
+| --- | --- |
+| Deleting a review reply | probe reply 4649944977 in the thread of 4649873034 was deleted with `gh api -X DELETE repos/PvtKaefsky/my-harness-wrapper/pulls/comments/4649944977`, exit 0; reading it back returned HTTP 404; the record kept the ID with a `deleted` entry after it |
+| A missing record | the record was moved aside to `.git/pr-comments-PvtKaefsky-my-harness-wrapper-112.record.moved-aside-20261121`; after the user's question 7055801550 by `KrylovViktor`, the session said the record was missing, listed all 20 comments as read, answered none, and wrote a new record beginning `binding 2026-11-21T02:18:46Z record-missing` |
+| The late event | a `<ci-monitor-event>` for 7055801550 arrived about 35 seconds after the comment; the record held it as read, so the session did not answer it |
+| A comment the user names | when the user named 7055801550 in the session, the session answered it with 7055835441, whose stored body equals its file |
+| An unreadable record | with the record overwritten by the line `not a record`, the next listing called the record unreadable, listed all 21 comments as read, answered none, and wrote a record beginning `binding 2026-11-21T02:22:19Z record-unreadable` |
+| A rebuilt record | the record rebuilt at 02:18:46Z listed the session's earlier reply 4649878801 as `handled` only, and the one rebuilt at 02:22:19Z listed 4649878801 and 7055835441 as `handled` only, with no `reply` entry |
+| A lost response that landed | the attempt began 02:22:55Z; the read-back found 7055859207 by `PvtKaefsky`, created 02:22:57Z, with a body equal to its file, counted it as the session's own, posted nothing again, and recorded `reply issue 7055859207 lost-response-readback` |
+| A lost response beside a new comment | the attempt began 02:23:28Z; the read-back counted 7055867365 as the session's own and handled 7055881851 by `KrylovViktor` as new; after `comment-triggers -> none`, `answer-check -> clear` and `ecc:security-reviewer`, the session answered it with 7055898175 |
+| A lost response beside a same-account comment | in the parent session, the attempt began 02:34:00Z; the read-back counted 7056003928 by `PvtKaefsky`, created 02:34:02Z, with a body equal to its file, as the session's own, and handled 7056010969 by `PvtKaefsky`, created 02:34:35Z in the same conversation, as new, since its body differs; after `comment-triggers -> none`, `answer-check -> clear` and `ecc:security-reviewer`, the session answered it with 7056037145, whose stored body equals its file |
+| Cleanup | 4649944977, 7055835441, 7055859207, 7055867365, 7055898175, 7056003928 and 7056037145 each read back HTTP 404; 4649873034, 7055801550, 7055881851 and 7056010969 read back present |
+
+`created_at` has one-second granularity, so a comment created in the same second the attempt began is not separated from one created just before it. A repost after a post that did not land was not shown, since all three discarded posts landed. The session's comparison stripped line endings and trailing newlines.
+
+#### The switch-off probe on `PvtKaefsky/autofix-probe` #5
+
+Observed on 2026-11-21 in local Claude desktop app Code sessions on Windows 11, with `CLAUDE_CODE_REMOTE` unset, under #112's Pull request comments section. A session opened scratch pull request `PvtKaefsky/autofix-probe` #5, which changes only `probe.txt`, from a clone in its scratchpad. That session's folder was a `my-harness-wrapper` worktree. The record was kept at `.git/pr-5-record.json` in the clone, not under the name the section gives.
+
+| Step | Result |
+| --- | --- |
+| Switch-on, session on another repository | `mcp__ccd_pr__set_monitor` was refused twice, before and after the clone was added with `mcp__ccd_directory__request_directory`, with `PreToolUse:mcp__ccd_pr__set_monitor hook error: PvtKaefsky/autofix-probe#5 is on the session's PR bar, but its repository could not be matched to the session's folders, so Auto-fix can't be enabled for it; tell the user that they can switch it themselves on the PR bar, which works at once.`; no hook in `~/.claude/*.json` matches `set_monitor` or `ccd_pr` |
+| Probe reply | held under `comment-triggered automation`: `comment-echo.yml` triggers on `issue_comment` on `main` and at the head; on the user's instruction it was not posted |
+| Switch-on, session opened on the clone | the first call was refused by Claude Code's auto mode classifier before reaching the app; after the user allowed the call, it returned `Auto-fix is on for PvtKaefsky/autofix-probe#5: the app will wake this session with a <ci-monitor-event> on CI failures, merge conflicts and new review comments. No need to poll CI.`, and an Auto-fix-enabled `<ci-monitor-event>` followed |
+| CI-failure event | one failing check, `fail`, at head `b7b2248864`, from `.github/workflows/ci-fail.yml` running `exit 1` on `pull_request`; the fix was held as `held-check -> held: CI workflows; a file the pull request does not change (.github/workflows/ci-fail.yml)`; the event's text calls Auto-fix "standing authorization to fix it and push", and it released nothing; the job log was not read |
+| Merge | the user merged #5 at 02:36:43Z, merge commit `a03d197`; no `<ci-monitor-event>` and no notification reported it; the session read `"state":"MERGED"` with `gh pr view 5` after the user said it merged |
+| Switches before the switch-off call | before any switch-off call by the session, `mcp__ccd_pr__get_status` showed `"state": "merged"` and every monitor switch `false` |
+| Switch-off without the url | `set_monitor` with `auto_fix: false` and `address_comments: false` returned the call error `Pass the pull request's url (get_status reports it).` |
+| Switch-off with the url | returned `Auto-fix is off for PvtKaefsky/autofix-probe#5; the app will no longer wake this session for it.`; `get_status` afterwards showed bound, `merged`, every switch `false` |
+| Record deletion | `.git/pr-5-record.json`, 122 bytes, was deleted after the switch-off; `ls -la .git` listed it before and not after |
+
+The switch-off was not refused after the merge, so a refused switch-off was not shown. A close without a merge was not probed. The first session gave the user no `/autofix-pr` hand-off after its refused call.
+
 ### The headless hand-off probe
 
 Run from branch `chore/probe-change` of a scratch repository with an open pull request, with stdin closed:
