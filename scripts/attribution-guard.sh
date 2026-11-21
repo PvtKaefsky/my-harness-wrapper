@@ -41,7 +41,7 @@ resend() {
 scan() {
   local hit rc
   need_re
-  hit=$(printf '%s\n' "$1" | tr '\r' '\n' | grep -a -i -E -m1 -- "$RE" 2>/dev/null); rc=$?
+  hit=$(printf '%s\n' "$1" | tr '\r' '\n' | grep -a -i -E -- "$RE" 2>/dev/null | sed -n 1p); rc=$?
   if [ "$rc" -gt 1 ]; then unchecked "grep could not apply the pattern (exit=$rc)"; fi
   if [ -n "$hit" ]; then block "$hit"; fi
 }
@@ -75,10 +75,10 @@ if [ "$TOOL" = Bash ]; then
   if [ -z "$CMD" ]; then exit 0; fi
   WRITE_OP=no
   SHORT_F=no
-  if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+(pr|issue)[[:space:]]+(create|edit)([^[:alnum:]_-]|$)'; then WRITE_OP=yes; SHORT_F=yes; fi
-  if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+(issue[[:space:]]+comment|pr[[:space:]]+(comment|review))([^[:alnum:]_-]|$)'; then WRITE_OP=yes; SHORT_F=yes; fi
-  if printf '%s\n' "$CMD" | grep -a -q -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+api([[:space:]]|$)' \
-     && printf '%s\n' "$CMD" | grep -a -q -E -- '/(pulls|issues)([^[:alnum:]_-]|$)'; then WRITE_OP=yes; fi
+  if printf '%s\n' "$CMD" | grep -a -c -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+(pr|issue)[[:space:]]+(create|edit)([^[:alnum:]_-]|$)' >/dev/null; then WRITE_OP=yes; SHORT_F=yes; fi
+  if printf '%s\n' "$CMD" | grep -a -c -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+(issue[[:space:]]+comment|pr[[:space:]]+(comment|review))([^[:alnum:]_-]|$)' >/dev/null; then WRITE_OP=yes; SHORT_F=yes; fi
+  if printf '%s\n' "$CMD" | grep -a -c -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+api([[:space:]]|$)' >/dev/null \
+     && printf '%s\n' "$CMD" | grep -a -c -E -- '/(pulls|issues)([^[:alnum:]_-]|$)' >/dev/null; then WRITE_OP=yes; fi
   if [ "$WRITE_OP" != yes ]; then exit 0; fi
   scan "$CMD"
   while IFS= read -r BODY_FILE; do

@@ -1598,6 +1598,10 @@ file from its own path, `${BASH_SOURCE[0]}`, as
 `../git-hooks/lib/attribution.ere`, and removes one trailing carriage return.
 Before matching, every carriage return in the scanned text becomes a line
 feed, so a line after a bare carriage return is matched as a line.
+The write check and the scan pipe the text into a `grep` that reads all of
+its input, so no stage before it is cut off and each gives the same result at
+any input size. The scan keeps the first matched line. A pipeline exit above 1
+fails closed with the pattern failure.
 
 | Outcome | Exit | Output |
 | --- | --- | --- |
@@ -1786,6 +1790,12 @@ passed, and 1 otherwise.
 | `gh api repos/o/r/issues/1/comments --input <file>`, UTF-8 byte order mark | The `Co-Authored-By` JSON file behind a leading byte order mark | 2 |
 | `gh api repos/o/r/issues/1/comments --input <file>`, past the `jq` depth limit | A clean string nested in 20,000 arrays; passes on the marker `so the body was not checked` | 2 |
 | `gh api repos/o/r/issues/1/comments --input <file>`, over 1 MiB | A complete JSON object, 1,100,000 spaces, then the `Co-Authored-By` JSON object, so the first mebibyte parses cleanly; passes on the same marker | 2 |
+| `gh pr create` heredoc, 140,000 bytes | A command whose `--body "$(cat <<'EOF'` heredoc holds 140,000 bytes, then a `Co-Authored-By` trailer naming Claude; built in a file | 2 |
+| `gh api repos/o/r/issues/1/comments -F body=@<file>` on the first line of a 396 KB command | The trailer file, named on the command's first line, followed by 6,000 comment lines; built in a file | 2 |
+| `gh api repos/o/r/issues/1/comments -F body=@<file>`, 900,000 bytes after the trailer | A body file whose first line is the `Co-Authored-By` trailer naming Claude; passes on the marker followed by that line | 2 |
+| A 140,000-byte command, not a `gh` write | `echo` lines around 140,000 bytes; built in a file | 0 |
+| `gh api repos/o/r/issues/1/comments -F body=@<file>`, 900,000 bytes of CRLF lines | 450,000 empty CRLF lines, then the `Co-Authored-By` trailer naming Claude; run under `timeout 10`, the `PreToolUse` hook's timeout | 2 |
+| `gh api repos/o/r/issues/1/comments -F body=@<file>`, one 900,000-byte line | 900,000 bytes of `a`, then the `Generated with` footer on the same line; run under `timeout 10` | 2 |
 | Issue tool `body`, three cases | An `mcp__github__issue_write` create whose `body` ends in each footer form | 2 |
 | `gh issue create --body`, clean | A body with no footer | 0 |
 | Issue tool `body`, clean | A body with no footer | 0 |

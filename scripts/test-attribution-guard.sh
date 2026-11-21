@@ -60,6 +60,13 @@ printf '%s\r%s\r\n' 'ok' "$CLEAN" > cr-clean.md
 printf -v CR_BODY 'ok\r%s' "$TRAILER_CLAUDE"
 jq -n --arg b "$CR_BODY" '{body:$b}' > cr.json
 { printf '{"a":1}'; printf '%1100000s' ''; cat by.json; } > big.json
+{ printf '%s\n' "$TRAILER_CLAUDE"; printf '%900000s' '' | tr ' ' a; } > early.md
+{ printf '%900000s' '' | sed 's/  /\r\n/g'; printf '%s\n' "$TRAILER_CLAUDE"; } > cr-dense.md
+{ printf '%900000s' '' | tr ' ' a; printf ' %s\n' "$FOOT_WITH"; } > long-line.md
+{ printf '%s\n' "gh pr create --title t --body \"\$(cat <<'EOF'"; printf '%140000s' '' | tr ' ' a | fold -w 80; printf '\n%s\nEOF\n)"\n' "$TRAILER_CLAUDE"; } > heredoc.cmd
+{ printf '%s\n' "gh api repos/o/r/issues/1/comments -F body=@$WORK/trailer.txt"; for i in $(seq 6000); do printf '# %064d\n' "$i"; done; } > first-line.cmd
+{ printf '%s\n' 'echo start'; printf '%140000s' '' | tr ' ' a | fold -w 80; printf '\n%s\n' 'echo done'; } > plain.cmd
+for f in heredoc first-line plain; do jq -n --rawfile c "$f.cmd" '{tool_name:"Bash",tool_input:{command:$c}}' > "$f.json"; done
 
 bash_in() { jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}'; }
 post_in() { jq -n --arg b "$CLEAN" --argjson r "$1" '{hook_event_name:"PostToolUse",tool_name:"mcp__github__create_pull_request",tool_input:{owner:"o",repo:"r",title:"t",head:"h",base:"main",body:$b},tool_response:$r}'; }
@@ -69,6 +76,7 @@ mcp_in() { jq -n --arg t "$1" --arg b "$2" --argjson a "$3" '{hook_event_name:"P
 
 run_guard() { bash "$GUARD"; }
 run_bare() { bash "$WORK/bare/scripts/attribution-guard.sh"; }
+run_timed() { timeout 10 bash "$GUARD"; }
 
 run_hook() {
   local input tool
@@ -179,6 +187,12 @@ run_case 'gh api .../comments --input -, standard input' 0 "$(bash_in 'gh api re
 run_case 'gh api .../comments --input bom.json, Co-Authored-By in a JSON string after a UTF-8 BOM' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input bom.json')"
 run_case 'gh api .../comments --input deep.json, past the jq depth limit' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input deep.json')" 'so the body was not checked'
 run_case 'gh api .../comments --input big.json, over 1 MiB' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments --input big.json')" 'so the body was not checked'
+run_case 'gh pr create heredoc, 140,000 bytes of body before Co-Authored-By' 2 "$(cat heredoc.json)"
+run_case 'gh api .../comments -F body=@trailer.txt on the first line of a 396 KB command' 2 "$(cat first-line.json)"
+run_case 'gh api .../comments -F body=@early.md, 900,000 bytes after Co-Authored-By on the first line' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments -F body=@early.md')" "$MARK $TRAILER_CLAUDE"
+run_case '140,000-byte command, not a gh write' 0 "$(cat plain.json)"
+run_case 'gh api .../comments -F body=@cr-dense.md, 900,000 bytes of CRLF lines then Co-Authored-By, within 10 s' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments -F body=@cr-dense.md')" "$MARK" run_timed
+run_case 'gh api .../comments -F body=@long-line.md, Generated with at the end of one 900,000-byte line, within 10 s' 2 "$(bash_in 'gh api repos/o/r/issues/1/comments -F body=@long-line.md')" "$MARK" run_timed
 run_case 'issue tool body, Generated with' 2 "$(issue_in "$CLEAN
 
 $FOOT_WITH")"
