@@ -51,10 +51,10 @@ check "the local Auto-fix standing request" has 'the user'"'"'s standing request
 check 'the local set_monitor call' has 'A local session with `mcp__ccd_pr__set_monitor` calls it once, with `auto_fix: true`, `address_comments: true` and the pull request'"'"'s url'
 check 'no auto_archive_on_close' has 'passes no `auto_archive_on_close`'
 check 'both switches off at merge or close, with the url' has 'it calls the tool again with `auto_fix: false`, `address_comments: false` and the pull request'"'"'s url.'
-check 'the app clears the switches at merge' has 'The app had already cleared both switches when a pull request merged, and the call still succeeded afterwards.'
+check 'the app clears the switches at merge' has 'When probed, the app had already cleared both switches at the merge, and the call still succeeded afterwards.'
 check 'the record is deleted after the switch-off' has 'After that call, the session deletes that pull request'"'"'s record file and says so in its reply.'
-check 'the merge is read from the pull request state' has 'No event reports a merge, so the session reads the pull request'"'"'s state at every listing and whenever the user says it merged or closed.'
-check 'the set_monitor refusal conditions' has 'The call fails where it is refused, where the account `gh` is signed in with did not open the pull request, where that account cannot push to the base repository, or where the pull request'"'"'s repository is not one of the session'"'"'s folders.'
+check 'the merge is read from the pull request state' has 'No event reported a merge when probed, so the session reads the pull request'"'"'s state at every listing and whenever the user says it merged or closed.'
+check 'the set_monitor refusal conditions' has 'The call fails where it is refused, where the account `gh` is signed in with did not open the pull request, where that account cannot push to the base repository, or where the session was not opened on the pull request'"'"'s repository folder; adding the folder during the session did not help when probed.'
 check 'the hand-off command appears verbatim' has "$HANDOFF"
 check 'set_monitor comes before the hand-off' awk -v a='A local session with `mcp__ccd_pr__set_monitor`' -v b='A local session without the tool' '{i = index($0, a); j = index($0, b); if (i && j > i) f = 1} END {exit !f}' <<<"$SECTION"
 check 'a local session never subscribes or schedules' has 'A local session never subscribes to a pull request'"'"'s activity and never schedules a check of it.'
