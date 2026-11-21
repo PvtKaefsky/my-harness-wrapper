@@ -2055,6 +2055,7 @@ check every 30 minutes`.
 | the local Auto-fix standing request | states the user's standing request for Auto-fix on every pull request a local harness session creates |
 | the local set_monitor call | has a local session call `mcp__ccd_pr__set_monitor` once with `auto_fix: true`, `address_comments: true` and the pull request's url |
 | no auto_archive_on_close | has that call pass no `auto_archive_on_close` |
+| the harness allows the set_monitor call | states that the harness allows the `set_monitor` call through `permissions.allow` in its `settings.json` |
 | both switches off at merge or close, with the url | has the session call the tool again with both switches false and the pull request's url |
 | the app clears the switches at merge | states that, when probed, the app had already cleared both switches at a merge and at a close, and that the call still succeeded afterwards |
 | the record is deleted after the switch-off | has the session delete the pull request's record file after that call and say so |

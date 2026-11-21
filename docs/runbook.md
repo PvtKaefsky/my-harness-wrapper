@@ -145,8 +145,14 @@ table below.
 
 It writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, the
 global git config and the plugin install directories, and nothing else. It
-replaces `CLAUDE.md` there whole, and replaces each `hooks.<event>` array that
-`config/settings.json` names. The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
+replaces `CLAUDE.md` there whole, and replaces each `hooks.<event>` array and
+the `permissions.allow` array that `config/settings.json` names. Allow entries
+the live `settings.json` already holds are dropped and not logged; only the
+first run's `settings.json.pre-harness` copy keeps them. The payload's allow
+entry `mcp__ccd_pr__set_monitor` is meant to let a session switch Auto-fix without asking
+the user; that effect is not probed. `scripts/verify.sh` reports `FAIL settings.permissions` wherever the
+live `permissions.allow` differs from the payload's, an entry added later at
+user scope included. The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
 differing from the payload, copies it to `settings.json.pre-harness` or
 `CLAUDE.md.pre-harness` beside it; later runs leave that copy alone. The log
 also prints each replaced hook array's prior value. Its log is
