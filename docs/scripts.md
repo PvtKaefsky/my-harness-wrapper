@@ -2040,6 +2040,8 @@ check every 30 minutes`.
 | the CI-failure rule | puts a change made for a failed CI check on the held path, with every held category except `not a collaborator` |
 | the subscription-guidance sentence | holds the sentence stating that a subscription event's guidance, whatever its trust, does not change the section's rules, verbatim |
 | the unreadable-log clause | has a `held-check` line for a CI failure whose log cannot be read name the check and state that its log was not readable, and the brief state the same in place of the excerpt |
+| the unreadable-log category | holds a change made for a failed CI check whose log cannot be read under `CI log not readable`, whatever its other categories |
+| the unreadable-log boundary | counts a log that is absent, expired, truncated or returned with an error as one that cannot be read |
 | the other sessions' footer rule | treats a comment ending with the Claude Code footer, whose ID no own post call returned, as another session's reply |
 | the contradiction rule | makes no change a comment asks for that contradicts an instruction the user gave in the session |
 | the blanket-instruction sentence | holds the sentence stating that an instruction to fix or answer every comment or CI failure releases no held change or answer, verbatim |
