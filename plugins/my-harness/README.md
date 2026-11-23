@@ -2,7 +2,7 @@
 
 A Claude Code plugin. It ships the task-delegation procedure, which makes a
 session analyze each task for decomposition and delegate each subtask to a
-routed subagent. It also ships four general skills, and a gate that limits the
+routed subagent. It also ships five other skills, and a gate that limits the
 Modern Web Guidance plugin to web front-end work. The marketplace
 `my-harness-wrapper`, at the repository root, lists it.
 
@@ -17,6 +17,7 @@ Modern Web Guidance plugin to web front-end work. The marketplace
 | `skills/edit-russian-technical-text/SKILL.md` | Rules for editing Russian technical prose while keeping its meaning, terms and requirements, with before and after examples. |
 | `skills/quick-human-readable-review/SKILL.md` | The shape of a summary of a finished stage of work or an experiment series: outcome, confirmed results, open questions and next step. |
 | `skills/python-fp-refactor/SKILL.md` | Steps for moving the decisions in Python code that mixes them with I/O or state into functions on values, keeping its behaviour. |
+| `skills/repository-setup/SKILL.md` | The order in which a session creates a repository, and the top-level layout rules for a new repository and for a top-level directory added to an existing one. |
 | `agents/executor.md` | The agent for a coding subtask no specialist matches. |
 | `agents/analyst.md` | The agent for an analysis subtask no specialist matches. |
 | `hooks/hooks.json` | A `UserPromptSubmit` hook printing one line that points every prompt at the `task-delegation` skill, a `PreToolUse` hook with matcher `Skill\|Bash`, and a `PostToolUse` hook with matcher `Skill`, each running `hooks/web-guidance-gate.sh` with a 10-second timeout. |
@@ -53,17 +54,29 @@ the same command; after a `modern-web-guidance:` skill call it prints one
 ## Eval suite
 
 The suite measures whether each skill is invoked on a prompt its description
-matches, and not invoked on a nearby prompt it does not. It does not grade a
-skill's output.
+matches, and not invoked on a nearby prompt it does not. The two
+`repository-setup` "invoke" cases also check the final reply for rules the
+skill carries. No other case grades a skill's output.
 
 Each case's `prompt.md` is a request worded as a user would type it, with its
 material inline, and sets `max_turns: 8` and
-`allowed_tools: [Read, Glob, Grep, Skill]`. Its one grader, `graders/skill.md`,
+`allowed_tools: [Read, Glob, Grep, Skill]`. Its grader `graders/skill.md`
 is `type: tool_used` on `tool: Skill`, with an `input_match` for that skill
 alone. An "invoke" case passes a run that calls the skill at least once. A "not
 invoke" case adds `min: 0`, `max: 0` and `arm: both`, and passes a run that never
 calls it. `task-delegation` has no "not invoke" case, because its description
 applies to every task.
+
+The two `repository-setup` "invoke" cases carry `type: regex` graders on the
+final reply as well, and a run scores `1.0` only where every grader passes.
+
+| Grader | Cases | Passes where the final reply |
+| --- | --- | --- |
+| `graders/layout-document.md` | `create-python-library`, `add-top-level-directory` | names `repository-layouts.md` or "layout document", in any casing |
+| `graders/initial-branch.md` | `create-python-library` | holds `git init --initial-branch=main` |
+
+A run has no deployed copy of the harness, so the layout document cannot be
+read in it.
 
 | Case | Skill | Expected | The prompt carries |
 | --- | --- | --- | --- |
@@ -77,6 +90,9 @@ applies to every task.
 | `diff-review` | `quick-human-readable-review` | not invoke | a unified diff and "Review this diff." |
 | `untangle-io` | `python-fp-refactor` | invoke | a Python function that reads a file, decides prices and writes a result, and a request to untangle it |
 | `add-type-hints` | `python-fp-refactor` | not invoke | a Python function mixing I/O and decisions, and a request to add type hints and change nothing else |
+| `create-python-library` | `repository-setup` | invoke | a statement that the folder is empty and a request to set up a local repository for a Python library |
+| `add-top-level-directory` | `repository-setup` | invoke | the tree of a Python library repository and a request for a release script in a new top-level directory |
+| `edit-one-file` | `repository-setup` | not invoke | one Python function from an existing repository and a request to rename a parameter in that file only |
 
 Run it from the repository root, with an output directory outside the
 repository:
@@ -112,22 +128,25 @@ skill that is missing.
 
 ### Measured scores
 
-Measured on 2026-11-12 with CLI 2.1.322, `--model claude-opus-5-5`,
-`--ablation none` and `--runs 3`, against the skills as merged at `58e5e2d`.
-The suite cost $3.60 and exited 1.
+Measured on 2026-11-23 with CLI 2.1.317, `--model claude-opus-5-5`,
+`--ablation none` and `--runs 3`, against this plugin at version 0.4.0.
+The suite cost $4.62 and exited 1.
 
 | Case | Score | Runs passed | Cost (USD) |
 | --- | --- | --- | --- |
-| `delegation-coding-task` | 1.0 | 3 of 3 | 0.32 |
-| `delegation-analysis-question` | 0.33 | 1 of 3 | 0.24 |
+| `delegation-coding-task` | 1.0 | 3 of 3 | 0.31 |
+| `delegation-analysis-question` | 0.33 | 1 of 3 | 0.23 |
 | `property-tests-serializer` | 1.0 | 3 of 3 | 0.59 |
-| `property-tests-javascript` | 1.0 | 3 of 3 | 0.41 |
-| `russian-edit` | 1.0 | 3 of 3 | 0.33 |
-| `english-edit` | 1.0 | 3 of 3 | 0.27 |
+| `property-tests-javascript` | 1.0 | 3 of 3 | 0.39 |
+| `russian-edit` | 1.0 | 3 of 3 | 0.26 |
+| `english-edit` | 1.0 | 3 of 3 | 0.26 |
 | `benchmark-outcome` | 1.0 | 3 of 3 | 0.39 |
-| `diff-review` | 1.0 | 3 of 3 | 0.36 |
-| `untangle-io` | 1.0 | 3 of 3 | 0.41 |
-| `add-type-hints` | 1.0 | 3 of 3 | 0.29 |
+| `diff-review` | 1.0 | 3 of 3 | 0.35 |
+| `untangle-io` | 1.0 | 3 of 3 | 0.39 |
+| `add-type-hints` | 1.0 | 3 of 3 | 0.27 |
+| `create-python-library` | 1.0 | 3 of 3 | 0.43 |
+| `add-top-level-directory` | 1.0 | 3 of 3 | 0.39 |
+| `edit-one-file` | 1.0 | 3 of 3 | 0.34 |
 
 In the two failing `delegation-analysis-question` runs, `Skill` was called 0
 times.

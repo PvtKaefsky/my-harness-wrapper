@@ -100,3 +100,11 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A harness Claude Code session's settings set `skillListingBudgetFraction` to `0.05`. | `scripts/verify.sh`, the `settings.skillListingBudgetFraction` comparison |
 | A session writes no `### Modern Web Guidance` reply section. | probe, recorded in pull request #110: the section in 0 of 2 replies with the plugin's `PostToolUse` hook, where 1 of 3 runs ended at its budget cap before a reply, and in 3 of 3 replies without it |
 | A session invokes `modern-web-guidance:modern-web-guidance` for a task that creates or changes a web front-end file without the prompt naming the skill. | probe, recorded in pull request #110: invoked in 2 of 3 runs with `config/CLAUDE.md`'s invoke-by-name sentence and 0 of 3 without it |
+
+## Repository setup
+
+| Requirement | Test |
+| --- | --- |
+| A session asked to create a repository invokes `my-harness:repository-setup`, and its reply gives `git init --initial-branch=main` and names the layout document. | `plugins/my-harness/evals/create-python-library` |
+| A session asked for a change that needs a new top-level directory in an existing repository invokes `my-harness:repository-setup`, and its reply names the layout document. | `plugins/my-harness/evals/add-top-level-directory` |
+| A session asked to edit one file in an existing repository does not invoke `my-harness:repository-setup`. | `plugins/my-harness/evals/edit-one-file` |
