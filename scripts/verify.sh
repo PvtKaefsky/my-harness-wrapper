@@ -17,6 +17,10 @@ settings_carries() {
   live_docs=$(jq -c -s . "$1" 2>/dev/null) || return 2
   want_docs=$(jq -c -s . "$2" 2>/dev/null) || return 2
   printf '%s\n%s\n' "$live_docs" "$want_docs" | jq -n -r --arg k "$3" '
+    def holds($l; $w): ($l | type) == "object" and ($w | type) == "object"
+      and all("allow", "deny"; . as $a | ($w | has($a) | not)
+        or (($w[$a] | type) == "array" and ($l[$a] | type) == "array" and $w[$a] - $l[$a] == []))
+      and (($l | del(.allow, .deny)) as $rest | $rest * ($w | del(.allow, .deny)) == $rest);
     input as $live | input as $want |
     if ($live | length) != 1 then "live file holds " + ($live | length | tostring) + " JSON documents"
     elif ($want | length) != 1 then "delivered file holds " + ($want | length | tostring) + " JSON documents"
@@ -25,6 +29,7 @@ settings_carries() {
         elif ($W | type) != "object" then "delivered top level is " + ($W | type)
         elif ($L | has($k) | not) then "absent from the live file"
         elif ($W | has($k) | not) then "absent from the delivered file"
+        elif $k == "permissions" then (if holds($L[$k]; $W[$k]) then "carries" else "does not carry" end)
         elif ((({($k): $L[$k]}) * ({($k): $W[$k]}))[$k]) == $L[$k] then "carries"
         else "does not carry" end
     end' 2>/dev/null

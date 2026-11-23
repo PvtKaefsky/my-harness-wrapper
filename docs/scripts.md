@@ -47,16 +47,26 @@ prints the target path for both.
 
 ### Step 4, the settings file
 
-Step 4 has three branches. Both files present: `jq -s '.[0] * .[1]'` merges the
-source over the destination. Destination absent: the source is copied whole.
-Source absent: `fails` is incremented.
+Step 4 has three branches. Both files present: the `MERGE` program, run with
+`jq -s`, merges the source over the destination with `.[0] * .[1]`.
+Destination absent: the source is copied whole. Source absent: `fails` is
+incremented.
+
+`MERGE` then sets `permissions.allow` and `permissions.deny` each to the
+destination's list followed by every source entry that list lacks, as
+`scripts/install-local.sh`'s step 5 does. A `permissions` that is neither
+absent, `null` nor an object, or one of the two lists that is neither absent,
+`null` nor an array, fails the merge, and the destination is left as it was.
+`scripts/test-install-settings.sh` runs this program and compares its
+`permissions` with the local installer's.
 
 Step 4 must precede step 6, which rewrites the same file at user scope.
 
 `jq`'s `*` operator recurses only where both sides are objects, and otherwise
 takes the right-hand value whole. Arrays are replaced rather than combined, at
-any depth. Whatever `config/settings.json` holds at a path is what the merge
-leaves there, so the merge cannot add to an array already present.
+any depth. Outside `permissions.allow` and `permissions.deny`, whatever
+`config/settings.json` holds at a path is what the merge leaves there, so the
+merge cannot add to an array already present.
 
 A destination key absent from the source survives. A nested object keeps the
 keys the source omits. A sibling hook event survives. A delivered
@@ -320,14 +330,18 @@ value of each `hooks.<event>` the delivered file
 names, or `"absent"`. Where the live file is absent or empty, the delivered file is
 merged over an empty object.
 
-The same program then adds `mcp__ccd_pr__set_monitor` to the merged
-`permissions.allow`, keeping every entry already there and adding none twice;
-a `permissions.allow` that is neither absent, `null` nor an array, or a
-`permissions` that is neither absent, `null` nor an object, fails the merge.
-After the write the
-step prints `jq -c .permissions.allow <file> -> exit=N value=<array>
-mcp__ccd_pr__set_monitor=added`, `=already there`, read from the live file before
-the merge, or `=missing` with one failure where the written file lacks the entry.
+The same program then sets `permissions.allow` and `permissions.deny` each to
+the live list followed by every delivered entry that list lacks. Every live
+entry keeps its place, and no delivered entry is added twice. A `permissions`
+that is neither absent, `null` nor an object, in either file, fails the merge.
+So does one of the two lists that is neither absent, `null` nor an array. A
+failed merge leaves the live file as it was.
+After the write the step prints one line for each of the two lists: `jq -c
+.permissions.<list> <file> -> exit=N entries=<count> added=<array>`. `entries`
+is the length of the written list. `added` holds the entries of the written
+list that the live list lacked before the merge, `[]` where it lacked none.
+The line prints no entry the live list already held. It reads `added=missing`
+alone, with one failure, where the written file lacks a delivered entry.
 `scripts/test-install-settings.sh` runs this program.
 
 The program reads every document in both files and fails unless it read
@@ -1066,6 +1080,13 @@ identical values would fail. Wrapping restricts `*` to the object merge
 `scripts/bootstrap.sh` itself performs, which recurses into objects and takes
 the right-hand value whole for everything else. A differing scalar, a differing
 array and an absent key then each fail, and equal values of any type carry.
+
+`permissions` has its own test, since both installers add to its lists. A live
+`permissions.allow` or `permissions.deny` carries the delivered list where both
+are arrays and the live one holds every delivered entry, in any order and with
+any entries of its own. The rest of `permissions` is tested as every other key
+is. `scripts/test-install-settings.sh` runs `settings_carries` on a live list
+with extra entries and on one missing a delivered entry.
 
 The comparison reports a named state, not an exit status: `carries`, `does not
 carry`, absent from the live or the delivered file, a non-object top level on
@@ -2089,25 +2110,43 @@ only where `DISABLE_TELEMETRY` reaches the package's environment.
 
 ## scripts/test-install-settings.sh
 
-Reads the `local MERGE=` line of `scripts/install-local.sh` in its own tree, or
-of the file its one optional argument names, and runs that program with
+Reads the `MERGE=` line of `scripts/install-local.sh` and of
+`scripts/bootstrap.sh`, the installer's `first_line` function and the lines of
+its settings step that read and log the two permission lists, and the
+`settings_carries` function of `scripts/verify.sh`, in its own tree. Its first, second and third optional
+arguments name another copy of each, in that order. It runs them with
 `config/settings.json` of its own tree as the delivered file, in a `mktemp -d`
 directory removed on exit. It prints one line per check, is run by hand only,
 and exits 0 only where every check passes. It exits 1 with `fail -> not run`
-where the `local MERGE=` line is absent.
+where a `MERGE=` line or the function is absent.
+
+The sample live file holds `permissions.allow` `["Bash(ls:*)"]` and
+`permissions.deny` `["Bash(rm:*)", "Read(**/.env)"]`, the second deny entry
+being one the delivered file also holds.
 
 | Check | Passes where |
 | --- | --- |
-| the merge runs on a live file holding another allow entry | the program exits 0 on a live file with `permissions.allow` `["Bash(ls:*)"]` and a `permissions.deny` |
+| the merge runs on a live file holding other allow and deny entries | the installer's program exits 0 on the sample live file |
 | the existing allow entry survives | the result still holds `Bash(ls:*)` |
-| mcp__ccd_pr__set_monitor is added once | the result holds `mcp__ccd_pr__set_monitor` exactly once |
-| the deny list survives | the result's `permissions.deny` is unchanged |
+| every payload allow entry is there once | the result's `permissions.allow` holds each delivered entry exactly once |
+| the existing deny entries survive | the result's `permissions.deny` starts with the two live entries |
+| every payload deny entry is there once | the result's `permissions.deny` holds each delivered entry exactly once |
 | a second run changes nothing | running the program on the first result gives the same document |
-| a live file with no permissions gains the entry | a live file without `permissions` gives `["mcp__ccd_pr__set_monitor"]` |
-| no live file gives the entry | the program merged over an empty object gives `["mcp__ccd_pr__set_monitor"]` |
-| a string permissions.allow fails the merge | the program exits non-zero on a live `permissions.allow` that is a string |
-| an object permissions.allow fails the merge | the program exits non-zero on a live `permissions.allow` that is an object |
-| a string permissions fails the merge | the program exits non-zero on a live `permissions` that is a string |
+| the bootstrap merge gives the same permissions | bootstrap's program gives the same `permissions` on the sample live file |
+| a live file with no permissions gains the payload entries | a live file without `permissions` gives the delivered `permissions` |
+| no live file gives the payload entries | the installer's program merged over an empty object gives the delivered `permissions` |
+| a string permissions.allow fails both merges, and the same for `deny` | both programs exit non-zero on a live list that is a string |
+| an object permissions.allow fails both merges, and the same for `deny` | both programs exit non-zero on a live list that is an object |
+| a string permissions fails both merges | both programs exit non-zero on a live `permissions` that is a string |
+| the log names the allow entry added | the installer's log loop, run after the merge of the sample live file, prints the `permissions.allow` line with `entries=2 added=["mcp__ccd_pr__set_monitor"]` |
+| the log names the deny entries added | its `permissions.deny` line has `entries=15` and an `added=` list starting with `Read(**/.env.local)`, the first delivered entry the live list lacked |
+| the log prints no live entry | neither line holds `Bash(`, which starts both entries only the live file held |
+| the log of a second run names nothing added | both lines of a second run end with `added=[]` |
+| the log of a failed merge reads missing and counts two failures | on a live `permissions.deny` that is a string, both lines read `added=missing` and the loop counts two failures |
+| verify passes a live permissions with extra entries | `settings_carries` prints `carries` for the first result |
+| verify fails a live deny list missing a delivered entry | it prints `does not carry` with `Read(**/*.pem)` removed from the live list |
+| verify fails a live allow list missing a delivered entry | it prints `does not carry` with the live `permissions.allow` set to `["Bash(ls:*)"]` |
+| verify keeps equality for an array under another key | it prints `does not carry` for a live `["a","b"]` against a delivered `["a"]` under the key `x` |
 
 ## scripts/test-pr-comment-rules.sh
 
@@ -2268,6 +2307,7 @@ settings steps above describe.
 | `env` | `DISABLE_TELEMETRY`, `DO_NOT_TRACK`, `DISABLE_ERROR_REPORTING` and `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS`, each `"1"` | Claude Code's telemetry and error reporting are off. ECC's MCP server `chrome-devtools-mcp` sends no usage statistics, by its README at 1.10.1; it still sends trace URLs to CrUX when a performance tool runs, because only its `--no-performance-crux` flag turns that off and ECC's `.mcp.json` does not pass it. It still checks the npm registry for updates, which only `CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS` turns off, and `npx -y` contacts the registry each time it starts the server. Claude Code's update checks, feature flags and Remote Control still use the network. The CLI sets each `env` key in the environment of every session and its subprocesses, by the Claude Code docs, "All settings", `env`, so a tool a hook or the `Bash` tool starts reads the same values. |
 | `pluginConfigs` | `ponytail@ponytail` options `webhookUrl` `""` and `sendNames` false | Ponytail sends no turn row and no task name to any webhook. The table under `config/plugins.tsv` lists ponytail's options. |
 | `skillListingBudgetFraction` | `0.05` | The share of the context window the skill listing may fill. The paragraph on issue #95 under `config/plugins.tsv` gives the value's source. |
+| `permissions` | `allow` holding `mcp__ccd_pr__set_monitor`, and `deny` holding ten `Read` and four `Edit` rules | A local session's Auto-fix call runs without an approval prompt. Claude Code refuses reads of secret files and edits of the delivered configuration. `docs/runbook.md`, under "Permission deny rules", lists each rule and what it matches. |
 | `hooks` | `UserPromptSubmit`, `PreToolUse`, `PostToolUse` and `SessionStart` entries | The per-prompt reminder, the attribution guard and the session-start check. |
 
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is not set, because it also turns

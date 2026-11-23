@@ -4,7 +4,7 @@ The index of `docs/`. One row per document.
 
 | Path | Contents |
 | --- | --- |
-| `docs/environment-changes.md` | The authoring tests a new environment rule must pass. |
+| `docs/environment-changes.md` | The authoring tests a new environment rule must pass, the evidence record each new control gets, and the lookup made before a plugin source is added. |
 | `docs/environment.md` | What the sandbox is, and what has been established about it. |
 | `docs/requirements.md` | The behaviors a user or caller can observe, one testable line each, with the test behind each. |
 | `docs/repository-layouts.md` | The top-level layout of a new repository holding application or library source, per module count and toolchain, with the sources behind it. |
