@@ -1258,6 +1258,27 @@ Each column is one run of the command in `plugins/my-harness/README.md`, under
 | No existing case drops | met: each of the ten scores the same in both runs |
 | The token count falls | met: 64,993 to 65,000 on `main`, 64,296 and 64,297 on the branch |
 
+### The control record for the Harness bullet
+
+The control is the Harness bullet of `config/CLAUDE.md` that names
+`my-harness:repository-setup`. The record follows
+`docs/environment-changes.md`, "The evidence record for a new control".
+
+| Field | Record |
+| --- | --- |
+| Incident | None. The bullet replaces the two always-loaded sections that issue #126 moves into the skill. |
+| Blocked input | A request to create a repository, answered without the skill's rules. Shown with the `create-python-library` prompt: session `89479a82-e5e5-4e3b-b0ec-8728b824e3a2` called `my-harness:repository-setup` before its first `git` call, read `docs/repository-layouts.md` from the deployed copy, and then called `git init --initial-branch=main`, which the headless run refused for want of approval. |
+| Permitted neighbour | A request to edit one file in an existing repository. Shown with the `edit-one-file` prompt: session `415a8aa0-1068-481d-88a0-7ac57421f324` made no `my-harness:repository-setup` call. |
+| Bypass | None of these is shown to match the bullet: a request that implies creating a repository without saying so, such as pushing a folder to a new GitHub repository; a fork or a clone pushed to a new repository; a scaffolder that runs `git init`, such as `cargo new` or `uv init`. A subagent follows its brief and does not read the bullet. A session that loads the plugin without the payload has the skill's description alone. No session was run in which the skill could not be invoked. |
+| Host and revision | Windows 11, CLI 2.1.317, `--model claude-opus-5-5`, with the payload and the plugin at `4f64acf`, run as under "Input tokens of a headless prompt" with `--allowedTools Read Glob Grep Skill --max-turns 8`. |
+| Cost | False blocks: none in the one neighbour session. Latency: one `Skill` call per repository created or top-level directory added. Upkeep: a change to the skill bumps the plugin version and needs a new Cowork package. |
+| Owner | The repository owner, `PvtKaefsky`. |
+| Removal condition | The two sections return to `config/CLAUDE.md`, or the skill is removed from the plugin. |
+
+Neither session separates the bullet's effect from the skill description's.
+The eval runs, which load no payload, called the skill in 3 of 3
+`create-python-library` runs and in 0 of 3 `edit-one-file` runs.
+
 ## Diagnostic-output invariant
 
 Every diagnostic line prints the predicate tested and the value observed, never
