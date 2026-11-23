@@ -1279,7 +1279,7 @@ Neither session separates the bullet's effect from the skill description's.
 The eval runs, which load no payload, called the skill in 3 of 3
 `create-python-library` runs and in 0 of 3 `edit-one-file` runs.
 
-### The control records for hidden characters
+## Hidden-character controls
 
 The controls are the hidden-character block in `scripts/attribution-guard.sh`,
 the hidden-character block in `commit-msg`, and the `pre-commit` step. The
