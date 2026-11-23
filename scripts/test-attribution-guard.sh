@@ -146,6 +146,31 @@ $TRAILER_SESSION")"
 run_case 'pull request tool body, Co-Authored-By naming a person' 0 "$(tool_in "$CLEAN
 
 $TRAILER_PERSON")"
+for word in Assisted-by Generated-by AI-assisted Written-by; do
+  printf '%s\n\n%s: Claude (Anthropic)\n' "$CLEAN" "$word" > "$word.md"
+  jq -n --arg b "$CLEAN
+
+$word: Claude Code" '{body:$b}' > "$word.json"
+  run_case "gh api .../comments -F body=@$word.md, $word naming Claude" 2 "$(bash_in "gh api repos/o/r/issues/1/comments -F body=@$word.md")"
+  run_case "gh api .../comments --input $word.json, $word naming Claude in a JSON string" 2 "$(bash_in "gh api repos/o/r/issues/1/comments --input $word.json")"
+  run_case "mcp__github__add_issue_comment body through the delivered hook, $word naming Anthropic" 2 "$(mcp_in mcp__github__add_issue_comment "$CLEAN
+
+$word: an Anthropic model" '{"owner":"o","repo":"r","issue_number":1}')" "$MARK" run_hook
+done
+run_case 'pull request tool body, indented lower-case assisted-by naming claude' 2 "$(tool_in "$CLEAN
+
+  assisted-by: claude")"
+for neighbour in \
+  'Assisted-by: Copilot' \
+  'Assisted-by: Claudette' \
+  'Assisted-by: Jean-Claude Dupont' \
+  'Reviewed-by: Claude' \
+  'the Assisted-by trailer is optional' \
+  'Use the Assisted-by: Claude trailer'; do
+  run_case "pull request tool body, $neighbour" 0 "$(tool_in "$CLEAN
+
+$neighbour")"
+done
 mkdir -p "$WORK/bare/scripts" && cp "$GUARD" "$WORK/bare/scripts/attribution-guard.sh"
 run_case 'pull request tool body, pattern file absent' 2 "$(tool_in "$CLEAN")" 'so the body was not checked' run_bare
 run_case 'gh pr create --body, clean' 0 "$(bash_in "gh pr create --title t --body \"$CLEAN\"")"
