@@ -146,8 +146,11 @@ table below.
 It writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, the
 global git config and the plugin install directories, and nothing else. It
 replaces `CLAUDE.md` there whole, and replaces each `hooks.<event>` array that
-`config/settings.json` names, then adds `mcp__ccd_pr__set_monitor` to the live
-`permissions.allow`, keeping every entry already there and adding none twice.
+`config/settings.json` names. It adds each `permissions.allow` and
+`permissions.deny` entry of `config/settings.json` that the live list lacks,
+keeping every entry already there and adding none twice. Where the live
+`permissions`, or either list, has another shape, the settings step fails and
+the live file is left as it was.
 The first run that finds a non-empty `settings.json`, or a `CLAUDE.md`
 differing from the payload, copies it to `settings.json.pre-harness` or
 `CLAUDE.md.pre-harness` beside it; later runs leave that copy alone. The log
@@ -176,6 +179,7 @@ started after the run carries the harness.
 | `cygpath -m <copy>/git-hooks -> exit=N value=...` | Printed only where `cygpath` exists. The value the installer writes into `env.GIT_CONFIG_VALUE_0`, in the `C:/...` form git for Windows reads. | Where `N` is not 0 or the value is `empty`, the triple is not written; one failure. Re-run in Git Bash. |
 | `test -x <copy>/git-hooks/commit-msg -> yes/no` | Whether the deployed copy carries an executable `commit-msg`. | Where `no`, the copy predates the hooks, is incomplete, or lost the mode; the triple is not written. |
 | `jq GIT_CONFIG_* keys of .env in <dir>/settings.json -> exit=N count=C` | The `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_<n>` and `GIT_CONFIG_VALUE_<n>` keys the live file's `env` holds before the merge. A non-zero `N` counts the file as foreign. | Nothing, unless the next line names something. |
+| `jq -c .permissions.allow <settings> -> exit=N entries=<count> added=<array>`, and the same for `.permissions.deny` | The length of the written list, and the entries of it the live list lacked before the merge. `added=[]` means the list already held every delivered entry. `added=missing` is one failure: the written file lacks a delivered entry. | Nothing, unless `added=missing`. Then read the `jq -s` line above it: a non-zero exit there means the live `permissions`, `permissions.allow` or `permissions.deny` has a shape the merge refuses, so correct it by hand and re-run. |
 | `GIT_CONFIG_* the installer did not write -> <list>` / `-> none` | Each such variable in the installer's environment, as `environment:<name>=[<value>]`, or in the live file, as `settings:<name>=[<value>]`, that is not the triple the installer writes. | Nothing where `none`. Otherwise find what set it: a value in the shell's profile, or a key another tool or a hand edit put in `settings.json`'s `env`. Remove it, or fold it into a triple that also carries `core.hooksPath` by hand, then re-run. |
 | `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=<dir> git -C <copy> config --get core.hooksPath -> exit=N value=[V]` | Whether this git reads `core.hooksPath` from the variables. It passes where `N` is 0 and `V` is `<dir>`. | Where it fails, the `not written` line follows; update Git. |
 | `env.GIT_CONFIG_COUNT, env.GIT_CONFIG_KEY_0, env.GIT_CONFIG_VALUE_0 -> not written, <cause>` | The triple was not written, for the cause named: the conversion failed, `commit-msg` is absent or not executable, another `GIT_CONFIG_*` is set, or git did not read the value; one failure. The merge still writes `env.HARNESS_DIR`, and no harness hook runs in sessions. | Act on the cause, then re-run. |
@@ -290,7 +294,9 @@ any message.
 4. In `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, move `CLAUDE.md.pre-harness` and
    `settings.json.pre-harness` back over `CLAUDE.md` and `settings.json` where
    they exist; otherwise remove `CLAUDE.md`, and remove from `settings.json` the
-   keys `config/settings.json` carries and `env.HARNESS_DIR`.
+   keys `config/settings.json` carries and `env.HARNESS_DIR`. Under
+   `permissions`, remove only the `allow` and `deny` entries
+   `config/settings.json` lists.
 5. Remove `my-harness-wrapper`, `.my-harness-wrapper.manifest.json`,
    `.my-harness-wrapper.install.log` and `session-check.log` there.
 6. Uninstall the harness's own plugin and remove its marketplace. The payload
@@ -528,7 +534,7 @@ Two checks exit immediately and stop the run: `FAIL live config dir path` and
 | `FAIL payload: ... actual absent` | Either `config/CLAUDE.md` is missing from the repository being checked, or bootstrap never wrote the live `CLAUDE.md`. The two `test -f` lines above separate them. | For a missing delivered file, fix the tree. For a missing live file, read `/home/user/bootstrap.log`: bootstrap's own `test -f`/`cp` lines say which step did not run. |
 | `FAIL payload: ... actual differs` | The live `CLAUDE.md` is not byte-identical to the delivered one. | Expected while the snapshot is frozen and `config/CLAUDE.md` has changed since, as with `FAIL manifest.commit`. Otherwise re-run bootstrap. |
 | `FAIL payload: ... actual cmp exit=N` | `cmp` could not compare the two files. | Read the exit code. Both `test -f` lines above read `yes`, so the cause is neither file being absent. |
-| `FAIL settings.<key>` | The live `settings.json` does not carry the value `config/settings.json` holds for that key. Every key the delivered file carries is checked. The two are compared as JSON values, so key order does not matter, and a live value holding more than the delivered one still carries it. | Expected while the snapshot is frozen and `config/settings.json` has changed since, as with `FAIL manifest.commit`. Otherwise re-run bootstrap: a failed `mv` in its step 4 leaves every delivered key absent from the live file. |
+| `FAIL settings.<key>` | The live `settings.json` does not carry the value `config/settings.json` holds for that key. Every key the delivered file carries is checked. The two are compared as JSON values, so key order does not matter, and a live value holding more than the delivered one still carries it. Under `permissions`, a live `allow` or `deny` list carries the delivered one where it holds every delivered entry; any other array must equal the delivered one. | Expected while the snapshot is frozen and `config/settings.json` has changed since, as with `FAIL manifest.commit`. Otherwise re-run bootstrap: a failed `mv` in its step 4 leaves every delivered key absent from the live file. |
 | `FAIL settings: expected a JSON object with at least one key` | `config/settings.json` is absent, unreadable, or carries no key. | Fix the tree. This is a repository fault, not a session fault. |
 | `FAIL settings....: actual no expectation could be read` | That key could not be read from `config/settings.json`. | Fix the tree. This is a repository fault, not a session fault. |
 | `FAIL settings....: ..., <state>` | The state ends the line and names the cause: `does not carry`, `absent from the live file`, `absent from the delivered file`, `live top level is ...`, `delivered top level is ...`, `live file holds N JSON documents`, `delivered file holds N JSON documents`, or `not determined` where `jq` could not run. | Read the state. A document count other than one, or a non-object top level, is a corrupt file rather than a delivery that did not happen. |
@@ -706,9 +712,64 @@ pull request's author raises no event. The probe on pull request #112 could not
 tell the author from the repository owner or the account `gh` is signed in
 with, which were one account. Tell a local session when its pull request merges
 or closes: no event reported a merge or a close when probed. Claude Code's auto
-mode classifier refused the `set_monitor` call when probed, so the local install
-adds `mcp__ccd_pr__set_monitor` to `permissions.allow` in the live
-`settings.json`, keeping every entry already there.
+mode classifier refused the `set_monitor` call when probed, so
+`config/settings.json` lists `mcp__ccd_pr__set_monitor` under
+`permissions.allow`, and the local install adds it to the live list, keeping
+every entry already there.
+
+## Permission deny rules
+
+`config/settings.json` delivers these `permissions.deny` rules. They are
+defence in depth. The rules in `config/CLAUDE.md` stay the primary control.
+
+| Rule | Matches |
+| --- | --- |
+| `Read(**/.env)` | A file named `.env` in the session's current directory or any directory under it. |
+| `Read(**/.env.local)` | A file named `.env.local` there. |
+| `Read(**/.env.*.local)` | A file there whose name starts with `.env.` and ends with `.local`, such as `.env.production.local`. |
+| `Read(**/*.pem)`, `Read(**/*.key)` | A file there whose name ends with `.pem` or `.key`. |
+| `Read(**/id_rsa*)`, `Read(**/id_ed25519*)` | A file there whose name starts with `id_rsa` or `id_ed25519`, the `.pub` files included. |
+| `Read(~/.ssh/**)` | Every file under `.ssh` in the home directory. |
+| `Read(~/.aws/credentials)` | That file in the home directory. |
+| `Read(~/.config/gh/hosts.yml)` | That file in the home directory. |
+| `Edit(~/.claude/settings.json)`, `Edit(~/.claude/CLAUDE.md)` | The live settings file and the live payload. |
+| `Edit(~/.claude/my-harness-wrapper/**)` | Every file of a local install's deployed copy. |
+| `Edit(//opt/my-harness-wrapper/**)` | Every file of the cloud clone, by its absolute path. |
+
+`.env.example` and `.env.sample` match no rule. Neither does any other
+`.env.<name>` file that does not end in `.local`, such as `.env.production`.
+No rule names `settings.local.json` or a project's `.claude` directory. The
+first seven rules anchor at
+the session's current directory, so they match no file in a parent directory
+or in another project. On Windows, `gh` keeps its `hosts.yml` under
+`%AppData%\GitHub CLI`, which no rule names.
+
+A `Read` rule refuses the Read tool, and also the Edit and Write tools on the
+same path. An `Edit` rule refuses every built-in tool that edits files. In a
+Bash command, both apply to redirection targets and to the file commands Claude
+Code recognizes, such as `cat`, `head`, `tail`, `sed` and `tee`. They do not
+apply to a command that reads a file without naming it, to a program called by
+its path, to a command inside `sh -c`, or to a script that opens the file
+itself. Source: `https://code.claude.com/docs/en/permissions`, read on
+2026-11-23.
+
+A session therefore cannot change the live `settings.json` or `CLAUDE.md` with
+its file tools. Change `config/` in a checkout and run the installer, or edit
+the live file by hand.
+
+Observed on 2026-11-23 with Claude Code 2.1.317 on Windows 11, in `claude -p`
+runs with `--settings` naming a file that held these rules and one more `Edit`
+rule, of the `~/` form, for a stand-in settings file:
+
+| Action | Result |
+| --- | --- |
+| Read tool on `.env` and on `key.pem` | refused, `File is in a directory that is denied by your permission settings.` |
+| `cat .env`, `head -1 .env` | refused, `Permission to use Bash with command ... has been denied.` |
+| Read tool on `.env.example`, `cat .env.example` | the file's text |
+| Edit tool on the stand-in file | refused, with the Read tool's message |
+| Edit tool on another file in the stand-in's directory | edited |
+| `cp <file> <stand-in>`, `echo x > <stand-in>` | refused, with the Bash message |
+| `sh -c "cat .env"`, `/usr/bin/cat .env`, `grep -r PROBE_VALUE .` | the file's text |
 
 ## Before every commit
 
