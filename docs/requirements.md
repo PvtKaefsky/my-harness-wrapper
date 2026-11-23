@@ -72,6 +72,28 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A `gh` write command, or a body file, carrying an attribution line is blocked with exit 2 and `matched line ->` at any size, wherever the `gh` line or the match sits; a large command that is not a `gh` write exits 0. | `scripts/test-attribution-guard.sh`, the 140,000-byte, 396 KB and 900,000-byte cases |
 | A line that starts, after optional whitespace and in any letter case, with `Assisted-by:`, `Generated-by:`, `AI-assisted:` or `Written-by:` and then carries the word `Claude` or `Anthropic` is blocked by the guard with exit 2 and the matched line, and refused by the `commit-msg` hook; such a line naming anyone else, and one of those trailer words in the middle of a line, pass both. | `scripts/test-attribution-guard.sh`, the trailer-word cases and their permitted neighbours; `scripts/test-hook-forwarding.sh`, M1 to M6 |
 
+## Hidden characters
+
+| Requirement | Test |
+| --- | --- |
+| The guard blocks a `gh api` write whose `-F body=@<file>` file or `--input <file>` JSON string carries U+202E, U+2066, U+E0001 or U+0000 on line 3, with exit 2 and `attribution-guard: hidden character -> U+<code point> on line 3`. | `scripts/test-attribution-guard.sh`, the `-F body=@` and `--input` cases for those four code points |
+| The guard blocks an `mcp__github__add_issue_comment` `body` carrying one of those four code points, through the delivered hook, with exit 2 and `attribution-guard: hidden character -> U+<code point>`, and a `gh pr comment` command carrying U+0000 with `on line 1`. | `scripts/test-attribution-guard.sh`, the `mcp__github__add_issue_comment body through the delivered hook` cases for those four code points and the `U+0000 in the command` case |
+| The guard blocks U+202A, U+2069, U+E0000 and U+E007F with exit 2, and exits 0 for U+2065 and U+206A. | `scripts/test-attribution-guard.sh`, the `at a range end` cases |
+| The guard exits 0 with empty stdout for a body carrying a UTF-8 byte-order mark, an emoji sequence joined with U+200D, Hebrew text with U+200F, or U+200E. | `scripts/test-attribution-guard.sh`, the `run_stdout` cases for `bom.md`, `zwj.md`, `hebrew.md` and `lrm.md` |
+| The guard exits 0 for a body carrying U+200B or U+2060 and prints one JSON object on stdout whose `hookSpecificOutput.hookEventName` is `PreToolUse`, whose `additionalContext` names the code point, and which has no `permissionDecision`. | `scripts/test-attribution-guard.sh`, the `U+200B on line 2` case and the `U+2060` case through the delivered hook |
+| The guard checks a 900,000-byte body file whole, within 10 s: U+202E as its last character is blocked with exit 2, and 900,000 clean bytes exit 0. | `scripts/test-attribution-guard.sh`, the `hidden-big.md` and `clean-big.md` cases |
+| Where `git-hooks/lib/hidden-chars.tsv` is absent, the guard exits 2 with `hidden-chars.tsv could not be applied, so the body was not checked`. | `scripts/test-attribution-guard.sh`, the `hidden-chars.tsv absent` case |
+| A `Bash` command that is not a scanned write is not scanned for hidden characters and exits 0. | `scripts/test-attribution-guard.sh`, the `echo U+202E, not a gh write` case |
+| `commit-msg` refuses a message carrying U+202E, U+2066, U+E0001 or U+0000 with `harness commit-msg: hidden character -> U+<code point>`, and names the line as `on line <n> of the commit message`. | `scripts/test-hook-forwarding.sh`, C1 to C4; C1 checks the line |
+| `commit-msg` accepts, with no `harness` line, a message carrying a byte order mark, an emoji sequence joined with U+200D, Hebrew text with U+200F, or U+200B. | `scripts/test-hook-forwarding.sh`, C5 to C8 |
+| `commit-msg` does not scan the text under the scissors line where git cuts it. | `scripts/test-hook-forwarding.sh`, C11 |
+| `pre-commit` refuses a commit whose staged change adds U+202E, U+2066, U+E0001 or U+0000, with `harness pre-commit: hidden character -> U+<code point> at <path>:<line>`, in a first or a later commit and on line 9000 of a 900,000-byte file. | `scripts/test-hook-forwarding.sh`, F1 to F4, F14 and F16 |
+| `pre-commit` accepts, with no `harness` line, a staged file carrying a byte order mark, an emoji sequence joined with U+200D, or Hebrew text with U+200F. | `scripts/test-hook-forwarding.sh`, F5 to F7 |
+| `pre-commit` prints `harness pre-commit: zero-width character U+<code point> at <path>:<line>` for a staged U+200B or U+2060 and the commit proceeds; a block-class character staged with one refuses the commit. | `scripts/test-hook-forwarding.sh`, F8, F9 and F22 |
+| `pre-commit` does not scan a file git treats as binary, a removed line, or a line already in the repository. | `scripts/test-hook-forwarding.sh`, F10, F13 and F12 |
+| The repository's own `pre-commit` runs once on a commit the check passes, its exit status decides that commit, and it does not run on a commit the check refuses. | `scripts/test-hook-forwarding.sh`, F17, F19 and F18 |
+| Where `lib/hidden-chars.sh` or `lib/hidden-chars.tsv` is absent from the hooks directory, the commit is refused as not checked: by `pre-commit` with `so the staged changes were not checked`, and by `commit-msg` with `so the message was not checked`. | `scripts/test-hook-forwarding.sh`, F21, F20 and C9 |
+
 ## Telemetry
 
 | Requirement | Test |

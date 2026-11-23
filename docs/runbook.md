@@ -650,6 +650,15 @@ is made again without the rejected line; no hook is bypassed with
 | `harness commit-msg: matched line -> <line>` | The commit message carries that attribution line, and the commit was refused. | Remove the line, then commit again. |
 | `harness commit-msg: <path>/attribution.ere holds no single pattern line, ...` | The pattern file is absent, empty or several lines, so every commit is refused. | Re-run `scripts/install-local.sh`, or rebuild in the cloud. |
 | `harness commit-msg: awk could not read the message file ...` / `... grep could not apply ...` | The check could not run, so the commit was refused. | Read the exit status; report it as a defect in `git-hooks/lib/dispatch.sh`. |
+| `harness commit-msg: hidden character -> <code point> on line <n> of the commit message` | The message carries that block-class character on that line of the cleaned message, and the commit was refused. | Remove the character, then commit again. |
+| `harness commit-msg: <path> could not be read, so the message was not checked; ...` | `lib/hidden-chars.sh` is absent or unreadable, so the commit was refused. | Re-run `scripts/install-local.sh`, or rebuild in the cloud. |
+| `harness commit-msg: <path> could not be applied (exit=2), so the message was not checked; ...` | `lib/hidden-chars.tsv` is absent, empty, holds a malformed row, or its scan fails, so the commit was refused. | Re-run `scripts/install-local.sh`, or rebuild in the cloud. |
+| `harness pre-commit: hidden character -> <code point> at <path>:<line>` | The staged change adds that block-class character on that line of that file, and the commit was refused. One line prints for each reported character. | Remove each character from the staged file, then commit again. |
+| `harness pre-commit: zero-width character <code point> at <path>:<line>, committed as staged.` | The staged change adds that warn-class character on that line, and the commit went ahead. | Remove the character if it was not meant to be there. |
+| `harness pre-commit: <path> could not be read, so the staged changes were not checked; ...` | `lib/hidden-chars.sh` is absent or unreadable, so the commit was refused. | Re-run `scripts/install-local.sh`, or rebuild in the cloud. |
+| `harness pre-commit: <path> could not be applied, so the staged changes were not checked; ...` | `lib/hidden-chars.tsv` is absent, empty, holds a malformed row, or its scan fails, so the commit was refused. | Re-run `scripts/install-local.sh`, or rebuild in the cloud. |
+| `harness pre-commit: git diff --cached could not be read, so the staged changes were not checked.` | git did not print the staged diff, so the commit was refused. | Run `git diff --cached` in the repository for git's error. |
+| `harness pre-commit: git diff --cached could not be mapped to files, so the staged changes were not checked.` | The reported lines did not map to a file and line, so the commit was refused. | Report it as a defect in `git-hooks/lib/dispatch.sh`. |
 | `harness <name>: the repository's git directory was not found from <dir>, and git rev-parse --git-common-dir -> exit=N, ...` | The hook could not find the repository, so it refused rather than skip the repository's own hook. | Run the git command from inside the repository. A `.git` file whose first line is not `gitdir: <path>` also leads here. |
 | `harness <name>: git config --show-scope --type=path --get-all core.hooksPath -> exit=N, ...` | The lookup of the hooks directory git would use without the harness failed, so the hook refused rather than skip the repository's own hook. | Run `git config --show-scope --get-all core.hooksPath` in the repository for git's error, such as an unreadable config file or a `~user` path naming no user, and correct it. |
 | `harness <name>: <path> was not run, it is not executable.` | The repository's own hook exists without the executable bit, which git also skips. | `chmod +x <path>` where it should run. |
@@ -658,6 +667,10 @@ is made again without the rejected line; no hook is bypassed with
 | `harness proc-receive: the repository has no executable proc-receive hook at <path>.` | `receive.procReceiveRefs` is set and the repository has no hook to serve it. | As without the harness: install the hook, or unset the key. |
 | `Hook already exists: pre-push`, from `git lfs install` or `git lfs update`, in the cloud or locally inside a Claude Code session | git-lfs found the harness hooks in the directory `core.hooksPath` names and installed nothing, so the repository has no LFS hooks unless it already had them. | Locally, run `git lfs install` in a terminal outside the session: it reads no triple and installs into the repository's own hooks, which the harness hooks forward to inside sessions. In the cloud, take each hook's contents from `git lfs update --manual`, and write them into the repository's own `<common dir>/hooks`, `.git/hooks` in a plain clone, not into the path it names, which is the harness directory; the harness hooks forward to them. Never run the suggested `--force`: it overwrites the harness hooks in the deployed copy for every repository, as `FAIL deployed copy changes` then shows. |
 | `attribution-guard: <path> holds no single pattern line, so the body was not checked.` | The attribution guard found no usable pattern file in the harness tree, so it blocked the write. | Restore the tree: re-run `scripts/install-local.sh`, or rebuild in the cloud. |
+| `attribution-guard: hidden character -> <code point> on line <n>` | The body, or the text of a write command, carries that block-class character on that line of the scanned text, and the write was blocked with exit 2. | Remove the character, then retry. |
+| `attribution-guard: <path> could not be read, so the body was not checked.` | `git-hooks/lib/hidden-chars.sh` is absent or unreadable, so the write was blocked. | Restore the tree: re-run `scripts/install-local.sh`, or rebuild in the cloud. |
+| `attribution-guard: <path> could not be applied, so the body was not checked.` | `git-hooks/lib/hidden-chars.tsv` is absent, empty, holds a malformed row, or its scan fails, so the write was blocked. | Restore the tree: re-run `scripts/install-local.sh`, or rebuild in the cloud. |
+| `attribution-guard: zero-width character <code point> on line <n> of the body; it was sent as written.`, in `additionalContext` on stdout | The body carries that warn-class character, and the write went ahead. | Remove the character if it was not meant to be there. |
 
 ## Reading the session-start check
 
@@ -781,7 +794,8 @@ exercises `scripts/plugin-dependencies.sh` through a deployed copy cloned from a
 local repository whose `main` carries the change, named in `HARNESS_REPO_URL`.
 Run
 `scripts/test-attribution-guard.sh` before committing a change to
-`scripts/attribution-guard.sh` or to the test script itself; it exits 0 only
+`scripts/attribution-guard.sh`, to `git-hooks/lib/hidden-chars.sh` or
+`git-hooks/lib/hidden-chars.tsv`, or to the test script itself; it exits 0 only
 where every case passes. Run `scripts/test-web-guidance-gate.sh` before
 committing a change to `plugins/my-harness/hooks/web-guidance-gate.sh`, to
 `plugins/my-harness/hooks/hooks.json` or to the test script itself; it exits 0

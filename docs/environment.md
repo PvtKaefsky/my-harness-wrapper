@@ -1279,6 +1279,57 @@ Neither session separates the bullet's effect from the skill description's.
 The eval runs, which load no payload, called the skill in 3 of 3
 `create-python-library` runs and in 0 of 3 `edit-one-file` runs.
 
+### The control records for hidden characters
+
+The controls are the hidden-character block in `scripts/attribution-guard.sh`,
+the hidden-character block in `commit-msg`, and the `pre-commit` step. The
+records follow `docs/environment-changes.md`, "The evidence record for a new
+control".
+
+The hidden-character block in `scripts/attribution-guard.sh`, `scan`:
+
+| Field | Record |
+| --- | --- |
+| Incident | None. Issue #123 asks for the control; no event in this repository is recorded. |
+| Blocked input | A `gh api repos/o/r/issues/1/comments -F body=@<file>` call whose file carries U+202E on line 3: exit 2 with `attribution-guard: hidden character -> U+202E on line 3`. |
+| Permitted neighbour | The same call with Hebrew text carrying U+200F: exit 0, empty stdout. |
+| Bypass | Every path the section `scripts/attribution-guard.sh` of `docs/scripts.md` lists as unscanned: a shell substitution, `curl`, `gh api graphql`, a commit message sent through `Bash`. File contents an MCP commit tool sends. A body past the first mebibyte of a body file. A character outside the classes, such as U+200E, U+200F, U+061C or U+FEFF. |
+| Host and revision | Windows 11, Git Bash, bash 5.3.15, GNU grep 3.0, GNU Awk 5.4.1, jq 1.8.2; and a `debian:stable-slim` container, Debian 13, bash 5.2.37, GNU grep 3.11, mawk 1.3.4 20250131, jq 1.7, git 2.47.3. Both on 2026-11-23, at the commit that adds this record, with `scripts/test-attribution-guard.sh` and `scripts/test-hook-forwarding.sh` ending `fail -> 0` on each. |
+| Cost | False blocks: text that uses the blocked characters on purpose, which are the bidirectional isolates U+2066 to U+2069 in right-to-left prose and the tag characters of the subdivision flag emoji (England, Scotland, Wales). Latency, the median of three runs on the Windows host with no other load: 1341 ms against 1079 ms at `6e0f5ae` for a `gh pr comment` command, and none for a command that is not a scanned write. Upkeep: a class change is a row in `git-hooks/lib/hidden-chars.tsv` with a case in each of the two test scripts. |
+| Owner | The repository owner, `PvtKaefsky`. |
+| Removal condition | GitHub rejects or visibly marks these characters in every body the guard scans, or the user withdraws the rule. Removing the rows of a class from `git-hooks/lib/hidden-chars.tsv` removes that class from all three controls. |
+
+The hidden-character block in `commit-msg`, `hook_commit_msg`:
+
+| Field | Record |
+| --- | --- |
+| Incident | None. Issue #123 asks for the control; no event in this repository is recorded. |
+| Blocked input | A commit whose message carries U+202E on line 3: refused with `harness commit-msg: hidden character -> U+202E on line 3 of the commit message` (case C1). |
+| Permitted neighbour | A message with Hebrew text carrying U+200F: accepted (case C7). |
+| Bypass | `git commit --no-verify`. `git rebase`, `git cherry-pick` and `git am`, which run no `commit-msg`. A commit made on GitHub. A character outside the classes. |
+| Host and revision | Windows 11, Git Bash, bash 5.3.15, GNU grep 3.0, GNU Awk 5.4.1, jq 1.8.2; and a `debian:stable-slim` container, Debian 13, bash 5.2.37, GNU grep 3.11, mawk 1.3.4 20250131, jq 1.7, git 2.47.3. Both on 2026-11-23, at the commit that adds this record, with `scripts/test-attribution-guard.sh` and `scripts/test-hook-forwarding.sh` ending `fail -> 0` on each. |
+| Cost | False blocks: text that uses the blocked characters on purpose, which are the bidirectional isolates U+2066 to U+2069 in right-to-left prose and the tag characters of the subdivision flag emoji (England, Scotland, Wales). Latency, the median of three runs on the Windows host with no other load: 583 ms against 438 ms at `6e0f5ae`. Upkeep: a class change is a row in `git-hooks/lib/hidden-chars.tsv` with a case in each of the two test scripts. |
+| Owner | The repository owner, `PvtKaefsky`. |
+| Removal condition | The user withdraws the rule. Removing the rows of a class from `git-hooks/lib/hidden-chars.tsv` removes that class from all three controls. |
+
+The `pre-commit` step, `hook_pre_commit`:
+
+| Field | Record |
+| --- | --- |
+| Incident | None. Issue #123 asks for the control; no event in this repository is recorded. |
+| Blocked input | A commit that stages a file with U+202E on line 2: refused with `harness pre-commit: hidden character -> U+202E at f:2` (case F1). |
+| Permitted neighbour | A staged file with Hebrew text carrying U+200F: accepted (case F7). |
+| Bypass | `git commit --no-verify`. A merge, `git rebase`, `git cherry-pick` and `git am`, which run no `pre-commit`. A file git treats as binary. A file name. A line already in the repository. A character outside the classes. |
+| Host and revision | Windows 11, Git Bash, bash 5.3.15, GNU grep 3.0, GNU Awk 5.4.1, jq 1.8.2; and a `debian:stable-slim` container, Debian 13, bash 5.2.37, GNU grep 3.11, mawk 1.3.4 20250131, jq 1.7, git 2.47.3. Both on 2026-11-23, at the commit that adds this record, with `scripts/test-attribution-guard.sh` and `scripts/test-hook-forwarding.sh` ending `fail -> 0` on each. |
+| Cost | False blocks: text that uses the blocked characters on purpose, which are the bidirectional isolates U+2066 to U+2069 in right-to-left prose and the tag characters of the subdivision flag emoji (England, Scotland, Wales). Latency, the median of three runs on the Windows host with no other load: 412 ms against 207 ms at `6e0f5ae`, for a commit staging one small file. Upkeep: a class change is a row in `git-hooks/lib/hidden-chars.tsv` with a case in each of the two test scripts. |
+| Owner | The repository owner, `PvtKaefsky`. |
+| Removal condition | The user withdraws the rule. Removing the rows of a class from `git-hooks/lib/hidden-chars.tsv` removes that class from all three controls. |
+
+The cases cover the code points named in the test scripts: one representative
+per range, plus the range ends in the guard suite. No live session was run in
+which Claude Code delivered the `additionalContext` warning, so that the
+warning reaches the model is stated by the hooks reference and was not observed.
+
 ## Diagnostic-output invariant
 
 Every diagnostic line prints the predicate tested and the value observed, never
