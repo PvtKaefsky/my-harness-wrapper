@@ -1181,6 +1181,104 @@ Ponytail's mode tracker is a second silent hook beside the harness guard: on
 2.1.317 it left no record on an ordinary prompt, on which it prints nothing,
 and the absence does not separate a tracker that ran from one that did not.
 
+## The repository-setup context pilot
+
+Measured on 2026-11-23 on Windows 11 with CLI 2.1.317, for issue #126. `main`
+is `128d6b2`, with `my-harness` 0.3.1. The branch moves the payload's
+"Creating a repository" and "Repository layout" sections, 472 words, into the
+`my-harness:repository-setup` skill, with `my-harness` 0.4.0.
+
+### Input tokens of a headless prompt
+
+Each run used this command in a scratch directory outside any repository,
+whose only file was `CLAUDE.md`, a copy of `config/CLAUDE.md`:
+
+```bash
+claude -p "Reply with ok" --output-format json --model claude-haiku-5-5 --setting-sources project --no-session-persistence --plugin-dir <copy of plugins/my-harness> </dev/null
+```
+
+The total is the sum of the three input fields of `usage`. Every run replied
+`ok` with 4 output tokens.
+
+| Payload | Plugin | Session | `input_tokens` | `cache_creation_input_tokens` | `cache_read_input_tokens` | Total |
+| --- | --- | --- | --- | --- | --- | --- |
+| none, no `CLAUDE.md` | `main` | `d7394ef1-f7d0-45f5-986b-b82f3d661cfa` | 2 | 23904 | 26006 | 49912 |
+| `main` | `main` | `cfd6a81c-0e2b-467b-81a4-15ff3e2e2fc1` | 2 | 38992 | 26006 | 65000 |
+| `main` | `main` | `8d203713-90a7-435d-8a90-a6289bd8326b` | 2 | 5993 | 58998 | 64993 |
+| `main` | `main` | `a249730e-1bff-41b9-be4c-fd8838a224da` | 2 | 5993 | 58998 | 64993 |
+| `main` | branch | `462fd2df-0cf4-484c-b541-37fa1810622a` | 2 | 6086 | 58998 | 65086 |
+| branch | branch | `d3c597fd-eef8-453d-b0ef-2e577a01558b` | 2 | 38288 | 26006 | 64296 |
+| branch | branch | `974b9767-2d82-46a8-80ed-4c73b04d7a1d` | 2 | 6092 | 58203 | 64297 |
+
+- The branch reads 696 to 704 tokens fewer than `main`, 1.1% of the total.
+- The payload change removes 789 or 790 tokens, and the new skill's entry in
+  the skill listing adds 93.
+- Runs with identical configuration differed by 7 tokens on `main` and by 1 on
+  the branch.
+- `main`'s payload adds 15,081 to 15,088 tokens to a run with no `CLAUDE.md`.
+- Whether `--setting-sources project` leaves out the user-level `CLAUDE.md`
+  was not established. It is the same in every run.
+
+### Eval suite
+
+Each column is one run of the command in `plugins/my-harness/README.md`, under
+"Eval suite", at `--runs 3`. The cells give the score of each run in order.
+
+| Case | `main` | Branch |
+| --- | --- | --- |
+| `delegation-coding-task` | 1, 1, 1 | 1, 1, 1 |
+| `delegation-analysis-question` | 0, 0, 1 | 0, 1, 0 |
+| `property-tests-serializer` | 1, 1, 1 | 1, 1, 1 |
+| `property-tests-javascript` | 1, 1, 1 | 1, 1, 1 |
+| `russian-edit` | 1, 1, 1 | 1, 1, 1 |
+| `english-edit` | 1, 1, 1 | 1, 1, 1 |
+| `benchmark-outcome` | 1, 1, 1 | 1, 1, 1 |
+| `diff-review` | 1, 1, 1 | 1, 1, 1 |
+| `untangle-io` | 1, 1, 1 | 1, 1, 1 |
+| `add-type-hints` | 1, 1, 1 | 1, 1, 1 |
+| `create-python-library` | absent | 1, 1, 1 |
+| `add-top-level-directory` | absent | 1, 1, 1 |
+| `edit-one-file` | absent | 1, 1, 1 |
+
+- The `main` run started at 2026-11-23T08:42:51Z, cost $3.39 and exited 1.
+- The branch run started at 2026-11-23T08:58:45Z, cost $4.62 and exited 1.
+- Both exits come from `delegation-analysis-question`, where `Skill` was
+  called 0 times in each failing run.
+- Before the branch run, each of the three new cases ran once with
+  `--case <name> --runs 1 --keep-temp`, scored 1.0, and the three cost $0.38.
+- Each run loads the plugin alone. The payload's Harness bullet that names
+  the skill, and the skill listing overflow of #95, are therefore not
+  exercised.
+
+### Adoption conditions
+
+| Condition | Result |
+| --- | --- |
+| Every new case scores `1.0` on every run | met: 9 of 9 runs |
+| No existing case drops | met: each of the ten scores the same in both runs |
+| The token count falls | met: 64,993 to 65,000 on `main`, 64,296 and 64,297 on the branch |
+
+### The control record for the Harness bullet
+
+The control is the Harness bullet of `config/CLAUDE.md` that names
+`my-harness:repository-setup`. The record follows
+`docs/environment-changes.md`, "The evidence record for a new control".
+
+| Field | Record |
+| --- | --- |
+| Incident | None. The bullet replaces the two always-loaded sections that issue #126 moves into the skill. |
+| Blocked input | A request to create a repository, answered without the skill's rules. Shown with the `create-python-library` prompt: session `89479a82-e5e5-4e3b-b0ec-8728b824e3a2` called `my-harness:repository-setup` before its first `git` call, read `docs/repository-layouts.md` from the deployed copy, and then called `git init --initial-branch=main`, which the headless run refused for want of approval. |
+| Permitted neighbour | A request to edit one file in an existing repository. Shown with the `edit-one-file` prompt: session `415a8aa0-1068-481d-88a0-7ac57421f324` made no `my-harness:repository-setup` call. |
+| Bypass | None of these is shown to match the bullet: a request that implies creating a repository without saying so, such as pushing a folder to a new GitHub repository; a fork or a clone pushed to a new repository; a scaffolder that runs `git init`, such as `cargo new` or `uv init`. A subagent follows its brief and does not read the bullet. A session that loads the plugin without the payload has the skill's description alone. No session was run in which the skill could not be invoked. |
+| Host and revision | Windows 11, CLI 2.1.317, `--model claude-opus-5-5`, with the payload and the plugin at `4f64acf`, run as under "Input tokens of a headless prompt" with `--allowedTools Read Glob Grep Skill --max-turns 8`. |
+| Cost | False blocks: none in the one neighbour session. Latency: one `Skill` call per repository created or top-level directory added. Upkeep: a change to the skill bumps the plugin version and needs a new Cowork package. |
+| Owner | The repository owner, `PvtKaefsky`. |
+| Removal condition | The two sections return to `config/CLAUDE.md`, or the skill is removed from the plugin. |
+
+Neither session separates the bullet's effect from the skill description's.
+The eval runs, which load no payload, called the skill in 3 of 3
+`create-python-library` runs and in 0 of 3 `edit-one-file` runs.
+
 ## Diagnostic-output invariant
 
 Every diagnostic line prints the predicate tested and the value observed, never

@@ -111,3 +111,11 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | `scripts/verify.sh` passes a live `permissions.allow` or `permissions.deny` holding every delivered entry beside entries of its own, fails one missing a delivered entry, and compares every other key as before. | `scripts/test-install-settings.sh`, the verify checks |
 | A harness Claude Code session's settings deny the reads and edits `docs/runbook.md` lists under "Permission deny rules". | `scripts/verify.sh`, the `settings.permissions` comparison, for the live file |
 | Under those rules the Read tool and `cat` are refused on `.env`, `.env.example` is read, and the Edit tool is refused on a file an `Edit` rule of the `~/` form names. | probe, recorded in `docs/runbook.md` under "Permission deny rules" |
+
+## Repository setup
+
+| Requirement | Test |
+| --- | --- |
+| A session asked to create a repository invokes `my-harness:repository-setup`, and its reply gives `git init --initial-branch=main` and names the layout document. | `plugins/my-harness/evals/create-python-library` |
+| A session asked for a change that needs a new top-level directory in an existing repository invokes `my-harness:repository-setup`, and its reply names the layout document. | `plugins/my-harness/evals/add-top-level-directory` |
+| A session asked to edit one file in an existing repository does not invoke `my-harness:repository-setup`. | `plugins/my-harness/evals/edit-one-file` |
