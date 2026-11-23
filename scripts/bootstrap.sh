@@ -54,8 +54,9 @@ if [ -f "$SRC_SETTINGS" ] && [ -f "$DST_SETTINGS" ]; then
   if [ "$rc" -ne 0 ] || [ -z "${TMP:-}" ]; then
     fails=$((fails + 1))
   else
-    jq -s '.[0] * .[1]' "$DST_SETTINGS" "$SRC_SETTINGS" > "$TMP"; rc=$?
-    echo "jq -s '.[0] * .[1]' $DST_SETTINGS $SRC_SETTINGS -> exit=$rc"
+    MERGE='def union($l; $p; $k): [$l, $p] | map(.permissions | if . == null then {} elif type == "object" then . else error("permissions is not an object") end | .[$k] | if . == null then [] elif type == "array" then . else error("permissions.\($k) is not an array") end) | reduce .[1][] as $x (.[0]; if any(.[]; . == $x) then . else . + [$x] end); .[0] as $l | .[1] as $p | $l * $p | .permissions.allow = union($l; $p; "allow") | .permissions.deny = union($l; $p; "deny")'
+    jq -s "$MERGE" "$DST_SETTINGS" "$SRC_SETTINGS" > "$TMP"; rc=$?
+    echo "jq -s '$MERGE' $DST_SETTINGS $SRC_SETTINGS -> exit=$rc"
     if [ "$rc" -eq 0 ]; then
       chmod 644 "$TMP"; ch_rc=$?
       echo "chmod 644 $TMP -> exit=$ch_rc"
