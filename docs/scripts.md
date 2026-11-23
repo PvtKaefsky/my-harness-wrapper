@@ -593,9 +593,15 @@ with a line saying the message was not checked.
 | `^[[:space:]]*Co-Authored-By:([^<]*[^[:alnum:]_<-])?Claude([^[:alnum:]_]\|$)` | A `Co-Authored-By:` line whose name, before any `<`, carries the word `Claude` not preceded by a hyphen. |
 | `^[[:space:]]*Co-Authored-By:.*@([[:alnum:]-]+\.)*anthropic\.com([^[:alnum:].-]\|$)` | A `Co-Authored-By:` line with an `anthropic.com` address. |
 | `^[[:space:]]*Claude-Session:` | Any `Claude-Session:` line. |
+| `^[[:space:]]*(Assisted-by\|Generated-by\|AI-assisted\|Written-by):(.*[^[:alnum:]_-])?(Claude\|Anthropic)([^[:alnum:]_]\|$)` | An `Assisted-by:`, `Generated-by:`, `AI-assisted:` or `Written-by:` line whose text after the colon carries the word `Claude` or `Anthropic` not preceded by a hyphen. |
 
 A `Co-Authored-By:` line naming anyone else passes, a hyphenated name such as
-`Jean-Claude` among them. The hook runs for the user's
+`Jean-Claude` among them. An `Assisted-by:`, `Generated-by:`, `AI-assisted:` or
+`Written-by:` line naming anyone else passes too, `Assisted-by: Copilot` among
+them, and so does one of those trailer words in the middle of a line. Such a
+line naming a person called Claude, as in `Written-by: Claude Shannon`, is
+matched. Any other trailer word, `Reviewed-by:` among them, passes whatever it
+names. The hook runs for the user's
 own commits too.
 
 The message is scanned as git will record it. Comment lines and everything from
@@ -1773,6 +1779,11 @@ passed, and 1 otherwise.
 | Pull request tool `body`, clean | A body with no footer | 0 |
 | Pull request tool `body`, `Co-Authored-By` naming Claude, with an `anthropic.com` address, and a `Claude-Session` trailer | A body ending in each trailer | 2 |
 | Pull request tool `body`, `Co-Authored-By` naming a person | A body ending in that trailer | 0 |
+| `gh api repos/o/r/issues/1/comments -F body=@<file>`, four cases | A body file ending in an `Assisted-by:`, `Generated-by:`, `AI-assisted:` or `Written-by:` line naming `Claude (Anthropic)` | 2 |
+| `gh api repos/o/r/issues/1/comments --input <file>`, four cases | A JSON file whose `body` string ends in each of those trailer words naming `Claude Code` | 2 |
+| `mcp__github__add_issue_comment` `body` through the delivered hook, four cases | A body ending in each of those trailer words naming `an Anthropic model` | 2 |
+| Pull request tool `body`, indented lower-case trailer | A body ending in `assisted-by: claude` after two spaces | 2 |
+| Pull request tool `body`, six permitted neighbours | A body ending in `Assisted-by: Copilot`, `Assisted-by: Claudette`, `Assisted-by: Jean-Claude Dupont`, `Reviewed-by: Claude`, `the Assisted-by trailer is optional` or `Use the Assisted-by: Claude trailer` | 0 |
 | Pull request tool `body`, pattern file absent | A clean body, scanned by a copy of the guard in a tree with no `git-hooks/`; passes on the marker `so the body was not checked` | 2 |
 | `grep` for the footer | A command carrying the footer that is not a pull request operation | 0 |
 | Input that is not valid JSON | `not json` | 0 |
@@ -1857,6 +1868,12 @@ marker file. `P`'s `commit-msg` appends to a second marker file. Each case runs
 message. A case passes where both exit 0 and the markers hold the expected
 counts.
 
+Each message case, M1 to M6, has its own scratch repository whose local
+`core.hooksPath` is a copy of the tree's `git-hooks/`. It runs `git commit -q`
+with a clean first paragraph and one line as the second. `refused` means the
+commit exited non-zero and its stderr carried `harness commit-msg: matched line
+->` followed by that line. `accepted` means the commit exited 0.
+
 | Line | What it reports |
 | --- | --- |
 | `test -f <root>/git-hooks/lib/dispatch.sh -> yes/no` | Whether the tree holds the hook library. |
@@ -1864,6 +1881,7 @@ counts.
 | `git -C <root> show 5f3f87a:git-hooks/lib/dispatch.sh -> exit=N` | Whether that commit's file is readable. Where it is not, T2 and T3 print `FAIL` with `unreadable`, and the other cases still run. |
 | `fail -> not run` | Printed, with exit 1, where `git-hooks/lib/dispatch.sh`, `timeout` or `git` is absent. |
 | `<id> <label> -> expected add=0 commit=0 ..., actual add=<rc> commit=<rc> ..., pass/FAIL` | One line per case. `add` and `commit` are the exits of the two git commands under `timeout`; `timeout` exits 124 when it stops a command. Each `runs=<n>` counts the marker lines. |
+| `<id> commit message ending in '<line>' -> expected refused/accepted, actual ..., pass/FAIL` | One line per message case. `actual` is `refused`, `accepted`, or `exit=<rc> without the marker`. |
 | `fail -> N` | The number of failed cases. |
 
 | Case | `core.hooksPath` | Expected |
@@ -1874,6 +1892,15 @@ counts.
 | T4 | local `D`, global `D` | Same as T1 |
 | T5 | command-scope `D`, local `P` | `add` and `commit` exit 0; `P`'s hook runs 1, repository hook runs 0 |
 | T6 | command-scope `C`, local `D` | Same as T1 |
+
+| Case | Second line of the commit message | Expected |
+| --- | --- | --- |
+| M1 | `Assisted-by: Claude (Anthropic)` | refused |
+| M2 | `Generated-by: Claude Code` | refused |
+| M3 | `AI-assisted: Claude` | refused |
+| M4 | `Written-by: an Anthropic model` | refused |
+| M5 | `Assisted-by: Copilot` | accepted |
+| M6 | `the Assisted-by trailer is optional` | accepted |
 
 With `git-hooks/lib/dispatch.sh` at the `5f3f87a` version, T1, T2 and T3 print
 `add=124 commit=124` and `FAIL`, and the script prints `fail -> 3`.

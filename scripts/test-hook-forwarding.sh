@@ -94,5 +94,32 @@ run_case T4 'local D, global D' D-fixed D-fixed ""
 run_case T5 'command-scope triple D, local plain directory P' P "" D-fixed P
 run_case T6 'command-scope triple C, local D' D-fixed "" C-fixed
 
+msg_case() {
+  local id=$1 line=$2 want=$3 dir="$WORK/$1" err commit_rc got=accepted verdict=pass
+  mkdir -p "$dir"
+  REPO="$dir/repo"; GC="$dir/gitconfig"; TRIPLE=""
+  : > "$GC"
+  mkdir -p "$REPO"
+  cgit init -q . >/dev/null 2>&1
+  mkcopy "$dir/C" fixed
+  cgit config core.hooksPath "$dir/C"
+  echo x > "$REPO/f"
+  cgit add f >/dev/null 2>&1
+  err=$(cgit commit -q -m 'what changed, in one sentence.' -m "$line" 2>&1 >/dev/null); commit_rc=$?
+  if [ "$commit_rc" -ne 0 ]; then
+    got="exit=$commit_rc without the marker"
+    if printf '%s\n' "$err" | grep -a -q -F -- "harness commit-msg: matched line -> $line"; then got=refused; fi
+  fi
+  if [ "$got" != "$want" ]; then verdict=FAIL; fails=$((fails + 1)); fi
+  echo "$id commit message ending in '$line' -> expected $want, actual $got, $verdict"
+}
+
+msg_case M1 'Assisted-by: Claude (Anthropic)' refused
+msg_case M2 'Generated-by: Claude Code' refused
+msg_case M3 'AI-assisted: Claude' refused
+msg_case M4 'Written-by: an Anthropic model' refused
+msg_case M5 'Assisted-by: Copilot' accepted
+msg_case M6 'the Assisted-by trailer is optional' accepted
+
 echo "fail -> $fails"
 [ "$fails" -eq 0 ]
