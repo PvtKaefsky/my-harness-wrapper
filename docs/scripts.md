@@ -2883,6 +2883,19 @@ mounts nothing beyond the two binds, and passes no credential. A `compose.yaml`
 that `docker compose config` resolves to anything outside the contract stops the
 run.
 
+The check reads the configuration `docker compose config` resolves. Privileged
+mode, added capabilities, host networking, the Docker socket and any host path
+other than the tree and the results directory each fall outside it. The results
+directory is created by the runner under its scratch directory, outside both
+trees. The check cannot detect what the image itself carries: the Dockerfile
+builds with network access and with `probe/` as its context, and a check can
+read anything in the read-only tree. The build network reaches every host the
+Docker daemon reaches, and the image keeps what the build fetches. The runner
+passes no `--ssh`, `--secret` or `--build-arg` to `docker build`; the Docker
+client's configured proxy settings still apply. Check ids reach the terminal as
+`checks.sh` wrote them, control characters included. The contract sets no time,
+memory or process limit on a run.
+
 A tree with no `checks.jsonl` after its run, or a file holding a line that is
 not such an object, stops the run. An empty file is zero checks. The container's
 exit status is printed and does not decide a check. Where one run reports an id
@@ -2988,7 +3001,7 @@ it out with CRLF; a precondition line checks all three.
 | The same pair, `AB_PROBE_CANARY` exported | `compose-env` holds `PROBE_TREE` and not `AB_PROBE_CANARY`. |
 | `mode` `nodaemon` | Exit 2, `verdict -> not run`. |
 | `mode` `buildfail` | Exit 2, the failed-build line. |
-| Ten `config.jq` patches: `network_mode` `bridge`, an `environment`, an `env_file`, `privileged`, another `image`, a third volume, `/work` not read-only, `/results` at another target, a second service, a top-level `secrets` | Exit 2, the contract line, for each. |
+| Thirteen `config.jq` patches: `network_mode` `bridge` and `host`, `cap_add`, a bind of `/var/run/docker.sock` in place of the results directory, an `environment`, an `env_file`, `privileged`, another `image`, a third volume, `/work` not read-only, `/results` at another target, a second service, a top-level `secrets` | Exit 2, the contract line, for each. |
 | `mode` `absent` | Exit 2, the `checks.jsonl absent` line. |
 | `mode` `malformed`, `skip`, `seconds` | Exit 2, the `checks.jsonl unreadable` line, for each. |
 | `main` against `symlink` | Exit 2, `candidate probe/ -> holds a symlink, probe not run`. Where a clone checks `probe/.env` out as a regular file, as Git for Windows does without symlink support, the case prints `not run` and counts as no failure. |

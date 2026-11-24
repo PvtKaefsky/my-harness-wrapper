@@ -195,6 +195,9 @@ expect 'a failed image build' 2 "$R" main shown -- \
 
 for patch in \
   '.services.checks.network_mode = "bridge"' \
+  '.services.checks.network_mode = "host"' \
+  '.services.checks.cap_add = ["SYS_ADMIN"]' \
+  '.services.checks.volumes[1] = {"type": "bind", "source": "/var/run/docker.sock", "target": "/results"}' \
   '.services.checks.environment = {"X": "1"}' \
   '.services.checks.env_file = ["x.env"]' \
   '.services.checks.privileged = true' \
