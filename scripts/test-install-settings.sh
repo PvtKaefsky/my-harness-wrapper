@@ -103,6 +103,10 @@ jq '.permissions.deny |= map(select(. != "Read(**/*.pem)"))' "$WORK/first.json" 
 check 'verify fails a live deny list missing a delivered entry' carry 'does not carry' "$WORK/short-deny.json" "$PAYLOAD" permissions
 jq '.permissions.allow = ["Bash(ls:*)"]' "$WORK/first.json" > "$WORK/short-allow.json"
 check 'verify fails a live allow list missing a delivered entry' carry 'does not carry' "$WORK/short-allow.json" "$PAYLOAD" permissions
+check 'verify passes the env the local merge writes' carry 'carries' "$WORK/first.json" "$PAYLOAD" env
+check 'verify passes the env the bootstrap merge writes' carry 'carries' "$WORK/cloud.json" "$PAYLOAD" env
+jq '.env.HARNESS_NESTED_MODEL = "x"' "$WORK/first.json" > "$WORK/other-model.json"
+check 'verify fails a live env with another nested model' carry 'does not carry' "$WORK/other-model.json" "$PAYLOAD" env
 printf '%s\n' '{"x":["a"]}' > "$WORK/want-x.json"
 printf '%s\n' '{"x":["a","b"]}' > "$WORK/live-x.json"
 check 'verify keeps equality for an array under another key' carry 'does not carry' "$WORK/live-x.json" "$WORK/want-x.json" x
