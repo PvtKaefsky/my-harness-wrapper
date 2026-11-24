@@ -1,8 +1,9 @@
 # my-harness
 
-A Claude Code plugin. It ships the task-delegation procedure, which makes a
-session analyze each task for decomposition and delegate each subtask to a
-routed subagent. It also ships five other skills, and a gate that limits the
+A Claude Code plugin. It ships the task-delegation procedure, under which an
+orchestrator session delegates every part of a coding task to nested sessions,
+and a session without a nested-session tool delegates each subtask to a routed
+subagent. It also ships five other skills, and a gate that limits the
 Modern Web Guidance plugin to web front-end work. The marketplace
 `my-harness-wrapper`, at the repository root, lists it.
 
@@ -11,18 +12,18 @@ Modern Web Guidance plugin to web front-end work. The marketplace
 | Path | Role |
 | --- | --- |
 | `.claude-plugin/plugin.json` | The manifest: name `my-harness` and the version. |
-| `skills/task-delegation/SKILL.md` | The whole procedure: what a delegated session does, analysis, ownership, routing, the brief, running, integration, failure, the report and the bounds. |
-| `skills/task-delegation/references/routing.md` | The coding and analysis routing tables. |
+| `skills/task-delegation/SKILL.md` | The whole procedure: which section a session follows; the limits of a nested session and of a delegated subagent; a question; the orchestrated path, with the orchestrator's actions, scratch files, models, decomposition, the combined branch, the nested-session brief, running, verification, the merge, the A/B probe, the combined pull request, bounds and report; and the subagent path. |
+| `skills/task-delegation/references/routing.md` | The routing tables of the subagent path: coding, for a session with no nested-session tool, and analysis, for an analysis-only session. |
 | `skills/python-property-model-tests/SKILL.md` | Writing Python tests that a unit keeps a property across many inputs or operation sequences: tool choice, property kinds, input strategies, state machines, failing examples and CI determinism. |
 | `skills/edit-russian-technical-text/SKILL.md` | Rules for editing Russian technical prose while keeping its meaning, terms and requirements, with before and after examples. |
 | `skills/quick-human-readable-review/SKILL.md` | The shape of a summary of a finished stage of work or an experiment series: outcome, confirmed results, open questions and next step. |
 | `skills/python-fp-refactor/SKILL.md` | Steps for moving the decisions in Python code that mixes them with I/O or state into functions on values, keeping its behaviour. |
 | `skills/repository-setup/SKILL.md` | The order in which a session creates a repository, and the top-level layout rules for a new repository and for a top-level directory added to an existing one. |
-| `agents/executor.md` | The agent for a coding subtask no specialist matches. |
-| `agents/analyst.md` | The agent for an analysis subtask no specialist matches. |
+| `agents/executor.md` | The agent for a coding subtask no specialist matches, in a session with no nested-session tool. |
+| `agents/analyst.md` | The agent for an analysis subtask no specialist matches, in an analysis-only session such as Cowork. |
 | `hooks/hooks.json` | A `UserPromptSubmit` hook printing one line that points every prompt at the `task-delegation` skill, a `PreToolUse` hook with matcher `Skill\|Bash`, and a `PostToolUse` hook with matcher `Skill`, each running `hooks/web-guidance-gate.sh` with a 10-second timeout. |
 | `hooks/web-guidance-gate.sh` | The gate: denies a `modern-web-guidance:` skill call or a run of the `modern-web-guidance` package outside web front-end work, and a package run with telemetry on; after a `modern-web-guidance:` skill call, adds context stating that the skill's reply section is not written. |
-| `evals/` | The eval suite: one case directory per row of the table under "Eval suite", each with a `prompt.md` and `graders/skill.md`. |
+| `evals/` | The eval suite: one case directory per row of the case table under "Eval suite", each with a `prompt.md`, `graders/skill.md` and the reply graders that table names. |
 | `evals/.gitignore` | Keeps `results/`, which each eval run writes, out of git. |
 
 ## Agents
@@ -55,8 +56,9 @@ the same command; after a `modern-web-guidance:` skill call it prints one
 
 The suite measures whether each skill is invoked on a prompt its description
 matches, and not invoked on a nearby prompt it does not. The two
-`repository-setup` "invoke" cases also check the final reply for rules the
-skill carries. No other case grades a skill's output.
+`repository-setup` "invoke" cases and the three `task-delegation` cases also
+check the final reply for rules the skill carries. No other case grades a
+skill's output.
 
 Each case's `prompt.md` is a request worded as a user would type it, with its
 material inline, and sets `max_turns: 8` and
@@ -67,21 +69,34 @@ invoke" case adds `min: 0`, `max: 0` and `arm: both`, and passes a run that neve
 calls it. `task-delegation` has no "not invoke" case, because its description
 applies to every task.
 
-The two `repository-setup` "invoke" cases carry `type: regex` graders on the
-final reply as well, and a run scores `1.0` only where every grader passes.
+Those cases carry `type: regex` graders on the final reply as well, and a run
+scores `1.0` only where every grader passes.
 
 | Grader | Cases | Passes where the final reply |
 | --- | --- | --- |
 | `graders/layout-document.md` | `create-python-library`, `add-top-level-directory` | names `repository-layouts.md` or "layout document", in any casing |
 | `graders/initial-branch.md` | `create-python-library` | holds `git init --initial-branch=main` |
+| `graders/decomposition.md` | `delegation-coding-task` | holds `decomposition -> nested: 1` |
+| `graders/brief.md` | `delegation-coding-task` | holds `nested-session -> base: main` |
+| `graders/decomposition.md` | `delegation-analysis-question` | holds `decomposition -> whole` |
+| `graders/unavailable.md` | `delegation-no-nested-tool` | holds `nested-sessions -> unavailable` |
+| `graders/no-nested-brief.md` | `delegation-analysis-question`, `delegation-no-nested-tool` | does not hold `nested-session -> base:` |
 
 A run has no deployed copy of the harness, so the layout document cannot be
 read in it.
 
+`claude plugin eval` cannot start nested sessions: a run lists no
+nested-session tool. The `task-delegation` graders therefore check the
+decomposition line and the briefs the final reply states, never the tool calls.
+The `delegation-coding-task` prompt states that the session is an orchestrator
+in the desktop app and asks for the decomposition and briefs in place of the
+calls.
+
 | Case | Skill | Expected | The prompt carries |
 | --- | --- | --- | --- |
-| `delegation-coding-task` | `task-delegation` | invoke | a Python script and a request to add a `--dry-run` flag and document it |
+| `delegation-coding-task` | `task-delegation` | invoke | a statement that the session is an orchestrator in the desktop app, a Python script, and a request to add a `--dry-run` flag and document it |
 | `delegation-analysis-question` | `task-delegation` | invoke | a short Python function and a question about why it returns `None` for an empty list |
+| `delegation-no-nested-tool` | `task-delegation` | invoke | a statement that the session is the terminal CLI with no nested-session tool, a Python script, and a request to plan a `--limit` flag and its test |
 | `property-tests-serializer` | `python-property-model-tests` | invoke | a Python `encode`/`decode` pair and a request for tests |
 | `property-tests-javascript` | `python-property-model-tests` | not invoke | a JavaScript function and a request for Jest tests |
 | `russian-edit` | `edit-russian-technical-text` | invoke | a Russian technical paragraph and a request in Russian to make it clearer |
