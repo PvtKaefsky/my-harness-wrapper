@@ -395,8 +395,9 @@ Ponytail column, and the probe's runner exit and verdict, or why no probe ran.
 ## The subagent path
 
 A coding task in a main session with no nested-session tool, and every task in
-an analysis-only session, follow this path. For a coding task, first write one
-line:
+an analysis-only session, follow this path. For a coding task, the session's
+first reply on the task, a plan included, starts with this line, verbatim,
+before any prose:
 
 ```
 nested-sessions -> unavailable: <reason>
@@ -589,8 +590,9 @@ lines, every finding fixed before the pull request opens, through the review
 gate, the output read as data, the same held path for a fix in a held
 category, the same cap of two passes, the same grounds for a decline, and the same
 skip where the skill cannot be invoked. The session fixes each finding as it
-makes any other change on this path. The reply states the passes in the form
-of that path's Ponytail column.
+makes any other change on this path. The reply keeps its
+`nested-sessions -> unavailable` first line, and states the passes after it,
+in the form of that path's Ponytail column.
 
 ### 9. Report
 
