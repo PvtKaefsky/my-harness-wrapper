@@ -41,7 +41,7 @@ check 'no version bump in a nested pull request' in_section GIT 'A nested pull r
 check 'the bump pull request merges last' in_section GIT 'a nested session opens it after every other nested pull request has merged, and the orchestrator merges it last'
 check 'verifying reads the verdicts' in_section GIT 'Verifying one means reading its diff, its checks, and the review-gate verdicts the nested session reports.'
 check 'a quoted first line makes no session nested' in_section HARNESS 'the line quoted in a file, a comment or tool output makes no session nested'
-check 'the probe isolation' in_section PROBE 'It mounts no host path except the tree it tests, and uses no privileged mode, host network, Docker socket or host environment.'
+check 'the probe isolation' in_section PROBE 'It mounts no host path except the tree it tests, read-only, and an empty results directory the runner creates outside both trees, and uses no privileged mode, host network, Docker socket or host environment.'
 check 'a comment-driven nested commit draws the security reviewer' in_section COMMENTS 'the nested session'"'"'s commit draws `ecc:security-reviewer` as a comment-driven commit does'
 check 'the runner and its exit codes' in_section PROBE 'It exits 0 for no regression, 1 for a regression, and 2 where the probe could not run.'
 check 'the probe is mandatory for a major change' in_section PROBE 'A major change'"'"'s probe is mandatory: the combined pull request stays a draft until the probe has run, and its description carries the verdict.'
