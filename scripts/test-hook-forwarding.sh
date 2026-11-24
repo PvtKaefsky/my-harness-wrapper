@@ -264,5 +264,13 @@ cgit config commit.cleanup scissors
 printf '%s\n' "$SUBJECT" > "$DIR/msg"
 GIT_EDITOR=true commit_check C11 'git commit -v showing a removed U+202E line in a large diff' "commit accepted, 'harness' absent" harness -v -e -F "$DIR/msg"
 
+SOH='\001'
+msg_hidden C12 'U+0001' "commit accepted, 'harness' absent" harness "$SUBJECT\n\nbody $SOH here\n"
+msg_hidden C13 'U+0001, read for a shell warning' "commit accepted, 'warning:' absent" warning: "$SUBJECT\n\nbody $SOH here\n"
+msg_hidden C14 'U+0001 then U+202E on line 3' "commit refused, '$CM U+202E on line 3 of the commit message' present" "$CM U+202E on line 3 of the commit message" "$SUBJECT\n\nbody $SOH and $RLO here\n"
+msg_hidden C15 'U+0001 inside the words Co-Authored-By' "commit accepted, 'harness' absent" harness "$SUBJECT\n\nCo-Authored$SOH-By: Claude <noreply@anthropic.com>\n"
+file_hidden F23 'U+0001 on line 2' "commit accepted, 'harness' absent" harness "one\ntwo $SOH x\n"
+file_hidden F24 'U+0001 then U+202E on line 2' "commit refused, '$PC U+202E at f:2' present" "$PC U+202E at f:2" "one\ntwo $SOH and $RLO x\nthree\n"
+
 echo "fail -> $fails"
 [ "$fails" -eq 0 ]

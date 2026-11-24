@@ -629,7 +629,11 @@ mark, an emoji sequence joined with `U+200D` and right-to-left text carrying
 The `\x00` row cannot be given to `grep` as written, since a command argument
 cannot hold a NUL byte. `hidden_scan` replaces `\x00` with `\x01` in field 4.
 `hidden_swap` swaps the bytes `0x00` and `0x01` of the text before the scan, so
-a NUL in the text is matched as `0x01`.
+a NUL in the text is matched as `0x01`. A `U+0001` in the text reaches the scan
+as NUL, which no row matches. `U+0001` is in neither class and is not reported.
+The output of `hidden_swap` goes through pipes to `hidden_scan` only. No caller
+captures it in a shell variable, and only the rows `hidden_scan` prints are
+captured.
 
 `lib/hidden-chars.sh` defines two functions:
 
@@ -699,10 +703,21 @@ the repository's own `commit-msg`.
 `git merge` runs `commit-msg` on the merge message, so a merge message carrying
 the pattern is rejected.
 
-The hidden-character check runs on the same cleaned text, after the attribution
-pattern. The message file passes through `hidden_swap` before `awk` reads it.
-`hidden_swap` may exit 0 or 141, and `awk` must exit 0; any other status refuses
-with the `awk` line above. The earliest block-class character of the text is
+`hook_commit_msg` runs the cleaning `awk` program over the message file twice.
+The two pipelines are:
+
+| Pipeline | Its output |
+| --- | --- |
+| `LC_ALL=C tr -d '\000'`, then `awk` | The cleaned text the attribution pattern is matched against. |
+| `hidden_swap`, then `awk`, then `hidden_scan` | The rows of the hidden-character check. |
+
+The attribution pattern runs first. In each pipeline the first stage may exit 0
+or 141, and `awk` must exit 0; any other status refuses with the `awk` line
+above. The first stage exits 141 where `awk` stops at the scissors line. In the
+second pipeline, `hidden_scan` returning non-zero refuses with the
+`lib/hidden-chars.tsv` line above. A `U+0001` in the message stays in the text
+the attribution pattern is matched against, and a NUL is removed from it. The
+earliest block-class character of the text is
 reported. Its line number counts the lines of the cleaned text, so a comment line
 that was dropped above it is not counted. The warn class is ignored here.
 
@@ -1794,8 +1809,19 @@ text. The texts are the ones the attribution pattern scans:
 | Decoded `--input` strings | The strings of an `--input` file's JSON, decoded. |
 | Scanned `tool_input` strings | The `tool_input` strings the attribution pattern scans for that tool. |
 
-Each text passes through `hidden_swap` before the scan. A text carrying both a
-hidden character and an attribution line reports the hidden character.
+`scan` receives each text twice, from two runs of the command that produces it.
+Its standard input carries the produced bytes, which it pipes through
+`hidden_swap` into `hidden_scan`. Its argument carries the same bytes through
+`LC_ALL=C tr -d '\000'`, as a shell variable, and the attribution pattern is
+matched against that argument. A text carrying both a hidden character and an
+attribution line reports the hidden character.
+
+A `U+0001` in a text is in neither class. It is not reported, it prints nothing
+on stderr, and it does not change the exit status. It stays in the text the
+attribution pattern is matched against, so `Co-Authored`, `U+0001` and `-By:
+Claude` on one line match no alternative, and `Co-Authored-By: Claude` followed
+by `U+0001` is matched. A NUL is removed from the text the attribution pattern
+is matched against, and the hidden-character check blocks that text first.
 
 A block-class character blocks the write with exit 2. The line number counts the
 lines of the scanned text. For a `Bash` command or a body file, that is a line
@@ -2014,13 +2040,23 @@ passed, and 1 otherwise.
 | The same command, 900,000 clean bytes, within 10 s | A body file of clean bytes | 0 |
 | Pull request tool `body`, `lib/hidden-chars.tsv` absent | A clean body, scanned by a copy of the guard in a tree without `git-hooks/lib/hidden-chars.tsv`; passes on the marker `hidden-chars.tsv could not be applied, so the body was not checked` | 2 |
 | `echo` with U+202E, not a `gh` write | A Bash command that no write check selects | 0 |
+| `gh pr comment 1 --body`, U+0001 in the command; the case checks stdout and stderr | A command whose JSON string carries `\u0001` | 0 |
+| `gh api repos/o/r/issues/1/comments -F body=@soh.md`, U+0001 alone; the case checks stdout and stderr | A body file of the bytes `a`, `0x01` and `b` | 0 |
+| The same command with `--input soh.json`, U+0001 escaped in a JSON string; the case checks stdout and stderr | A JSON string carrying `\u0001` | 0 |
+| `mcp__github__add_issue_comment` `body` through the delivered hook, U+0001 alone; the case checks stdout and stderr | A `body` carrying the character | 0 |
+| `-F body=@soh-rlo.md`, U+0001 then U+202E on line 1 | Both characters on one line; passes on `hidden character -> U+202E on line 1` | 2 |
+| `-F body=@soh-nul.md`, U+0001 then U+0000 on line 1 | Both bytes on one line; passes on `hidden character -> U+0000 on line 1` | 2 |
+| `-F body=@soh-inside.md`, U+0001 inside the words `Co-Authored-By`; the case checks stdout and stderr | A line `Co-Authored`, U+0001, `-By: Claude <noreply@anthropic.com>` | 0 |
+| `-F body=@soh-after.md`, U+0001 after `Co-Authored-By: Claude` | A line `Co-Authored-By: Claude`, U+0001, ` <noreply@anthropic.com>`; passes on the matched-line marker | 2 |
+| `-F body=@U+0000.md`, stderr holds the two `attribution-guard:` lines only | The U+0000 body file; passes where stderr has two lines, each starting `attribution-guard: `, one naming `U+0000 on line 3` | 2 |
 
 The hidden-character cases build each character at run time, from `printf`
 octal escapes or from JSON `\u` escapes, so the script holds ASCII only.
 `run_stdout` checks standard output: either empty, or one `PreToolUse` JSON
 object whose `additionalContext` names the code point, with no
-`permissionDecision`. A case that expects exit 0 without `run_stdout` checks the
-exit status only.
+`permissionDecision`. `run_quiet` passes where the guard exits 0 and prints
+nothing on stdout or stderr. A case that expects exit 0 without `run_stdout` or
+`run_quiet` checks the exit status only.
 
 ## scripts/test-hook-forwarding.sh
 
@@ -2089,8 +2125,8 @@ commit exited non-zero and its stderr carried `harness commit-msg: matched line
 | M5 | `Assisted-by: Copilot` | accepted |
 | M6 | `the Assisted-by trailer is optional` | accepted |
 
-Each hidden-character commit case, C1 to C11, and each staged-content case, F1 to
-F22, runs in a scratch repository whose `core.hooksPath` is a copy of the
+Each hidden-character commit case, C1 to C15, and each staged-content case, F1 to
+F24, runs in a scratch repository whose `core.hooksPath` is a copy of the
 tree's `git-hooks/`, `lib/` included. F12 and F13 continue in the repository of
 F11, F16 in that of F15, and C11 in that of C10. The repository has no hook of
 its own except where the row names one. Each case runs `git add`, then
@@ -2113,6 +2149,10 @@ holds ASCII only.
 | C9 | A clean commit, with `lib/hidden-chars.tsv` and the copy's `pre-commit` removed | refused, with `so the message was not checked` |
 | C10 | A 9,000-line file ending in a U+202E line, with no harness hook configured | accepted, no `harness` line |
 | C11 | `git commit -v` with `commit.cleanup=scissors`, where the diff below the scissors line removes a U+202E line | accepted, no `harness` line |
+| C12 | U+0001 in the body | accepted, no `harness` line |
+| C13 | U+0001 in the body | accepted, no `warning:` text on the commit's stderr |
+| C14 | U+0001 then U+202E on line 3 | refused, with `harness commit-msg: hidden character -> U+202E on line 3 of the commit message` |
+| C15 | A line `Co-Authored`, U+0001, `-By: Claude <noreply@anthropic.com>` | accepted, no `harness` line |
 
 | Case | Staged content | Expected |
 | --- | --- | --- |
@@ -2138,6 +2178,8 @@ holds ASCII only.
 | F20 | A clean commit with `lib/hidden-chars.tsv` removed from the copy | refused, with `hidden-chars.tsv could not be applied, so the staged changes were not checked` |
 | F21 | A clean commit with `lib/hidden-chars.sh` removed from the copy | refused, with `hidden-chars.sh could not be read, so the staged changes were not checked` |
 | F22 | U+200B on line 2 and U+202E on line 3 | refused, with `harness pre-commit: hidden character -> U+202E at f:3` |
+| F23 | U+0001 on line 2 | accepted, no `harness` line |
+| F24 | U+0001 then U+202E on line 2 | refused, with `harness pre-commit: hidden character -> U+202E at f:2` |
 
 With `git-hooks/lib/dispatch.sh` at the `5f3f87a` version, T1, T2 and T3 print
 `add=124 commit=124` and `FAIL`, and the script prints `fail -> 3`.

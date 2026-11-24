@@ -396,5 +396,33 @@ run_no_tsv() { bash "$WORK/no-tsv/scripts/attribution-guard.sh"; }
 run_case 'pull request tool body, hidden-chars.tsv absent' 2 "$(tool_in "$CLEAN")" 'hidden-chars.tsv could not be applied, so the body was not checked' run_no_tsv
 run_case 'echo U+202E, not a gh write' 0 "$(bash_in "echo $RLO")"
 
+run_quiet() {
+  local label=$1 input=$2 runner=${3:-run_guard} out got verdict=pass
+  out=$(printf '%s' "$input" | "$runner" 2>&1); got=$?
+  if [ "$got" -ne 0 ] || [ -n "$out" ]; then verdict=FAIL; fails=$((fails + 1)); fi
+  echo "$label -> expected exit=0 and empty stdout and stderr, actual exit=$got output=$(printf '%s' "$out" | LC_ALL=C tr -c ' -~' '?'), $verdict"
+}
+
+printf -v SOH '\001'
+printf 'a\001b' > soh.md
+jq -n --arg b "a${SOH}b" '{body:$b}' > soh.json
+printf 'a\001b%sc\n' "$RLO" > soh-rlo.md
+printf 'a\001b\000c\n' > soh-nul.md
+printf '%s\n\nCo-Authored\001-By: Claude <noreply@anthropic.com>\n' "$CLEAN" > soh-inside.md
+printf '%s\n\nCo-Authored-By: Claude\001 <noreply@anthropic.com>\n' "$CLEAN" > soh-after.md
+run_quiet 'gh pr comment --body, U+0001 in the command' "$(bash_in "gh pr comment 1 --body \"a${SOH}b\"")"
+run_quiet "$COMMENT -F body=@soh.md, U+0001 alone" "$(bash_in "$COMMENT -F body=@soh.md")"
+run_quiet "$COMMENT --input soh.json, U+0001 escaped in a JSON string" "$(bash_in "$COMMENT --input soh.json")"
+run_quiet 'mcp__github__add_issue_comment body through the delivered hook, U+0001 alone' "$(mcp_in mcp__github__add_issue_comment "a${SOH}b" "$ISSUE_ARGS")" run_hook
+run_case "$COMMENT -F body=@soh-rlo.md, U+0001 then U+202E on line 1" 2 "$(bash_in "$COMMENT -F body=@soh-rlo.md")" "$HIDDEN U+202E on line 1"
+run_case "$COMMENT -F body=@soh-nul.md, U+0001 then U+0000 on line 1" 2 "$(bash_in "$COMMENT -F body=@soh-nul.md")" "$HIDDEN U+0000 on line 1"
+run_quiet "$COMMENT -F body=@soh-inside.md, U+0001 inside the words Co-Authored-By" "$(bash_in "$COMMENT -F body=@soh-inside.md")"
+run_case "$COMMENT -F body=@soh-after.md, U+0001 after Co-Authored-By: Claude" 2 "$(bash_in "$COMMENT -F body=@soh-after.md")"
+err=$(bash_in "$COMMENT -F body=@U+0000.md" | run_guard 2>&1 >/dev/null); got=$?
+stray=$(printf '%s\n' "$err" | grep -a -c -v -- '^attribution-guard: ')
+verdict=pass
+if [ "$got" -ne 2 ] || [ "$stray" -ne 0 ] || [ "$(printf '%s\n' "$err" | wc -l)" -ne 2 ] || ! printf '%s\n' "$err" | grep -a -q -F -- "$HIDDEN U+0000 on line 3"; then verdict=FAIL; fails=$((fails + 1)); fi
+echo "$COMMENT -F body=@U+0000.md, stderr holds the two attribution-guard lines only -> expected exit=2 and 0 other lines, actual exit=$got and $stray other lines, $verdict"
+
 echo "fail -> $fails"
 [ "$fails" -eq 0 ]

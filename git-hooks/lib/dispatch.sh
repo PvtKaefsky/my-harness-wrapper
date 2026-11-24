@@ -9,7 +9,7 @@ hook_refuse() {
 }
 
 hook_commit_msg() {
-  local pattern key val mode="" comment="#" cut=no drop=no scanned awk_rc hit grep_rc found scan_rc action n cp
+  local pattern key val mode="" comment="#" cut=no drop=no clean scanned awk_rc hit grep_rc found scan_rc action n cp
   . "$hook_lib/hidden-chars.sh" 2>/dev/null || hook_refuse "$hook_lib/hidden-chars.sh could not be read, so the message was not checked; re-run the harness installer, then commit again."
   { pattern=$(< "$hook_lib/attribution.ere"); } 2>/dev/null
   pattern=${pattern%$'\r'}
@@ -29,7 +29,7 @@ hook_commit_msg() {
     scissors) [ "${GIT_EDITOR-}" = ":" ] || cut=yes ;;
     *) [ "${GIT_EDITOR-}" = ":" ] || { cut=yes; drop=yes; } ;;
   esac
-  { scanned=$(hidden_swap < "$1" | LC_ALL=C awk -v cut="$cut" -v drop="$drop" -v c="$comment" '
+  clean='
     BEGIN { scissors = " ------------------------ >8 ------------------------"; cands = "#;@!$%^&|:" }
     {
       line = $0
@@ -39,7 +39,8 @@ hook_commit_msg() {
       if (cut == "yes" && iscomment && line == cmt scissors) exit
       if (drop == "yes" && iscomment) next
       print line
-    }'; rc=("${PIPESTATUS[@]}"); if [ "${rc[0]}" -ne 0 ] && [ "${rc[0]}" -ne 141 ]; then exit "${rc[0]}"; fi; exit "${rc[1]}"); awk_rc=$?; } 2>/dev/null
+    }'
+  { scanned=$(LC_ALL=C tr -d '\000' < "$1" | LC_ALL=C awk -v cut="$cut" -v drop="$drop" -v c="$comment" "$clean"; rc=("${PIPESTATUS[@]}"); if [ "${rc[0]}" -ne 0 ] && [ "${rc[0]}" -ne 141 ]; then exit "${rc[0]}"; fi; exit "${rc[1]}"); awk_rc=$?; } 2>/dev/null
   if [ "$awk_rc" -ne 0 ]; then
     hook_refuse "awk could not read the message file $1 (exit=$awk_rc), so the message was not checked."
   fi
@@ -52,9 +53,12 @@ hook_commit_msg() {
     printf 'harness commit-msg: remove that attribution line from the commit message, then commit again.\n' >&2
     exit 1
   fi
-  found=$(printf '%s\n' "$scanned" | hidden_scan "$hook_lib/hidden-chars.tsv"); scan_rc=$?
-  if [ "$scan_rc" -ne 0 ]; then
+  found=$(hidden_swap < "$1" | LC_ALL=C awk -v cut="$cut" -v drop="$drop" -v c="$comment" "$clean" | hidden_scan "$hook_lib/hidden-chars.tsv"; rc=("${PIPESTATUS[@]}"); if [ "${rc[2]}" -ne 0 ]; then exit 2; fi; if [ "${rc[0]}" -ne 0 ] && [ "${rc[0]}" -ne 141 ]; then exit 1; fi; [ "${rc[1]}" -eq 0 ]); scan_rc=$?
+  if [ "$scan_rc" -eq 2 ]; then
     hook_refuse "$hook_lib/hidden-chars.tsv could not be applied (exit=$scan_rc), so the message was not checked; re-run the harness installer, then commit again."
+  fi
+  if [ "$scan_rc" -ne 0 ]; then
+    hook_refuse "awk could not read the message file $1 (exit=$scan_rc), so the message was not checked."
   fi
   while IFS=$'\t' read -r action n cp; do
     [ "$action" = block ] || continue
