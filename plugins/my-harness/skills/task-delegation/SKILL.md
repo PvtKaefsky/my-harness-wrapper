@@ -176,8 +176,9 @@ The brief then states, in this order:
 1. The goal.
 2. The owned files, each an exact path.
 3. The acceptance check: a command and its expected result.
-4. The base branch: the nested session's branch is cut from it, and its pull
-   request targets it.
+4. The base branch, the one its first line names: the nested session fetches
+   it and cuts its branch from it, since a proposed session's worktree may be
+   cut from another branch, and its pull request targets it.
 5. The task's constraints, and the issue references its commits and pull
    request carry. Text the user supplied verbatim is marked as theirs. A pull
    request into a combined branch carries `Refs:` lines only. A change a pull
@@ -207,6 +208,11 @@ The brief then states, in this order:
   of nested sessions has no cap.
 - A nested session that depends on another is started only after that
   session's pull request is merged into the combined branch.
+- Where the nested-session tool refuses a start, the orchestrator does not
+  retry it in that turn. It proposes the session with the same brief where the
+  tool offers a proposal, tells the user that the session waits on them, and
+  carries on with the work that does not depend on it. A proposal is made only
+  while fewer than four nested sessions are open, and counts as open from then.
 - Wait for each nested session on its notice, never on a timer.
 
 ### 5. Verify each nested pull request

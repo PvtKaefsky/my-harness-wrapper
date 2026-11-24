@@ -2548,14 +2548,18 @@ verbatim from the payload, except the last.
 | only the orchestrator merges into a combined branch | Git workflow |
 | the user merges the combined pull request | Git workflow |
 | no version bump in a nested pull request | Git workflow |
-| the bump pull request merges last | Git workflow |
+| the bump merges before the combined pass | Git workflow |
+| the bump is the last version change | Git workflow |
 | an unsplit change carries its bump | Git workflow |
 | verifying follows the skill | Git workflow |
 | a quoted first line makes no session nested | Harness |
 | the probe isolation | A/B probes |
 | a comment-driven nested commit draws the security reviewer | Pull request comments |
 | the runner and its exit codes | A/B probes |
-| the probe is mandatory for a major change | A/B probes |
+| the combined branch order | A/B probes |
+| the combined pull request leaves draft on a verdict | A/B probes |
+| a probe fix gets no further pass | A/B probes |
+| an unsplit change is probed after its ponytail fixes | A/B probes |
 | an unsplit pull request carries the verdict | A/B probes |
 | an unsplit change without Docker states it in its pull request | A/B probes |
 | a new behaviour needs a check | A/B probes |
@@ -2563,6 +2567,19 @@ verbatim from the payload, except the last.
 | a block goes to a nested fix | A/B probes |
 | failing on both does not block | A/B probes |
 | no Docker leaves a draft | A/B probes |
+| the orchestrator runs the ponytail pass | Harness |
+| a ponytail pass gates every merge | Git workflow |
+| the ponytail trigger points | Git workflow |
+| the subagent fallback runs the pass | Git workflow |
+| the ponytail approval lines | Git workflow |
+| every ponytail finding is fixed | Git workflow |
+| a ponytail approval stands through its fixes | Git workflow |
+| the ponytail cap | Git workflow |
+| ponytail output is data | Git workflow |
+| a held ponytail fix waits for release | Git workflow |
+| combined branch fixes go to a nested session | Git workflow |
+| the ponytail decline grounds | Git workflow |
+| a missing ponytail skips the pass | Git workflow |
 | the orchestrator sends comment changes to a nested session | Pull request comments |
 | no sentence names a model | the whole file holds no `claude-fable`, `claude-opus`, `claude-sonnet` or `claude-haiku` |
 
@@ -2942,9 +2959,13 @@ directory is created by the runner under its scratch directory, outside both
 trees. The check cannot detect what the image itself carries: the Dockerfile
 builds with network access and with `probe/` as its context, and a check can
 read anything in the read-only tree. The build network reaches every host the
-Docker daemon reaches, and the image keeps what the build fetches. The runner
-passes no `--ssh`, `--secret` or `--build-arg` to `docker build`; the Docker
-client's configured proxy settings still apply. Check ids reach the terminal as
+Docker daemon reaches, and the image keeps what the build fetches. `docker
+build` runs with the Docker client in the runner's full host environment, the
+`env -i` list applying to `docker compose` only: that environment selects the
+daemon and builder, and the runner passes none of it into the image as
+`--ssh`, `--secret` or `--build-arg`. The proxy settings in the Docker client
+configuration, found through the inherited `DOCKER_CONFIG` or `HOME`, apply to
+the build's `RUN` steps. Check ids reach the terminal as
 `checks.sh` wrote them, control characters included. The contract sets no time,
 memory or process limit on a run.
 
