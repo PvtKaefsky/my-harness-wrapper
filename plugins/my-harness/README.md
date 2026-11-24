@@ -143,14 +143,23 @@ skill that is missing.
 
 ### Measured scores
 
-Measured on 2026-11-23 with CLI 2.1.317, `--model claude-opus-5-5`,
-`--ablation none` and `--runs 3`, against this plugin at version 0.4.0.
-The suite cost $4.62 and exited 1.
+The `task-delegation` cases were measured on 2026-11-24 with CLI 2.1.317,
+`--model claude-opus-5-5`, `--ablation none`, `--runs 3` and
+`--case 'delegation-*'`, against this plugin at version 0.5.0. The run cost
+$1.40 and exited 0.
 
 | Case | Score | Runs passed | Cost (USD) |
 | --- | --- | --- | --- |
-| `delegation-coding-task` | 1.0 | 3 of 3 | 0.31 |
-| `delegation-analysis-question` | 0.33 | 1 of 3 | 0.23 |
+| `delegation-coding-task` | 1.0 | 3 of 3 | 0.52 |
+| `delegation-analysis-question` | 1.0 | 3 of 3 | 0.41 |
+| `delegation-no-nested-tool` | 1.0 | 3 of 3 | 0.47 |
+
+The other cases were measured on 2026-11-23 with CLI 2.1.317,
+`--model claude-opus-5-5`, `--ablation none` and `--runs 3`, against this
+plugin at version 0.4.0.
+
+| Case | Score | Runs passed | Cost (USD) |
+| --- | --- | --- | --- |
 | `property-tests-serializer` | 1.0 | 3 of 3 | 0.59 |
 | `property-tests-javascript` | 1.0 | 3 of 3 | 0.39 |
 | `russian-edit` | 1.0 | 3 of 3 | 0.26 |
@@ -162,9 +171,6 @@ The suite cost $4.62 and exited 1.
 | `create-python-library` | 1.0 | 3 of 3 | 0.43 |
 | `add-top-level-directory` | 1.0 | 3 of 3 | 0.39 |
 | `edit-one-file` | 1.0 | 3 of 3 | 0.34 |
-
-In the two failing `delegation-analysis-question` runs, `Skill` was called 0
-times.
 
 ## Delivery
 
