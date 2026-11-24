@@ -706,7 +706,7 @@ later, inside the `SessionStart` hook timeout of 90 seconds that
 | `NOTE hidden-character scan stopped at the cap of 50 NOTE lines, in <path>` | That file and the files before it gave 50 `NOTE` lines, and the scan stopped. | Anything about the rest of that file or the files after it. |
 | `NOTE hidden-character scan stopped at the cap of <N>s (exit=124)`, or `(exit=137)` | The scan ran past its time bound, 85 seconds less the time the check had already run, and was killed, 2 seconds later where the status is 137. | Anything about a file with no `NOTE` above the line. |
 | `hidden-character scan <top> -> git ls-files exit=0 files=N bytes=N notes=0` | The scan read N files of that repository and found no character of the classes. | That the repository has no other instruction file: an ignored file, a submodule's file and a file under another name are not scanned. |
-| `git -C <dir> rev-parse --show-toplevel -> exit=N, hidden-character scan not run`, or `hidden-character scan -> not run, ...` | Nothing was scanned: git names no work tree for the working directory, or the scanner, the pattern file or a file size could not be read. | That the instruction files are clean. |
+| `git -C <dir> rev-parse --show-toplevel -> exit=N, hidden-character scan not run`, or `hidden-character scan -> not run, ...` | Nothing was scanned: git names no work tree for the working directory, or the scanner, the pattern file, a file size or a line count could not be read. | That the instruction files are clean. |
 
 `/home/user/session-check.log` holds every run's output, appended. Locally the
 file is `session-check.log` in the config directory.

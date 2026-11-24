@@ -37,8 +37,8 @@ emit_hooks_path() {
 clean() { printf '%s' "$1" | LC_ALL=C tr '\000-\037\177-\377' '?'; }
 
 hidden_notes() {
-  local top rc f prev="" total=0 i bytes=0 capped="" found action line cp label notes=0
-  local cand=() sizes=() files=() names=()
+  local top rc f prev="" total=0 i bytes=0 capped="" found action line cp label notes=0 start=0 off
+  local cand=() sizes=() files=() names=() counts=()
   top=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); rc=$?
   if [ "$rc" -ne 0 ] || [ -z "$top" ]; then
     emit "git -C $(clean "$PWD") rev-parse --show-toplevel -> exit=$rc, hidden-character scan not run"
@@ -71,24 +71,37 @@ hidden_notes() {
     bytes=$((bytes + sizes[i]))
   done
   if [ "${#files[@]}" -gt 0 ]; then
-    if ! found=$({ cat -- "${files[@]}" 2>/dev/null || :; } | hidden_swap | hidden_scan "$HIDDEN_FILE"); then
+    mapfile -t counts < <(LC_ALL=C grep -a -c -h '' -- "${files[@]}" 2>/dev/null)
+    if [ "${#counts[@]}" -ne "${#files[@]}" ]; then
+      emit "hidden-character scan -> not run, grep gave ${#counts[@]} line counts for ${#files[@]} files"
+      return
+    fi
+  fi
+  while [ "$start" -lt "${#files[@]}" ]; do
+    if ! found=$({ LC_ALL=C grep -a -h '' -- "${files[@]:start}" 2>/dev/null || :; } | hidden_swap | hidden_scan "$HIDDEN_FILE"); then
       emit "hidden-character scan -> not run, $(clean "$HIDDEN_FILE") could not be applied"
       return
     fi
-    if [ -n "$found" ]; then
-      for i in "${!files[@]}"; do
-        while IFS=$'\t' read -r action line cp; do
-          case "$action" in block) label="hidden character" ;; warn) label="zero-width character" ;; *) continue ;; esac
-          if [ "$notes" -ge "$HIDDEN_MAX_NOTES" ]; then
-            emit "NOTE hidden-character scan stopped at the cap of $HIDDEN_MAX_NOTES NOTE lines, in $(clean "${names[i]}")"
-            break 2
-          fi
-          emit "NOTE $label $cp at $(clean "${names[i]}"):$line"
-          notes=$((notes + 1))
-        done < <(hidden_swap < "${files[i]}" 2>/dev/null | hidden_scan "$HIDDEN_FILE")
-      done
-    fi
-  fi
+    if [ -z "$found" ]; then break; fi
+    IFS=$'\t' read -r action line cp <<< "$found"
+    off=0
+    i=$start
+    while [ "$i" -lt "$((${#files[@]} - 1))" ] && [ "$((off + counts[i]))" -lt "$line" ]; do
+      off=$((off + counts[i]))
+      i=$((i + 1))
+    done
+    while IFS=$'\t' read -r action line cp; do
+      if [ "$line" -gt "$((off + counts[i]))" ]; then continue; fi
+      case "$action" in block) label="hidden character" ;; warn) label="zero-width character" ;; *) continue ;; esac
+      if [ "$notes" -ge "$HIDDEN_MAX_NOTES" ]; then
+        emit "NOTE hidden-character scan stopped at the cap of $HIDDEN_MAX_NOTES NOTE lines, in $(clean "${names[i]}")"
+        break 2
+      fi
+      emit "NOTE $label $cp at $(clean "${names[i]}"):$((line - off))"
+      notes=$((notes + 1))
+    done <<< "$found"
+    start=$((i + 1))
+  done
   if [ -n "$capped" ]; then
     emit "NOTE hidden-character scan stopped at the cap of $capped, before $(clean "${cand[${#files[@]}]}"); ${#files[@]} of $total files scanned"
   fi

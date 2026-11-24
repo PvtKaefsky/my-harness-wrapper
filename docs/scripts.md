@@ -1600,7 +1600,7 @@ session was quiet.
 | `NOTE hidden-character scan stopped at the cap of ...` | The scan stopped at 200 files, at 5 MiB, at 50 `NOTE` lines or at its time bound. The line names the cap. For the file and byte caps it also names the first file not scanned and how many of the listed files were scanned, and for the `NOTE` cap the file it stopped in. |
 | `hidden-character scan <top> -> git ls-files exit=N files=N bytes=N notes=N` | The scan ran in the repository whose top directory is `<top>`: `git ls-files`' exit status, the files and bytes scanned, and the `NOTE` lines printed for characters. |
 | `git -C <dir> rev-parse --show-toplevel -> exit=N, hidden-character scan not run` | Git names no work tree for the working directory, so nothing was scanned. |
-| `hidden-character scan -> not run, ...` | The scanner, the pattern file or a file size could not be read. The line names which. |
+| `hidden-character scan -> not run, ...` | The scanner, the pattern file, a file size or a line count could not be read. The line names which. |
 
 An absent `/home/user/bootstrap.log`, an absent `scripts/verify.sh`, and a
 directory git would not read each produce a line naming the path or the
@@ -1714,10 +1714,18 @@ naming that cap and the file it stopped in.
 path with `?`, so a path prints no hidden character and a non-ASCII name
 prints as `?` bytes.
 
-The scan first passes every taken file through one `hidden_scan` call. Only
-where that call reports a character does it call `hidden_scan` once for each
-file, which is what names the file. A repository with no hidden character
-therefore costs one call however many files it has.
+Each `hidden_scan` call reads every taken file not yet settled, joined by
+`grep -a -h ''`, which ends each file's last line with a newline. The first
+row it prints names the lowest line, and the per-file line counts of
+`grep -a -c -h ''` place that line in a file. The rows that fall in that file
+become its `NOTE` lines, and the next call starts at the file after it. The
+scan therefore makes one call more than the number of files that hold a
+character, and one call fewer where the last taken file holds one: one call for
+a repository with none, however many files it has.
+
+Measured in Git Bash on Windows 11 at the commit that adds this paragraph, with
+200 one-line `AGENTS.md` files scanned: 1.6 to 1.7 s with no character, and 2.0 s
+with U+202E in one file, for `bash scripts/session-check.sh hidden-notes`.
 
 | Not reported | Why |
 | --- | --- |
@@ -2276,14 +2284,15 @@ whole.
 | 60 distinct tag characters in `CLAUDE.md`, U+202E in `z/CLAUDE.md` | 50 `NOTE` lines for `CLAUDE.md` and the `50 NOTE lines` cap `NOTE`. |
 | That repository with `SESSION_CHECK_HIDDEN_TIMEOUT=0.001` | The `NOTE` reading `stopped at the cap of 0.001s`, with `exit=124` or `exit=137`, and fewer than 51 `NOTE` lines. |
 | U+202E in an indexed `CLAUDE.md` and in `a/CLAUDE.md` beside U+2066, U+200B in `.claude/agents/r.md`, U+0000 in `.mcp.json` | Five `NOTE` lines, the U+200B one reading `zero-width character`. |
-| 201 `AGENTS.md` files, U+202E in the 200th and the 201st | One `NOTE` for the 200th and the `200 files` cap `NOTE` naming the 201st. |
+| 201 `AGENTS.md` files, U+202E in the 51st, the 200th and the 201st | One `NOTE` each for the 51st and the 200th, and the `200 files` cap `NOTE` naming the 201st. |
+| That repository through a copy of the script whose `hidden_scan` appends a line to a file on each run | The same `NOTE` lines, and 2 runs. |
+| `a/AGENTS.md` with no final newline, an empty `b/AGENTS.md`, U+202E on the unterminated line 2 of `c/AGENTS.md` and on line 1 of `d/AGENTS.md` | Two `NOTE` lines, naming `c/AGENTS.md:2` and `d/AGENTS.md:1`. |
 | A 6-byte `AGENTS.md`, a 5,242,880-byte `m/CLAUDE.md` and `z/AGENTS.md`, U+202E in the first and the third | One `NOTE` for the first and the `5242880 bytes (5 MiB)` cap `NOTE` naming `m/CLAUDE.md`. |
 | A directory outside a git repository holding an `AGENTS.md` with U+202E | No `NOTE`; the `rev-parse --show-toplevel -> exit=128` line. |
 | A copy of the script with no `git-hooks/lib/hidden-chars.sh` beside it, then with no `hidden-chars.tsv` | No `NOTE`; the `not run` line naming the file. |
 
 The last line is `fail -> N`, and the exit status is 0 only where N is 0. The
-201-file case calls `hidden_scan` once per file, and the run takes about one
-minute in Git Bash.
+run takes about one minute in Git Bash.
 
 ## scripts/check-hook-matchers.sh
 

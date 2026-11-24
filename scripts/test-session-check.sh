@@ -105,9 +105,33 @@ i=0
 while [ "$i" -le 200 ]; do printf -v d 'd%03d' "$i"; mkdir "$d" && printf 'x\n' > "$d/AGENTS.md"; i=$((i + 1)); done
 printf 'a%sb\n' "$RLO" > d200/AGENTS.md
 printf 'a%sb\n' "$RLO" > d199/AGENTS.md
-expect '201 files, U+202E in the 200th and the 201st' 2 '' \
+printf 'x\na%sb\n' "$RLO" > d050/AGENTS.md
+expect '201 files, U+202E in the 51st, the 200th and the 201st' 3 '' \
+  'NOTE hidden character U+202E at d050/AGENTS.md:2' \
   'NOTE hidden character U+202E at d199/AGENTS.md:1' \
   'NOTE hidden-character scan stopped at the cap of 200 files, before d200/AGENTS.md; 200 of 201 files scanned'
+LIB="$(dirname "$CHECK")/../git-hooks/lib"
+mkdir -p "$WORK/count/scripts" "$WORK/count/git-hooks/lib"
+cp "$CHECK" "$WORK/count/scripts/session-check.sh" && cp "$LIB/hidden-chars.tsv" "$WORK/count/git-hooks/lib/"
+printf '. "%s"\neval "real_$(declare -f hidden_scan)"\nhidden_scan() { echo run >> "%s"; real_hidden_scan "$@"; }\n' \
+  "$LIB/hidden-chars.sh" "$WORK/runs" > "$WORK/count/git-hooks/lib/hidden-chars.sh"
+expect 'the same repository through a hidden_scan that counts its runs' 3 "$WORK/count/scripts/session-check.sh" \
+  'NOTE hidden character U+202E at d050/AGENTS.md:2' \
+  'NOTE hidden character U+202E at d199/AGENTS.md:1'
+runs=$(grep -a -c '' "$WORK/runs" 2>/dev/null)
+verdict=pass
+if [ "${runs:-0}" -ne 2 ]; then verdict=FAIL; fails=$((fails + 1)); fi
+echo "hidden_scan runs for 200 scanned files, 2 of them with a hit -> expected 2, actual ${runs:-0}, $verdict"
+
+repo joined
+mkdir a b c d
+printf 'one\ntwo' > a/AGENTS.md
+: > b/AGENTS.md
+printf 'x\na%sb' "$RLO" > c/AGENTS.md
+printf 'a%sb\n' "$RLO" > d/AGENTS.md
+expect 'files with no final newline, and an empty file, before files with a hit' 2 '' \
+  'NOTE hidden character U+202E at c/AGENTS.md:2' \
+  'NOTE hidden character U+202E at d/AGENTS.md:1'
 
 repo big
 mkdir m z
