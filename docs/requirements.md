@@ -156,3 +156,4 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A session asked to create a repository invokes `my-harness:repository-setup`, and its reply gives `git init --initial-branch=main` and names the layout document. | `plugins/my-harness/evals/create-python-library` |
 | A session asked for a change that needs a new top-level directory in an existing repository invokes `my-harness:repository-setup`, and its reply names the layout document. | `plugins/my-harness/evals/add-top-level-directory` |
 | A session asked to edit one file in an existing repository does not invoke `my-harness:repository-setup`. | `plugins/my-harness/evals/edit-one-file` |
+| A session adding the A/B probe's files places `probe/Dockerfile`, `probe/compose.yaml` and `probe/checks.sh` in one top-level `probe/` directory, in both layouts. | not tested; no eval case adds probe files |

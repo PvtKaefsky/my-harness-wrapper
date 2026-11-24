@@ -19,6 +19,7 @@ go. The top level always follows the layout.
 <repo>/
 ├── .github/            # workflows, issue and pull request templates
 ├── docs/               # indexed by docs/README.md
+├── probe/              # the A/B probe: Dockerfile, compose.yaml, checks.sh
 ├── scripts/            # build, release and maintenance scripts
 ├── src/                # all source: see the toolchain table
 ├── tests/              # tests that live outside the source tree
@@ -66,6 +67,7 @@ the repository has no pull request.
 ├── libs/               # shared internal libraries
 │   └── <lib>/          # its own manifest and README.md; inside, the toolchain table
 ├── docs/
+├── probe/              # the A/B probe, one for the whole repository
 ├── scripts/            # repository-wide scripts
 ├── <workspace manifest>
 ├── <lockfile>
@@ -91,6 +93,21 @@ the repository has no pull request.
   The domain level holds no manifest.
 - Turborepo names the libraries folder `packages/`. This layout names it
   `libs/`.
+
+## Probe directory
+
+`probe/` holds the files of the A/B probe, which runs the project's scripted
+checks in Docker on a baseline tree and a candidate tree.
+
+| File | Role |
+| --- | --- |
+| `probe/Dockerfile` | the image the checks run in |
+| `probe/compose.yaml` | the compose file that runs the image |
+| `probe/checks.sh` | the scripted checks |
+
+- The files are committed to the project.
+- Both layouts place `probe/` at the top level.
+- A grouped monorepo has one `probe/` for all its modules.
 
 ## Sources
 
