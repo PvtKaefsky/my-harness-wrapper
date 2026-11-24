@@ -9,7 +9,8 @@ hook_refuse() {
 }
 
 hook_commit_msg() {
-  local pattern key val mode="" comment="#" cut=no drop=no scanned awk_rc hit grep_rc
+  local pattern key val mode="" comment="#" cut=no drop=no clean scanned awk_rc hit grep_rc found scan_rc action n cp
+  . "$hook_lib/hidden-chars.sh" 2>/dev/null || hook_refuse "$hook_lib/hidden-chars.sh could not be read, so the message was not checked; re-run the harness installer, then commit again."
   { pattern=$(< "$hook_lib/attribution.ere"); } 2>/dev/null
   pattern=${pattern%$'\r'}
   if [ -z "$pattern" ] || [ "$pattern" != "${pattern%%$'\n'*}" ]; then
@@ -28,7 +29,7 @@ hook_commit_msg() {
     scissors) [ "${GIT_EDITOR-}" = ":" ] || cut=yes ;;
     *) [ "${GIT_EDITOR-}" = ":" ] || { cut=yes; drop=yes; } ;;
   esac
-  scanned=$(LC_ALL=C awk -v cut="$cut" -v drop="$drop" -v c="$comment" '
+  clean='
     BEGIN { scissors = " ------------------------ >8 ------------------------"; cands = "#;@!$%^&|:" }
     {
       line = $0
@@ -38,7 +39,8 @@ hook_commit_msg() {
       if (cut == "yes" && iscomment && line == cmt scissors) exit
       if (drop == "yes" && iscomment) next
       print line
-    }' < "$1" 2>/dev/null); awk_rc=$?
+    }'
+  { scanned=$(LC_ALL=C tr -d '\000' < "$1" | LC_ALL=C awk -v cut="$cut" -v drop="$drop" -v c="$comment" "$clean"; rc=("${PIPESTATUS[@]}"); if [ "${rc[0]}" -ne 0 ] && [ "${rc[0]}" -ne 141 ]; then exit "${rc[0]}"; fi; exit "${rc[1]}"); awk_rc=$?; } 2>/dev/null
   if [ "$awk_rc" -ne 0 ]; then
     hook_refuse "awk could not read the message file $1 (exit=$awk_rc), so the message was not checked."
   fi
@@ -49,6 +51,63 @@ hook_commit_msg() {
   if [ "$grep_rc" -eq 0 ]; then
     printf 'harness commit-msg: matched line -> %s\n' "$(hook_sanitize "$hit")" >&2
     printf 'harness commit-msg: remove that attribution line from the commit message, then commit again.\n' >&2
+    exit 1
+  fi
+  found=$(hidden_swap < "$1" | LC_ALL=C awk -v cut="$cut" -v drop="$drop" -v c="$comment" "$clean" | hidden_scan "$hook_lib/hidden-chars.tsv"; rc=("${PIPESTATUS[@]}"); if [ "${rc[2]}" -ne 0 ]; then exit 2; fi; if [ "${rc[0]}" -ne 0 ] && [ "${rc[0]}" -ne 141 ]; then exit 1; fi; [ "${rc[1]}" -eq 0 ]); scan_rc=$?
+  if [ "$scan_rc" -eq 2 ]; then
+    hook_refuse "$hook_lib/hidden-chars.tsv could not be applied (exit=$scan_rc), so the message was not checked; re-run the harness installer, then commit again."
+  fi
+  if [ "$scan_rc" -ne 0 ]; then
+    hook_refuse "awk could not read the message file $1 (exit=$scan_rc), so the message was not checked."
+  fi
+  while IFS=$'\t' read -r action n cp; do
+    [ "$action" = block ] || continue
+    printf 'harness commit-msg: hidden character -> %s on line %s of the commit message\n' "$cp" "$n" >&2
+    printf 'harness commit-msg: remove that character from the commit message, then commit again.\n' >&2
+    exit 1
+  done <<< "$found"
+}
+
+hook_staged_diff() {
+  git -c core.quotePath=true diff --cached --no-color --no-ext-diff --no-textconv --src-prefix=a/ --dst-prefix=b/ -U0 | hidden_swap
+  return "${PIPESTATUS[0]}"
+}
+
+hook_pre_commit() {
+  local tsv="$hook_lib/hidden-chars.tsv" found mapped rc action cp n path blocked=no
+  . "$hook_lib/hidden-chars.sh" 2>/dev/null || hook_refuse "$hook_lib/hidden-chars.sh could not be read, so the staged changes were not checked; re-run the harness installer, then commit again."
+  found=$(hook_staged_diff | LC_ALL=C sed -e '/^+/!s/.*//' | hidden_scan "$tsv"; rc=("${PIPESTATUS[@]}"); if [ "${rc[2]}" -ne 0 ]; then exit 2; fi; [ "${rc[0]}" -eq 0 ] && [ "${rc[1]}" -eq 0 ]); rc=$?
+  if [ "$rc" -eq 2 ]; then
+    hook_refuse "$tsv could not be applied, so the staged changes were not checked; re-run the harness installer, then commit again."
+  fi
+  if [ "$rc" -ne 0 ]; then
+    hook_refuse "git diff --cached could not be read, so the staged changes were not checked."
+  fi
+  [ -n "$found" ] || return 0
+  mapped=$(hook_staged_diff | LC_ALL=C awk -v found="${found//$'\n'/;}" '
+    function count(x, a) { return split(x, a, ",") > 1 ? a[2] + 0 : 1 }
+    BEGIN { n = split(found, f, ";"); for (i = 1; i <= n; i++) { split(f[i], c, "\t"); want[c[2]] = want[c[2]] c[1] "\t" c[3] "\n"; left++ } }
+    old + new > 0 {
+      first = substr($0, 1, 1)
+      if (first == "\\") next
+      if (first == "+") {
+        if (NR in want) { m = split(want[NR], w, "\n"); for (i = 1; i < m; i++) { printf "%s\t%d\t%s\n", w[i], ln, path; left-- } }
+        ln++; new--
+      } else if (first == "-") old--
+      else { old--; new--; ln++ }
+      next
+    }
+    /^\+\+\+ / { path = substr($0, 5); sub(/\t$/, "", path); if (substr(path, 1, 2) == "b/") path = substr(path, 3); next }
+    /^@@ / { split($0, h, " "); old = count(h[2]); new = count(h[3]); split(substr(h[3], 2), s, ","); ln = s[1] + 0 }
+    END { if (left != 0) exit 3 }'; rc=("${PIPESTATUS[@]}"); [ "${rc[0]}" -eq 0 ] && [ "${rc[1]}" -eq 0 ]) || hook_refuse "git diff --cached could not be mapped to files, so the staged changes were not checked."
+  while IFS=$'\t' read -r action cp n path; do
+    case "$action" in
+      block) blocked=yes; printf 'harness pre-commit: hidden character -> %s at %s:%s\n' "$cp" "$(hook_sanitize "$path")" "$n" >&2 ;;
+      warn) printf 'harness pre-commit: zero-width character %s at %s:%s, committed as staged.\n' "$cp" "$(hook_sanitize "$path")" "$n" >&2 ;;
+    esac
+  done <<< "$mapped"
+  if [ "$blocked" = yes ]; then
+    printf 'harness pre-commit: remove each character from the staged file, then commit again.\n' >&2
     exit 1
   fi
 }
@@ -151,4 +210,5 @@ hook_forward() {
 }
 
 if [ "$hook_name" = commit-msg ]; then hook_commit_msg "$1"; fi
+if [ "$hook_name" = pre-commit ]; then hook_pre_commit; fi
 hook_forward "$@"

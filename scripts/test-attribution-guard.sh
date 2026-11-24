@@ -324,5 +324,105 @@ run_case 'create response text content carrying a body with the marker' 2 "$(pos
 ---
 $FOOT_SERVER" '[{type:"text",text:({number:3,body:$b} | tojson)}]')")" "$RESEND"
 
+HIDDEN='attribution-guard: hidden character ->'
+COMMENT='gh api repos/o/r/issues/1/comments'
+ISSUE_ARGS='{"owner":"o","repo":"r","issue_number":1}'
+printf -v RLO '\342\200\256'
+printf -v ZWSP '\342\200\213'
+printf -v WJ '\342\201\240'
+
+run_stdout() {
+  local label=$1 cp=$2 input=$3 runner=${4:-run_guard} out got want verdict=FAIL
+  out=$(printf '%s' "$input" | "$runner" 2>/dev/null); got=$?
+  if [ -z "$cp" ]; then
+    want='empty stdout'
+    if [ "$got" -eq 0 ] && [ -z "$out" ]; then verdict=pass; fi
+  else
+    want="PreToolUse additionalContext naming $cp on stdout"
+    if [ "$got" -eq 0 ] && printf '%s' "$out" | jq -e --arg cp "$cp" '.hookSpecificOutput | .hookEventName == "PreToolUse" and (.additionalContext | contains($cp)) and (has("permissionDecision") | not)' >/dev/null 2>&1; then verdict=pass; fi
+  fi
+  if [ "$verdict" = FAIL ]; then fails=$((fails + 1)); fi
+  echo "$label -> expected exit=0 and $want, actual exit=$got stdout=$(printf '%s' "$out" | LC_ALL=C tr -c ' -~' '?'), $verdict"
+}
+
+for spec in \
+  'U+202E|\342\200\256|\u202e' \
+  'U+2066|\342\201\246|\u2066' \
+  'U+E0001|\363\240\200\201|\udb40\udc01' \
+  'U+0000|\000|\u0000'; do
+  cp=${spec%%|*}
+  oct=${spec#*|}
+  oct=${oct%|*}
+  printf "one\ntwo\nx${oct}y\n" > "$cp.md"
+  jq -an "{body:\"one\\ntwo\\nx${spec##*|}y\"}" > "$cp.json"
+  run_case "$COMMENT -F body=@$cp.md, $cp on line 3" 2 "$(bash_in "$COMMENT -F body=@$cp.md")" "$HIDDEN $cp on line 3"
+  run_case "$COMMENT --input $cp.json, $cp escaped on line 3 of a JSON string" 2 "$(bash_in "$COMMENT --input $cp.json")" "$HIDDEN $cp on line 3"
+  run_case "mcp__github__add_issue_comment body through the delivered hook, $cp" 2 "$(mcp_in mcp__github__add_issue_comment x "$ISSUE_ARGS" | jq --slurpfile j "$cp.json" '.tool_input.body = $j[0].body')" "$HIDDEN $cp" run_hook
+done
+run_case 'gh pr comment --body, U+0000 in the command' 2 "$(jq -n '{tool_name:"Bash",tool_input:{command:"gh pr comment 1 --body \"a\u0000b\""}}')" "$HIDDEN U+0000 on line 1"
+for spec in \
+  '2|U+202A|\342\200\252' \
+  '2|U+2069|\342\201\251' \
+  '2|U+E0000|\363\240\200\200' \
+  '2|U+E007F|\363\240\201\277' \
+  '0|U+2065|\342\201\245' \
+  '0|U+206A|\342\201\252'; do
+  cp=${spec#*|}
+  cp=${cp%|*}
+  printf "x${spec##*|}y\n" > "$cp.md"
+  run_case "$COMMENT -F body=@$cp.md, $cp at a range end" "${spec%%|*}" "$(bash_in "$COMMENT -F body=@$cp.md")" "$HIDDEN $cp on line 1"
+done
+printf '\357\273\277%s\n' "$CLEAN" > bom.md
+printf 'pair \360\237\221\251\342\200\215\360\237\222\273 done\n' > zwj.md
+printf '\327\251\327\234\327\225\327\235\342\200\217 %s\n' "$CLEAN" > hebrew.md
+printf 'left\342\200\216 to right\n' > lrm.md
+for spec in \
+  'bom.md|a UTF-8 byte-order mark' \
+  'zwj.md|an emoji sequence joined with U+200D' \
+  'hebrew.md|Hebrew text with U+200F' \
+  'lrm.md|U+200E' \
+  'clean.md|clean'; do
+  run_stdout "$COMMENT -F body=@${spec%%|*}, ${spec#*|}" '' "$(bash_in "$COMMENT -F body=@${spec%%|*}")"
+done
+printf 'one\nzero%swidth\n' "$ZWSP" > zwsp.md
+run_stdout "$COMMENT -F body=@zwsp.md, U+200B on line 2" 'U+200B on line 2' "$(bash_in "$COMMENT -F body=@zwsp.md")"
+run_stdout 'mcp__github__add_issue_comment body through the delivered hook, U+2060' U+2060 "$(mcp_in mcp__github__add_issue_comment "word${WJ}joiner" "$ISSUE_ARGS")" run_hook
+{ printf '%899997s' '' | tr ' ' a; printf '%s' "$RLO"; } > hidden-big.md
+printf '%900000s' '' | tr ' ' a > clean-big.md
+run_case "$COMMENT -F body=@hidden-big.md, U+202E as the last character of 900,000 bytes, within 10 s" 2 "$(bash_in "$COMMENT -F body=@hidden-big.md")" "$HIDDEN U+202E on line 1" run_timed
+run_case "$COMMENT -F body=@clean-big.md, 900,000 clean bytes, within 10 s" 0 "$(bash_in "$COMMENT -F body=@clean-big.md")" "$HIDDEN" run_timed
+mkdir -p "$WORK/no-tsv/scripts" "$WORK/no-tsv/git-hooks/lib" && cp "$GUARD" "$WORK/no-tsv/scripts/" && cp "$ROOT/git-hooks/lib/attribution.ere" "$ROOT/git-hooks/lib/hidden-chars.sh" "$WORK/no-tsv/git-hooks/lib/"
+run_no_tsv() { bash "$WORK/no-tsv/scripts/attribution-guard.sh"; }
+run_case 'pull request tool body, hidden-chars.tsv absent' 2 "$(tool_in "$CLEAN")" 'hidden-chars.tsv could not be applied, so the body was not checked' run_no_tsv
+run_case 'echo U+202E, not a gh write' 0 "$(bash_in "echo $RLO")"
+
+run_quiet() {
+  local label=$1 input=$2 runner=${3:-run_guard} out got verdict=pass
+  out=$(printf '%s' "$input" | "$runner" 2>&1); got=$?
+  if [ "$got" -ne 0 ] || [ -n "$out" ]; then verdict=FAIL; fails=$((fails + 1)); fi
+  echo "$label -> expected exit=0 and empty stdout and stderr, actual exit=$got output=$(printf '%s' "$out" | LC_ALL=C tr -c ' -~' '?'), $verdict"
+}
+
+printf -v SOH '\001'
+printf 'a\001b' > soh.md
+jq -n --arg b "a${SOH}b" '{body:$b}' > soh.json
+printf 'a\001b%sc\n' "$RLO" > soh-rlo.md
+printf 'a\001b\000c\n' > soh-nul.md
+printf '%s\n\nCo-Authored\001-By: Claude <noreply@anthropic.com>\n' "$CLEAN" > soh-inside.md
+printf '%s\n\nCo-Authored-By: Claude\001 <noreply@anthropic.com>\n' "$CLEAN" > soh-after.md
+run_quiet 'gh pr comment --body, U+0001 in the command' "$(bash_in "gh pr comment 1 --body \"a${SOH}b\"")"
+run_quiet "$COMMENT -F body=@soh.md, U+0001 alone" "$(bash_in "$COMMENT -F body=@soh.md")"
+run_quiet "$COMMENT --input soh.json, U+0001 escaped in a JSON string" "$(bash_in "$COMMENT --input soh.json")"
+run_quiet 'mcp__github__add_issue_comment body through the delivered hook, U+0001 alone' "$(mcp_in mcp__github__add_issue_comment "a${SOH}b" "$ISSUE_ARGS")" run_hook
+run_case "$COMMENT -F body=@soh-rlo.md, U+0001 then U+202E on line 1" 2 "$(bash_in "$COMMENT -F body=@soh-rlo.md")" "$HIDDEN U+202E on line 1"
+run_case "$COMMENT -F body=@soh-nul.md, U+0001 then U+0000 on line 1" 2 "$(bash_in "$COMMENT -F body=@soh-nul.md")" "$HIDDEN U+0000 on line 1"
+run_quiet "$COMMENT -F body=@soh-inside.md, U+0001 inside the words Co-Authored-By" "$(bash_in "$COMMENT -F body=@soh-inside.md")"
+run_case "$COMMENT -F body=@soh-after.md, U+0001 after Co-Authored-By: Claude" 2 "$(bash_in "$COMMENT -F body=@soh-after.md")"
+err=$(bash_in "$COMMENT -F body=@U+0000.md" | run_guard 2>&1 >/dev/null); got=$?
+stray=$(printf '%s\n' "$err" | grep -a -c -v -- '^attribution-guard: ')
+verdict=pass
+if [ "$got" -ne 2 ] || [ "$stray" -ne 0 ] || [ "$(printf '%s\n' "$err" | wc -l)" -ne 2 ] || ! printf '%s\n' "$err" | grep -a -q -F -- "$HIDDEN U+0000 on line 3"; then verdict=FAIL; fails=$((fails + 1)); fi
+echo "$COMMENT -F body=@U+0000.md, stderr holds the two attribution-guard lines only -> expected exit=2 and 0 other lines, actual exit=$got and $stray other lines, $verdict"
+
 echo "fail -> $fails"
 [ "$fails" -eq 0 ]

@@ -5,12 +5,16 @@ case "${BASH_SOURCE[0]}" in */*) GUARD_DIR=${BASH_SOURCE[0]%/*} ;; *) GUARD_DIR=
 RE_FILE="$GUARD_DIR/../git-hooks/lib/attribution.ere"
 { RE=$(< "$RE_FILE"); } 2>/dev/null
 RE=${RE%$'\r'}
+HIDDEN_LIB="$GUARD_DIR/../git-hooks/lib/hidden-chars.sh"
+HIDDEN_FILE="$GUARD_DIR/../git-hooks/lib/hidden-chars.tsv"
+WARN=""
+. "$HIDDEN_LIB" 2>/dev/null || hidden_swap() { cat; }
 
 sanitize() { printf '%s' "$1" | LC_ALL=C tr '\n' ' ' | LC_ALL=C tr '\000-\037\177' '?'; }
 
 unchecked() {
   printf 'attribution-guard: %s, so the body was not checked.\n' "$1" >&2
-  printf 'attribution-guard: restore %s from the harness repository, then retry.\n' "$(sanitize "$RE_FILE")" >&2
+  printf 'attribution-guard: restore %s from the harness repository, then retry.\n' "$(sanitize "${2:-$RE_FILE}")" >&2
   exit 2
 }
 
@@ -38,9 +42,23 @@ resend() {
   exit 2
 }
 
+hidden() {
+  printf 'attribution-guard: hidden character -> %s on line %s\n' "$1" "$2" >&2
+  printf 'attribution-guard: remove that character from the body, then retry.\n' >&2
+  exit 2
+}
+
 scan() {
-  local hit rc
+  local hit rc found action line cp
   need_re
+  if ! declare -F hidden_scan >/dev/null; then unchecked "$(sanitize "$HIDDEN_LIB") could not be read" "$HIDDEN_LIB"; fi
+  found=$(hidden_swap | hidden_scan "$HIDDEN_FILE") || unchecked "$(sanitize "$HIDDEN_FILE") could not be applied" "$HIDDEN_FILE"
+  while IFS=$'\t' read -r action line cp; do
+    if [ "$action" = block ]; then hidden "$cp" "$line"; fi
+    if [ "$action" != warn ]; then continue; fi
+    hit="attribution-guard: zero-width character $cp on line $line of the body; it was sent as written."
+    case "$WARN" in *"$hit"*) ;; *) WARN="${WARN:+$WARN }$hit" ;; esac
+  done <<< "$found"
   hit=$(printf '%s\n' "$1" | tr '\r' '\n' | grep -a -i -E -- "$RE" 2>/dev/null | sed -n 1p); rc=$?
   if [ "$rc" -gt 1 ]; then unchecked "grep could not apply the pattern (exit=$rc)"; fi
   if [ -n "$hit" ]; then block "$hit"; fi
@@ -71,7 +89,8 @@ if [ "$EVENT" = PostToolUse ]; then
 fi
 
 if [ "$TOOL" = Bash ]; then
-  CMD=$(printf '%s' "$INPUT" | jq -r 'if (.tool_input | type) == "object" then (.tool_input.command // empty) else empty end' 2>/dev/null)
+  CMD_FILTER='if (.tool_input | type) == "object" then (.tool_input.command // empty) else empty end'
+  CMD=$(printf '%s' "$INPUT" | jq -r "$CMD_FILTER" 2>/dev/null | LC_ALL=C tr -d '\000')
   if [ -z "$CMD" ]; then exit 0; fi
   WRITE_OP=no
   SHORT_F=no
@@ -80,22 +99,22 @@ if [ "$TOOL" = Bash ]; then
   if printf '%s\n' "$CMD" | grep -a -c -E -- '(^|[^[:alnum:]_-])gh[[:space:]]+api([[:space:]]|$)' >/dev/null \
      && printf '%s\n' "$CMD" | grep -a -c -E -- '/(pulls|issues)([^[:alnum:]_-]|$)' >/dev/null; then WRITE_OP=yes; fi
   if [ "$WRITE_OP" != yes ]; then exit 0; fi
-  scan "$CMD"
+  scan "$CMD" < <(printf '%s' "$INPUT" | jq -r "$CMD_FILTER" 2>/dev/null)
   while IFS= read -r BODY_FILE; do
     KIND=${BODY_FILE%%:*}
     BODY_FILE=${BODY_FILE#*:}
     if [ -z "$BODY_FILE" ]; then continue; fi
     if [ ! -f "$BODY_FILE" ] || [ ! -r "$BODY_FILE" ]; then continue; fi
-    BODY=$(head -c 1048576 -- "$BODY_FILE" 2>/dev/null)
-    scan "$BODY"
+    BODY=$(head -c 1048576 -- "$BODY_FILE" 2>/dev/null | LC_ALL=C tr -d '\000')
+    scan "$BODY" < <(head -c 1048576 -- "$BODY_FILE" 2>/dev/null)
     if [ "$KIND" = J ]; then
       if [ "$(LC_ALL=C wc -c < "$BODY_FILE")" -gt 1048576 ]; then undecoded "$BODY_FILE" 'exceeds 1 MiB'; fi
       BODY=${BODY#$'\xef\xbb\xbf'}
-      DECODED=$(printf '%s' "$BODY" | jq -r '.. | strings' 2>/dev/null); JQ_RC=$?
+      DECODED=$(printf '%s' "$BODY" | jq -r '.. | strings' 2>/dev/null | LC_ALL=C tr -d '\000'); JQ_RC=$?
       case "${BODY#"${BODY%%[![:space:]]*}"}" in
         [\{\[]*) if [ "$JQ_RC" -ne 0 ]; then undecoded "$BODY_FILE" "is not JSON jq can parse (jq exit=$JQ_RC)"; fi ;;
       esac
-      scan "$DECODED"
+      scan "$DECODED" < <(printf '%s' "$BODY" | jq -r '.. | strings' 2>/dev/null)
     fi
   done < <({
       printf '%s\n' "$CMD" \
@@ -116,6 +135,8 @@ else
       KEEP='if type == "object" then del(.content) | (if (.files | type) == "array" then .files |= map(if type == "object" then del(.content) else . end) else . end) else . end' ;;
     *) KEEP='.' ;;
   esac
-  scan "$(printf '%s' "$INPUT" | jq -r "if (.tool_input | type) == \"object\" or (.tool_input | type) == \"array\" then ([.tool_input | $KEEP | .. | strings] | .[]) else empty end" 2>/dev/null)"
+  TEXTS="if (.tool_input | type) == \"object\" or (.tool_input | type) == \"array\" then ([.tool_input | $KEEP | .. | strings] | .[]) else empty end"
+  scan "$(printf '%s' "$INPUT" | jq -r "$TEXTS" 2>/dev/null | LC_ALL=C tr -d '\000')" < <(printf '%s' "$INPUT" | jq -r "$TEXTS" 2>/dev/null)
 fi
+if [ -n "$WARN" ]; then jq -cn --arg c "$WARN" '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:$c}}'; fi
 exit 0

@@ -1,0 +1,6 @@
+block	U+0000	U+0000	\x00
+block	U+202A	U+202E	\xe2\x80[\xaa-\xae]
+block	U+2066	U+2069	\xe2\x81[\xa6-\xa9]
+block	U+E0000	U+E007F	\xf3\xa0[\x80\x81][\x80-\xbf]
+warn	U+200B	U+200B	\xe2\x80\x8b
+warn	U+2060	U+2060	\xe2\x81\xa0
