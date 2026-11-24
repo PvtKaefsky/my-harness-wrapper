@@ -1,11 +1,12 @@
 # my-harness-wrapper
 
 A configuration source for Claude Code sessions, cloud and local. It is not
-an application. It has no build, no package manifest and no CI. Its seven test
+an application. It has no build, no package manifest and no CI. Its eight test
 scripts, `scripts/test-attribution-guard.sh`,
 `scripts/test-web-guidance-gate.sh`, `scripts/test-pr-comment-rules.sh`,
-`scripts/test-install-settings.sh`, `scripts/test-hook-forwarding.sh`,
-`scripts/test-session-check.sh` and `scripts/test-ab-probe.sh`, are run by hand.
+`scripts/test-orchestrator-rules.sh`, `scripts/test-install-settings.sh`,
+`scripts/test-hook-forwarding.sh`, `scripts/test-session-check.sh` and
+`scripts/test-ab-probe.sh`, are run by hand.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
 into a session's Claude config directory. It also holds one plugin,
@@ -108,7 +109,8 @@ every session.
 | `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, the hidden-character cases among them, directly and through the `PreToolUse` hook the tree's `config/settings.json` registers, one line per case. Run by hand only. |
 | `scripts/test-web-guidance-gate.sh` | Runs the Modern Web Guidance gate of its own tree in scratch repositories against a fixed set of cases, directly and through the `PreToolUse` hook `plugins/my-harness/hooks/hooks.json` registers, one line per case. Run by hand only. |
 | `scripts/test-pr-comment-rules.sh` | Checks the Pull request comments section of a `config/CLAUDE.md`, its own tree's unless an argument names another, for the subscription, the 30-minute check, the rules issue #113 adds and the cloud and local paths issue #111 adds, one line per check. Run by hand only. |
-| `scripts/test-install-settings.sh` | Runs the settings merge programs of its own tree's `scripts/install-local.sh` and `scripts/bootstrap.sh`, and the `settings_carries` function of its `scripts/verify.sh`, on sample live files. It checks that existing allow and deny entries survive, that each delivered entry is added once, that a second run changes nothing, that a shape that is not an array fails, and that `verify.sh` passes a live list with extra entries and fails one missing a delivered entry, one line per check. Three optional arguments name other copies of the three scripts. Run by hand only. |
+| `scripts/test-orchestrator-rules.sh` | Checks the Harness, Git workflow, A/B probes and Pull request comments sections of a `config/CLAUDE.md`, its own tree's unless an argument names another, for the orchestrator, nested-session, combined-branch and probe rules issue #137 adds, and checks that the file names no model, one line per check. Run by hand only. |
+| `scripts/test-install-settings.sh` | Runs the settings merge programs of its own tree's `scripts/install-local.sh` and `scripts/bootstrap.sh`, and the `settings_carries` function of its `scripts/verify.sh`, on sample live files. It checks that existing allow and deny entries survive, that each delivered entry is added once, that a second run changes nothing, that a shape that is not an array fails, that `verify.sh` passes a live list with extra entries and fails one missing a delivered entry, and that it passes the `env` both merges write and fails one with another value, one line per check. Three optional arguments name other copies of the three scripts. Run by hand only. |
 | `scripts/test-hook-forwarding.sh` | Runs the `git-hooks/` of its own tree in scratch repositories through six `core.hooksPath` cases, six commit-message cases and the hidden-character cases C1 to C11 and F1 to F22, one line per case. Run by hand only. |
 | `git-hooks/` | The git hooks `core.hooksPath` names: globally in the cloud, and locally only for the git commands Claude Code sessions start. One file per hook name git looks up. `commit-msg` rejects a message carrying a Claude Code attribution line or a block-class hidden character, and `pre-commit` rejects a staged change that adds one; every hook then runs the hook of that name git would run without the harness. `git-hooks/lib/attribution.ere` is the pattern both it and the attribution guard read. |
 | `scripts/check-hook-matchers.sh` | Compares the tool names the attribution guard's hook matchers name with a file of a session's tool names. Run by hand only. |

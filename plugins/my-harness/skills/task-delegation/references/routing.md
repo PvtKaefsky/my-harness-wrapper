@@ -1,9 +1,14 @@
 # Routing tables
 
-A subtask draws the first row of its table that matches. `SKILL.md` decides
-which table a session uses, and what happens where an executor is unavailable.
+A subtask on the subagent path draws the first row of its table that matches.
+`SKILL.md` decides which table a session uses, and what happens where an
+executor is unavailable. The orchestrated path uses neither table: its parts go
+to nested sessions, and its only subagents are the review gate's reviewers.
 
 ## Coding table
+
+The coding table applies only to a coding task in a session that lists no
+nested-session tool.
 
 | Subtask | Executor |
 | --- | --- |
@@ -17,6 +22,9 @@ which table a session uses, and what happens where an executor is unavailable.
 | Anything else | `my-harness:executor` |
 
 ## Analysis table
+
+The analysis table applies to a session under analysis-only instructions, such
+as a chat or Cowork session.
 
 | Subtask | Executor |
 | --- | --- |

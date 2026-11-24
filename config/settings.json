@@ -8,7 +8,11 @@
     "DISABLE_TELEMETRY": "1",
     "DO_NOT_TRACK": "1",
     "DISABLE_ERROR_REPORTING": "1",
-    "CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1"
+    "CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1",
+    "HARNESS_ORCHESTRATOR_MODEL": "claude-fable-5-2",
+    "HARNESS_ORCHESTRATOR_EFFORT": "medium",
+    "HARNESS_NESTED_MODEL": "claude-opus-5-5",
+    "HARNESS_NESTED_EFFORT": "medium"
   },
   "pluginConfigs": {
     "ponytail@ponytail": {

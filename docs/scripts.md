@@ -2512,7 +2512,59 @@ being one the delivered file also holds.
 | verify passes a live permissions with extra entries | `settings_carries` prints `carries` for the first result |
 | verify fails a live deny list missing a delivered entry | it prints `does not carry` with `Read(**/*.pem)` removed from the live list |
 | verify fails a live allow list missing a delivered entry | it prints `does not carry` with the live `permissions.allow` set to `["Bash(ls:*)"]` |
+| verify passes the env the local merge writes | `settings_carries` prints `carries` for the first result's `env` |
+| verify passes the env the bootstrap merge writes | it prints `carries` for the `env` of bootstrap's result on the sample live file |
+| verify fails a live env with another nested model | it prints `does not carry` with the first result's `env.HARNESS_NESTED_MODEL` set to `x` |
 | verify keeps equality for an array under another key | it prints `does not carry` for a live `["a","b"]` against a delivered `["a"]` under the key `x` |
+
+## scripts/test-orchestrator-rules.sh
+
+Reads the `## Harness`, `## Git workflow`, `## A/B probes` and `## Pull request
+comments` sections of the file its one optional argument names, or of
+`config/CLAUDE.md` in its own tree where none is given, and prints one line per
+check. It is run by hand only. It exits 0 only where every check passes, and
+exits 1 with `fail -> not run` where the file or a section is absent, both read
+as an empty section. Each
+check passes where its section holds the sentence or clause the label names,
+verbatim from the payload, except the last.
+
+| Check | Section |
+| --- | --- |
+| a coding task goes to an orchestrator | Harness |
+| the orchestrator model is named by variable | Harness |
+| every file change goes to a nested session | Harness |
+| an unsplit task goes to one nested session | Harness |
+| four nested sessions at once | Harness |
+| scratch files stay uncommitted | Harness |
+| the nested first line | Harness |
+| the nested model is named by variable | Harness |
+| an unset nested model stops and asks | Harness |
+| a nested session neither decomposes nor delegates | Harness |
+| a nested session keeps to its files and merges nothing | Harness |
+| the fallback without a nested-session tool | Harness |
+| chat sessions keep the analyst | Harness |
+| the combined branch name | Git workflow |
+| a nested pull request targets the combined branch | Git workflow |
+| only the orchestrator merges into a combined branch | Git workflow |
+| the user merges the combined pull request | Git workflow |
+| no version bump in a nested pull request | Git workflow |
+| the bump pull request merges last | Git workflow |
+| an unsplit change carries its bump | Git workflow |
+| verifying follows the skill | Git workflow |
+| a quoted first line makes no session nested | Harness |
+| the probe isolation | A/B probes |
+| a comment-driven nested commit draws the security reviewer | Pull request comments |
+| the runner and its exit codes | A/B probes |
+| the probe is mandatory for a major change | A/B probes |
+| an unsplit pull request carries the verdict | A/B probes |
+| an unsplit change without Docker states it in its pull request | A/B probes |
+| a new behaviour needs a check | A/B probes |
+| a regression blocks | A/B probes |
+| a block goes to a nested fix | A/B probes |
+| failing on both does not block | A/B probes |
+| no Docker leaves a draft | A/B probes |
+| the orchestrator sends comment changes to a nested session | Pull request comments |
+| no sentence names a model | the whole file holds no `claude-fable`, `claude-opus`, `claude-sonnet` or `claude-haiku` |
 
 ## scripts/test-pr-comment-rules.sh
 

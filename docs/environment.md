@@ -1395,6 +1395,50 @@ The control is the fourteen rules. The record follows
 | Owner | The repository owner, `PvtKaefsky`. |
 | Removal condition | None recorded. |
 
+## Orchestrator and nested sessions
+
+`config/CLAUDE.md`'s Harness bullets name the orchestrator's and the nested
+sessions' model and effort by the `env` variables `config/settings.json`
+delivers:
+
+| Variable | Value |
+| --- | --- |
+| `HARNESS_ORCHESTRATOR_MODEL` | `claude-fable-5-2` |
+| `HARNESS_ORCHESTRATOR_EFFORT` | `medium` |
+| `HARNESS_NESTED_MODEL` | `claude-opus-5-5` |
+| `HARNESS_NESTED_EFFORT` | `medium` |
+
+### The nested-session tool
+
+Read in the Claude desktop app's Code tab on 2026-11-24, from the tool
+descriptions an orchestrator session listed and from its own calls.
+
+| Fact | Value |
+| --- | --- |
+| Tool | `mcp__ccd_session__start_session`, a deferred tool loaded with `ToolSearch` before use. |
+| `model` parameter | "fresh" context only, optional: a cheaper model id. Same family or cheaper than the caller's; the description states a higher one is ignored. Omitted, the session inherits the caller's model. |
+| `effort` parameter | "fresh" context only, optional: `low`, `medium`, `high`, `xhigh` or `max`, at or below the caller's. Omitted, the session inherits the caller's effort. |
+| Folder | `use_worktree: true` gives the session its own git worktree, cut from the existing local branch `source_branch` names; `cwd` names another folder. |
+| The caller's own model | `mcp__ccd_session_mgmt__get_session` with `self` reported `model` `claude-fable-5-2` and `effort` `medium` for the orchestrator. |
+| Hand-back | The app continues the starting session when a started session ends its turn (`wake_when_done`). |
+| Where absent | Cloud sessions and the terminal CLI list no such tool. |
+
+Not probed: whether a `model` id above the caller's is refused or silently
+ignored.
+
+### The control record for the orchestrator rules
+
+| Field | Value |
+| --- | --- |
+| Incident | None. Issue #137 asks for the rules; no event in this repository is recorded. |
+| Blocked input | A main session doing a coding task's work itself. Shown under the brief that carried these rules before the payload did: orchestrator session `local_7da2d5ef-43ba-4206-b39e-1ba436ada99a` decomposed issue #137 and started nested sessions for its parts. |
+| Permitted neighbour | A nested session running the review gate's reviewer subagents. Shown in the nested session that wrote `config/CLAUDE.md`'s orchestrator bullets, which ran `ecc:code-reviewer` and `ecc:security-reviewer` on its staged diff and no executor subagent. |
+| Bypass | No hook enforces the rules: a session that does not treat its task as a coding task, or a brief missing the `nested-session -> base:` line, falls outside them. |
+| Host and revision | Windows 11, Claude desktop app, branch `release/137-orchestrator-ab-probe` at commit `1abfd67`. |
+| Cost | One orchestrator session and one nested session per part, at most four open at once; the brief and the hand-back add latency to every coding task. Upkeep: the four `env` values when models change. |
+| Owner | The repository owner, `PvtKaefsky`. |
+| Removal condition | None recorded. |
+
 ## Diagnostic-output invariant
 
 Every diagnostic line prints the predicate tested and the value observed, never
