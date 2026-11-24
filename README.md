@@ -1,11 +1,11 @@
 # my-harness-wrapper
 
 A configuration source for Claude Code sessions, cloud and local. It is not
-an application. It has no build, no package manifest and no CI. Its five test
+an application. It has no build, no package manifest and no CI. Its six test
 scripts, `scripts/test-attribution-guard.sh`,
 `scripts/test-web-guidance-gate.sh`, `scripts/test-pr-comment-rules.sh`,
-`scripts/test-install-settings.sh` and
-`scripts/test-hook-forwarding.sh`, are run by hand.
+`scripts/test-install-settings.sh`, `scripts/test-hook-forwarding.sh` and
+`scripts/test-session-check.sh`, are run by hand.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
 into a session's Claude config directory. It also holds one plugin,
@@ -101,7 +101,8 @@ every session.
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config's signing keys. |
 | `scripts/plugin-dependencies.sh` | Installs a delivered plugin's npm dependencies where any is unresolved, and runs nothing otherwise. Run by both delivery scripts after each plugin's install. Needs `npm` only where it installs. |
-| `scripts/session-check.sh` | Reports what a session starts with. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
+| `scripts/session-check.sh` | Reports what a session starts with, and prints a `NOTE` line for each hidden character in the working repository's instruction files. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
+| `scripts/test-session-check.sh` | Runs the `scripts/session-check.sh` of its own tree in scratch repositories against the hidden-character scan's cases, one line per case. Run by hand only. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |
 | `scripts/attribution-guard.sh` | Blocks a pull request, issue, comment, review or review reply body, or a commit a GitHub tool makes, carrying a Claude Code attribution line or a block-class hidden character, and tells the session to resend a description the create call returns with an attribution line. Run by the `PreToolUse` and `PostToolUse` hooks `config/settings.json` registers. |
 | `scripts/test-attribution-guard.sh` | Runs the attribution guard in its own tree against a fixed set of cases, the hidden-character cases among them, directly and through the `PreToolUse` hook the tree's `config/settings.json` registers, one line per case. Run by hand only. |
