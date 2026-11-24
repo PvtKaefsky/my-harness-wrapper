@@ -2822,3 +2822,176 @@ than being overwritten or silently delivered from.
 Each skip path prints its reason and reaches `exit 0`. An absent `git`, a
 failed clone, and a clone without `scripts/bootstrap.sh` are three distinct
 lines. Neither an absent nor an empty `HARNESS_REPO_URL` skips bootstrap.
+
+## scripts/ab-probe.sh
+
+Runs a project's scripted checks in Docker on two commits, the baseline and
+the candidate, and compares them check by check. It is run by hand, or by an
+orchestrating session before it opens a combined pull request.
+
+```
+bash scripts/ab-probe.sh <repo> <baseline-ref> <candidate-ref> [--runs N]
+```
+
+`<repo>` is a clone or a git worktree. Each ref is anything `git rev-parse`
+resolves to a commit in it. `--runs N` runs each tree N times, N being a
+positive integer written without a leading zero; the default is 1. It needs `git`, `jq` and the `docker` CLI
+with Compose.
+
+| Step | What it does |
+| --- | --- |
+| 1 | Checks that `git`, `jq` and `docker` are on `PATH`, that `docker info` reaches a daemon, and that `docker compose version` runs. |
+| 2 | Resolves each ref in `<repo>` to a commit, makes a standalone clone of `<repo>` per tree under a `mktemp -d` directory, and checks the commit out detached with `core.autocrlf=false`. |
+| 3 | Replaces the baseline's `probe/` with a copy of the candidate's. A candidate without `probe/Dockerfile`, `probe/compose.yaml` or `probe/checks.sh` as regular files, or whose `probe/` is a symlink or holds one, stops the run, since Compose reads `probe/.env` on the host. |
+| 4 | Builds the image once from the candidate's `probe/Dockerfile`, with `probe/` as the build context, tagged `ab-probe:<pid>-<random>`. |
+| 5 | For each run and each tree, baseline first: runs `docker compose config` on the tree's `probe/compose.yaml`, checks the result against the contract, runs `docker compose run --rm --no-deps -T checks`, and reads `checks.jsonl` from that run's results directory. |
+| 6 | Reads each check's status per tree, prints one `check` line per check id in sorted order, and prints the verdict. |
+| 7 | On exit, removes every container labelled with the run's Compose project, the image and the scratch directory. |
+
+The clones are local `git clone` copies, so they carry the full history and
+every object of `<repo>`, a worktree's shared repository included. A container
+mounting a worktree itself could not read its repository, its `.git` being a
+file that points into the main clone.
+
+### The probe contract
+
+A project's `probe/` holds three files. The runner uses the candidate's copy
+for both trees.
+
+| Part | Contract |
+| --- | --- |
+| `probe/Dockerfile` | Builds the image the checks run in, with `probe/` as the build context. The build is the only step with network access. |
+| `probe/compose.yaml` | Resolves to the top-level keys `name` and `services` only, and to exactly one service, `checks`, whose `image` is `${PROBE_IMAGE}` and whose `network_mode` is `none`. The service carries no key outside `command`, `entrypoint`, `image`, `network_mode`, `volumes`, `working_dir`, `user`, `read_only`, `tmpfs`, `mem_limit`, `pids_limit` and `cpus`, so `environment`, `env_file`, `privileged`, `build`, `depends_on`, `secrets` and every other key stop the run. |
+| Mounts | Exactly two `volumes`, both of type `bind`: `${PROBE_TREE}` at `/work` with `read_only: true`, and `${PROBE_RESULTS}` at `/results`. |
+| `probe/checks.sh` | Run by the service's `command`, normally `["bash", "probe/checks.sh"]` with `working_dir: /work`. It writes `/results/checks.jsonl`, one JSON line per check: `{"id": "<id>", "status": "pass" or "fail", "seconds": <number>}`, and writes nothing else under `/results`. |
+
+| Variable | Value |
+| --- | --- |
+| `PROBE_IMAGE` | The tag step 4 built. |
+| `PROBE_TREE` | The host path of the tree's clone. |
+| `PROBE_RESULTS` | The host path of an empty directory for that run's results. |
+
+The runner runs `docker compose` under `env -i`, with the three variables and,
+where set, only the variables the Docker CLI reads: `PATH`, `HOME`,
+`DOCKER_HOST`, `DOCKER_CONTEXT`, `DOCKER_CONFIG`, `DOCKER_CERT_PATH`,
+`DOCKER_TLS_VERIFY`, and on Windows `SYSTEMROOT`, `USERPROFILE`, `APPDATA`,
+`LOCALAPPDATA`, `PROGRAMFILES`, `ProgramData`, `TEMP` and `TMP`. The Docker CLI
+on Windows finds the Compose plugin only with `PROGRAMFILES` set. Compose
+substitutes variables into any field, so those are the only host values a
+`compose.yaml` can reach. The runner passes no variable into the container,
+mounts nothing beyond the two binds, and passes no credential. A `compose.yaml`
+that `docker compose config` resolves to anything outside the contract stops the
+run.
+
+A tree with no `checks.jsonl` after its run, or a file holding a line that is
+not such an object, stops the run. An empty file is zero checks. The container's
+exit status is printed and does not decide a check. Where one run reports an id
+more than once, it is `fail` in that run if any of its lines is `fail`.
+
+### Reading a check's status
+
+A check's status per tree is `pass`, `fail` or `absent`, `absent` meaning no
+line carried its id.
+
+| Tree | Status over N runs |
+| --- | --- |
+| Baseline | `pass` where any run reports `pass`; otherwise `fail` where any run reports `fail`; otherwise `absent`. |
+| Candidate | `absent` where no run reports it; `pass` where every run reports `pass`; otherwise `fail`, a run missing the id counting as `fail`. |
+
+A check that passes in any baseline run and fails or is missing in any
+candidate run therefore reports as a regression. With one run both rules give
+that run's status.
+
+### Output and exit status
+
+| Baseline | Candidate | Label | Blocks |
+| --- | --- | --- | --- |
+| `pass` | `fail` or `absent` | `regression` | yes |
+| `fail` or `absent` | `pass` | `shown` | no |
+| `pass` | `pass` | `ok` | no |
+| `fail` | `fail` | `failing on both` | no |
+| `fail` or `absent` | `fail` or `absent`, the two not both `fail` | `not passing` | no |
+
+Each check prints `check <id> baseline -> <status>, candidate -> <status>, <label>`.
+The last line is `verdict -> blocked, regressions=R shown=S failing=F` or
+`verdict -> no regression, regressions=0 shown=S failing=F`, `F` counting the
+`failing on both` and `not passing` checks. A run that stops early prints the
+reason and `verdict -> not run`.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | No regression. |
+| 1 | At least one regression. |
+| 2 | The probe did not run: a missing tool, no reachable Docker daemon, a ref that is not a commit, a failed clone, a candidate without `probe/`, a failed build, a `compose.yaml` outside the contract, or results absent or unreadable. A usage error also exits 2. |
+
+### Windows Git Bash
+
+Every `docker` call runs with `MSYS_NO_PATHCONV=1`, so Git Bash rewrites no
+argument. Where `cygpath` exists, host paths are passed as `cygpath -m` gives
+them, `C:/Users/...`, the form Docker Desktop accepts and reports back from
+`docker compose config`. Git for Windows' `jq` ends its lines with CRLF, so the
+runner strips carriage returns from the `jq` output it reads back. The scratch
+directory is `mktemp -d`, which in Git Bash lies under the user's profile,
+shared with Docker Desktop by default.
+
+## scripts/test-ab-probe.sh
+
+Runs the `scripts/ab-probe.sh` beside it against a fixture repository it builds
+under a `mktemp -d` directory, with a fake `docker` first on `PATH`, one line per
+case. It is run by hand only, and needs `git` and `jq`, no Docker and no
+network.
+
+The fake answers `info`, `build`, `ps`, `rm`, `image rm`, `compose version`,
+`compose config` and `compose run`. It reads its controls from files beside
+itself, since the runner calls `docker compose` under `env -i`: `mode` holds one
+word and `config.jq` a `jq` filter, `.` by default.
+
+| Control | Effect |
+| --- | --- |
+| `mode` `nodaemon` | `info` fails. |
+| `mode` `buildfail` | `build` fails. |
+| `mode` `absent` | `compose run` writes no `checks.jsonl`. |
+| `mode` `malformed`, `skip`, `seconds` | `compose run` appends a line that is not JSON, one with status `skip`, or one with `seconds` a string. |
+| `config.jq` | Applied to the whole config JSON that `compose config` reports, the contract's service built from `PROBE_IMAGE`, `PROBE_TREE` and `PROBE_RESULTS`. |
+
+`compose config` appends its environment to `compose-env` beside the fake.
+`compose run` runs the tree's `probe/checks.sh` with bash from inside the tree,
+with `PROBE_OUT` set to the results directory and `FAKE_RUN` to the run's number
+for that tree.
+
+The test sets `GIT_CONFIG_GLOBAL` to a file holding `core.autocrlf = true`, sets
+`GIT_CONFIG_NOSYSTEM=1`, and exports `AB_PROBE_CANARY`. The fixture's `main`
+holds `a.txt` reading `ok`, `g.txt` and no `probe/`. Branch `regression` adds
+`probe/`, changes `a.txt` and removes `g.txt`; branch `shown` adds `probe/`,
+`b.txt`, `c.txt` and `h.txt`; branch `symlink`, cut from `shown`, adds
+`probe/.env` as a symlink to the test's git config file. The fixture's `probe/checks.sh` is written with
+CRLF line endings and committed as LF, so a plain clone under that config checks
+it out with CRLF; a precondition line checks all three.
+
+| Check id | Passes where |
+| --- | --- |
+| `a` | `a.txt` reads `ok`. |
+| `b` | `b.txt` exists. |
+| `c` | Always; reported only where `c.txt` exists. |
+| `d` | Never. |
+| `f` | `FAKE_RUN` is odd, or unset. |
+| `g` | Always; reported only where `g.txt` exists. |
+| `h` | Never; reported only where `h.txt` exists. |
+
+| Case | Expected |
+| --- | --- |
+| `main` against `regression` | Exit 1, `a` a regression with the candidate `fail`, `g` a regression with the candidate `absent`. |
+| `main` against `shown` | Exit 0, `b` and `c` `shown`, `a` `ok`. |
+| The same pair | `d` `failing on both`, `h` `not passing`. |
+| The same pair | Both runs complete, the CRLF-committed `probe/checks.sh` having run. |
+| The same pair with `--runs 2` | Exit 1, `check f baseline -> pass, candidate -> fail, regression`. |
+| The same pair, `AB_PROBE_CANARY` exported | `compose-env` holds `PROBE_TREE` and not `AB_PROBE_CANARY`. |
+| `mode` `nodaemon` | Exit 2, `verdict -> not run`. |
+| `mode` `buildfail` | Exit 2, the failed-build line. |
+| Ten `config.jq` patches: `network_mode` `bridge`, an `environment`, an `env_file`, `privileged`, another `image`, a third volume, `/work` not read-only, `/results` at another target, a second service, a top-level `secrets` | Exit 2, the contract line, for each. |
+| `mode` `absent` | Exit 2, the `checks.jsonl absent` line. |
+| `mode` `malformed`, `skip`, `seconds` | Exit 2, the `checks.jsonl unreadable` line, for each. |
+| `main` against `symlink` | Exit 2, `candidate probe/ -> holds a symlink, probe not run`. Where a clone checks `probe/.env` out as a regular file, as Git for Windows does without symlink support, the case prints `not run` and counts as no failure. |
+| `shown` against `main`, the candidate without `probe/` | Exit 2, the absent `probe/Dockerfile` line. |
+
+The last line is `fail -> N`, and the exit status is 0 only where N is 0.

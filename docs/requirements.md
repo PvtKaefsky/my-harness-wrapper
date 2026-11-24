@@ -156,3 +156,19 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A session asked to create a repository invokes `my-harness:repository-setup`, and its reply gives `git init --initial-branch=main` and names the layout document. | `plugins/my-harness/evals/create-python-library` |
 | A session asked for a change that needs a new top-level directory in an existing repository invokes `my-harness:repository-setup`, and its reply names the layout document. | `plugins/my-harness/evals/add-top-level-directory` |
 | A session asked to edit one file in an existing repository does not invoke `my-harness:repository-setup`. | `plugins/my-harness/evals/edit-one-file` |
+
+## A/B probe
+
+| Requirement | Test |
+| --- | --- |
+| `scripts/ab-probe.sh` prints `check <id> baseline -> pass, candidate -> fail, regression` and `verdict -> blocked, ...` and exits 1 where a check passing on the baseline fails on the candidate, and prints `candidate -> absent, regression` where the candidate reports no such check. | `scripts/test-ab-probe.sh`, `main` against `regression` |
+| A check failing or absent on the baseline and passing on the candidate prints `shown`, and the runner exits 0 where nothing regresses. | `scripts/test-ab-probe.sh`, `main` against `shown` |
+| A check failing on both trees prints `failing on both`, a check absent on the baseline and failing on the candidate prints `not passing`, and neither blocks. | `scripts/test-ab-probe.sh`, the failing-on-both case |
+| The candidate's `probe/` runs against both trees, a baseline without `probe/` included. | `scripts/test-ab-probe.sh`, every case against `main` |
+| A `probe/checks.sh` that a plain clone under `core.autocrlf=true` checks out with CRLF runs, the runner's clones checking out with `core.autocrlf=false`. | `scripts/test-ab-probe.sh`, the precondition line and the CRLF case |
+| With `--runs N`, a check reads `pass` on the baseline where any run passes, and `pass` on the candidate only where every run passes. | `scripts/test-ab-probe.sh`, the `--runs 2` case |
+| Without a reachable Docker daemon, after a failed image build, and with a candidate lacking `probe/`, the runner prints `verdict -> not run` and exits 2. | `scripts/test-ab-probe.sh`, the `nodaemon`, `buildfail` and candidate-without-`probe/` cases |
+| A `docker compose config` result with `network_mode` other than `none`, an `environment`, an `env_file`, `privileged`, an image other than the one the runner built, a third volume, `/work` not read-only, `/results` at another target, a second service, or a top-level `secrets` stops the run with exit 2 and `probe/compose.yaml -> breaks the probe contract, probe not run`. | `scripts/test-ab-probe.sh`, the ten `config.jq` cases |
+| A run that leaves no `checks.jsonl`, or one holding a line that is not JSON, a status other than `pass` or `fail`, or a `seconds` that is not a number, stops the run with exit 2. | `scripts/test-ab-probe.sh`, the `absent`, `malformed`, `skip` and `seconds` cases |
+| A variable exported in the runner's environment outside the documented list does not reach `docker compose`. | `scripts/test-ab-probe.sh`, the `AB_PROBE_CANARY` case |
+| A candidate whose `probe/` is a symlink or holds one stops the run with exit 2 and `candidate probe/ -> holds a symlink, probe not run`. | `scripts/test-ab-probe.sh`, `main` against `symlink`, run where the checkout creates symlinks, as on Linux |

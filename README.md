@@ -1,11 +1,11 @@
 # my-harness-wrapper
 
 A configuration source for Claude Code sessions, cloud and local. It is not
-an application. It has no build, no package manifest and no CI. Its six test
+an application. It has no build, no package manifest and no CI. Its seven test
 scripts, `scripts/test-attribution-guard.sh`,
 `scripts/test-web-guidance-gate.sh`, `scripts/test-pr-comment-rules.sh`,
-`scripts/test-install-settings.sh`, `scripts/test-hook-forwarding.sh` and
-`scripts/test-session-check.sh`, are run by hand.
+`scripts/test-install-settings.sh`, `scripts/test-hook-forwarding.sh`,
+`scripts/test-session-check.sh` and `scripts/test-ab-probe.sh`, are run by hand.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
 into a session's Claude config directory. It also holds one plugin,
@@ -112,6 +112,8 @@ every session.
 | `scripts/test-hook-forwarding.sh` | Runs the `git-hooks/` of its own tree in scratch repositories through six `core.hooksPath` cases, six commit-message cases and the hidden-character cases C1 to C11 and F1 to F22, one line per case. Run by hand only. |
 | `git-hooks/` | The git hooks `core.hooksPath` names: globally in the cloud, and locally only for the git commands Claude Code sessions start. One file per hook name git looks up. `commit-msg` rejects a message carrying a Claude Code attribution line or a block-class hidden character, and `pre-commit` rejects a staged change that adds one; every hook then runs the hook of that name git would run without the harness. `git-hooks/lib/attribution.ere` is the pattern both it and the attribution guard read. |
 | `scripts/check-hook-matchers.sh` | Compares the tool names the attribution guard's hook matchers name with a file of a session's tool names. Run by hand only. |
+| `scripts/ab-probe.sh` | The A/B probe runner. Runs a project's `probe/checks.sh` in Docker on a baseline and a candidate commit of a repository, using the candidate's `probe/` for both, prints one line per check and a verdict, and exits 1 on a regression and 2 where the probe could not run. Run by hand. |
+| `scripts/test-ab-probe.sh` | Runs the `scripts/ab-probe.sh` of its own tree against a fixture repository with a fake `docker`, one line per case. Needs no Docker and no network. Run by hand only. |
 | `.gitattributes` | The line-ending rule. Git checks out every file it detects as text with LF line endings, on every platform. |
 | `README.md` | This file. |
 | `docs/` | Documentation. |
