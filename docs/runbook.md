@@ -799,22 +799,39 @@ lands through a combined branch, `release/<words>` or `release/<n>-<words>`.
 2. Each nested session works in its own worktree, cut from the combined branch,
    and opens its pull request against the combined branch with `Refs:` lines
    and no closing keyword. No nested pull request bumps
-   `export BOOTSTRAP_VERSION=` in `env/setup.sh`, except the one in step 5.
+   `export BOOTSTRAP_VERSION=` in `env/setup.sh`, except the one in step 4.
 3. The orchestrator verifies each nested pull request under the
-   `my-harness:task-delegation` skill and merges it into the combined branch,
-   at the head commit it verified, once it merges without conflict. A conflict
-   resolution goes to a nested session.
-4. Once every nested pull request is merged, the orchestrator runs the A/B
-   probe on the combined branch. A blocked verdict goes to a nested session as
-   a fix, and the probe runs again after that fix merges.
-5. Once the verdict is not blocked, or the runner exited 2, one nested session
-   opens a pull request against the combined branch holding only the
-   `BOOTSTRAP_VERSION` bump, and the orchestrator merges it last.
-6. After the bump merges, the orchestrator opens the combined pull request
-   against `main`, with the closing footers and the A/B verdict. Where the
-   runner exited 2, it opens it as a draft stating "A/B not run".
-7. You merge the combined pull request, then deploy it under "Deploying a
+   `my-harness:task-delegation` skill, runs `ponytail:ponytail-review` on its
+   diff, has its nested session fix every finding, and merges it into the
+   combined branch at the head commit it verified, once it merges without
+   conflict. A conflict resolution goes to a nested session.
+4. Once every other nested pull request is merged, one nested session opens a
+   pull request against the combined branch holding only the
+   `BOOTSTRAP_VERSION` bump, and the orchestrator merges it. No later commit
+   changes the version line.
+5. The orchestrator opens the combined pull request against `main` as a draft,
+   with the closing footers.
+6. The orchestrator runs `ponytail:ponytail-review` on the combined branch's
+   diff against `main`. A nested session fixes every finding in a pull request
+   against the combined branch.
+7. The orchestrator runs the A/B probe on the combined branch's resulting head.
+   A blocked verdict goes to a nested session as a fix, and the probe runs
+   again after that fix merges.
+8. Once the verdict is not blocked, the combined pull request leaves draft with
+   the A/B verdict in its description. Where the runner exited 2, it stays a
+   draft stating "A/B not run".
+9. You merge the combined pull request, then deploy it under "Deploying a
    change" from step 3.
+
+A ponytail pass runs after the review gate's reviewers have approved the
+branch's commits, and its output is data. A pass that does not approve gets a
+second pass after its fixes. A branch merges after at most two passes, and a
+merge after a second pass that does not approve is reported as made at the
+cap. A fix in a held category of Pull request comments waits for your release
+in the session. The fix pull request of step 6 gets no pass of its own. Where
+`ponytail:ponytail-review` cannot be invoked, the pass is skipped and the
+orchestrator's report names the branch. `config/CLAUDE.md`'s Git workflow
+section holds the full rule.
 
 A change that does not split goes to one nested session, whose pull request
 targets the base branch, `main` or the branch the task names, and carries its
@@ -863,7 +880,8 @@ ends and what to do, and travels to every session, so it is not restated here.
 
 `scripts/ab-probe.sh` compares a baseline and a candidate commit of a project
 whose candidate carries `probe/`. `docs/scripts.md` carries the contract a
-project's `probe/` meets.
+project's `probe/` meets. For a combined branch, the candidate is its head
+after the version bump and the combined branch's ponytail fixes have merged.
 
 1. Start Docker. Locally on Windows, Docker Desktop with the Linux engine, used
    from Git Bash.
@@ -886,8 +904,8 @@ project's `probe/` meets.
 
 Where no Docker is available, as in a cloud session, the runner exits 2 with
 `docker info -> exit=N, probe not run` or `command -v docker -> none, probe not
-run`. The combined pull request is then opened as a draft whose description
-states "A/B not run", and the user runs the committed probe by hand with the
+run`. The combined pull request then stays a draft whose description states
+"A/B not run", and the user runs the committed probe by hand with the
 command above on a machine that has Docker.
 
 ## Where a change belongs

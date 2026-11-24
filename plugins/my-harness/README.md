@@ -12,7 +12,7 @@ Modern Web Guidance plugin to web front-end work. The marketplace
 | Path | Role |
 | --- | --- |
 | `.claude-plugin/plugin.json` | The manifest: name `my-harness` and the version. |
-| `skills/task-delegation/SKILL.md` | The whole procedure: which section a session follows; the limits of a nested session and of a delegated subagent; a question; the orchestrated path, with the orchestrator's actions, scratch files, models, decomposition, the combined branch, the nested-session brief, running, verification, the merge, the A/B probe, the combined pull request, bounds and report; and the subagent path. |
+| `skills/task-delegation/SKILL.md` | The whole procedure: which section a session follows; the limits of a nested session and of a delegated subagent; a question; the orchestrated path, with the orchestrator's actions, scratch files, models, decomposition, the combined branch, the nested-session brief, running, verification, the ponytail review, the merge, the combined pull request, the A/B probe, bounds and report; and the subagent path, with its ponytail review before a pull request opens. |
 | `skills/task-delegation/references/routing.md` | The routing tables of the subagent path: coding, for a session with no nested-session tool, and analysis, for an analysis-only session. |
 | `skills/python-property-model-tests/SKILL.md` | Writing Python tests that a unit keeps a property across many inputs or operation sequences: tool choice, property kinds, input strategies, state machines, failing examples and CI determinism. |
 | `skills/edit-russian-technical-text/SKILL.md` | Rules for editing Russian technical prose while keeping its meaning, terms and requirements, with before and after examples. |
@@ -78,6 +78,7 @@ scores `1.0` only where every grader passes.
 | `graders/initial-branch.md` | `create-python-library` | holds `git init --initial-branch=main` |
 | `graders/decomposition.md` | `delegation-coding-task` | holds `decomposition -> nested: 1` |
 | `graders/brief.md` | `delegation-coding-task` | holds `nested-session -> base: main` |
+| `graders/ponytail.md` | `delegation-coding-task` | holds `ponytail-review` followed later by "merg" or the word "ready", in any casing |
 | `graders/decomposition.md` | `delegation-analysis-question` | holds `decomposition -> whole` |
 | `graders/unavailable.md` | `delegation-no-nested-tool` | holds `nested-sessions -> unavailable` |
 | `graders/no-nested-brief.md` | `delegation-analysis-question`, `delegation-no-nested-tool` | does not hold `nested-session -> base:` |
@@ -87,14 +88,15 @@ read in it.
 
 `claude plugin eval` cannot start nested sessions: a run lists no
 nested-session tool. The `task-delegation` graders therefore check the
-decomposition line and the briefs the final reply states, never the tool calls.
-The `delegation-coding-task` prompt states that the session is an orchestrator
-in the desktop app and asks for the decomposition and briefs in place of the
-calls.
+decomposition line, the briefs and the steps to the merge the final reply
+states, never the tool calls. The `delegation-coding-task` prompt states that
+the session is an orchestrator in the desktop app and asks for the
+decomposition, the briefs and each step from the nested pull request to its
+merge in place of the calls.
 
 | Case | Skill | Expected | The prompt carries |
 | --- | --- | --- | --- |
-| `delegation-coding-task` | `task-delegation` | invoke | a statement that the session is an orchestrator in the desktop app, a Python script, and a request to add a `--dry-run` flag and document it |
+| `delegation-coding-task` | `task-delegation` | invoke | a statement that the session is an orchestrator in the desktop app, a Python script, a request to add a `--dry-run` flag and document it, and a request for each step up to the merge |
 | `delegation-analysis-question` | `task-delegation` | invoke | a short Python function and a question about why it returns `None` for an empty list |
 | `delegation-no-nested-tool` | `task-delegation` | invoke | a statement that the session is the terminal CLI with no nested-session tool, a Python script, and a request to plan a `--limit` flag and its test |
 | `property-tests-serializer` | `python-property-model-tests` | invoke | a Python `encode`/`decode` pair and a request for tests |
@@ -145,14 +147,14 @@ skill that is missing.
 
 The `task-delegation` cases were measured on 2026-11-24 with CLI 2.1.317,
 `--model claude-opus-5-5`, `--ablation none`, `--runs 3` and
-`--case 'delegation-*'`, against this plugin at version 0.5.0. The run cost
-$1.40 and exited 0.
+`--case 'delegation-*'`, against this plugin at version 0.5.0 at commit
+`5f52555`. The run cost $1.54 and exited 0.
 
 | Case | Score | Runs passed | Cost (USD) |
 | --- | --- | --- | --- |
-| `delegation-coding-task` | 1.0 | 3 of 3 | 0.52 |
-| `delegation-analysis-question` | 1.0 | 3 of 3 | 0.41 |
-| `delegation-no-nested-tool` | 1.0 | 3 of 3 | 0.47 |
+| `delegation-coding-task` | 1.0 | 3 of 3 | 0.60 |
+| `delegation-analysis-question` | 1.0 | 3 of 3 | 0.44 |
+| `delegation-no-nested-tool` | 1.0 | 3 of 3 | 0.50 |
 
 The other cases were measured on 2026-11-23 with CLI 2.1.317,
 `--model claude-opus-5-5`, `--ablation none` and `--runs 3`, against this

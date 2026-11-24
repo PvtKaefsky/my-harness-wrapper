@@ -4,7 +4,7 @@ allowed_tools: [Read, Glob, Grep, Skill]
 tags: [task-delegation]
 ---
 
-This session is the orchestrator in the Claude desktop app, in a clone of `acme/cleanup` whose default branch is `main`. `mcp__ccd_session__start_session` is available there but not loaded in this run, so start nothing: write out the decomposition and each brief you would send.
+This session is the orchestrator in the Claude desktop app, in a clone of `acme/cleanup` whose default branch is `main`. `mcp__ccd_session__start_session` is available there but not loaded in this run, so start nothing: write out the decomposition, each brief you would send, and each step you would take from the nested pull request to its merge.
 
 Add a `--dry-run` flag to this script: with it, the script prints what it would delete and deletes nothing. Document the flag in the script's usage text too.
 
