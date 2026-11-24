@@ -5,6 +5,8 @@ OUT=/results/checks.jsonl
 TREE=/tmp/probe-tree
 LOGS=/tmp/probe-logs
 SRC=/tmp/probe-install-src
+FAKE=/tmp/probe-fake-claude
+LIMIT=600
 : > "$OUT"
 mkdir -p "$TREE" "$LOGS"
 cp -a /work/. "$TREE"
@@ -23,12 +25,21 @@ last_line() {
   tail -n 1 "$1" | tr -d '\r'
 }
 
+limited() {
+  local log=$1 code
+  shift
+  timeout -k 10 "$LIMIT" "$@" > "$log" 2>&1 < /dev/null
+  code=$?
+  [ "$code" -ne 124 ] && [ "$code" -ne 137 ] || echo "$* -> timed out after ${LIMIT}s" | tee -a "$log"
+  return "$code"
+}
+
 for path in "$TREE"/scripts/test-*.sh; do
   [ -f "$path" ] || continue
   name=${path##*/}
   log="$LOGS/$name.log"
   start=$EPOCHREALTIME
-  (cd "$TREE" && bash "scripts/$name") > "$log" 2>&1 < /dev/null
+  (cd "$TREE" && limited "$log" bash "scripts/$name")
   code=$?
   status=fail
   [ "$code" -eq 0 ] && [ "$(last_line "$log")" = "fail -> 0" ] && status=pass
@@ -46,9 +57,12 @@ if [ "$code" -eq 0 ] && git -c init.defaultBranch=main clone -q --no-checkout "$
   mkdir -p /home/user
   export GIT_AUTHOR_NAME=Probe GIT_AUTHOR_EMAIL=probe@example.com
   export GIT_COMMITTER_NAME=Probe GIT_COMMITTER_EMAIL=probe@example.com HARNESS_ASSIGNEE=probe
-  HARNESS_REPO_URL=$SRC bash "$SRC/env/setup.sh" < /dev/null
-  cat /home/user/bootstrap.log
-  bash /opt/my-harness-wrapper/scripts/verify.sh > "$LOGS/verify.log" 2>&1 < /dev/null
+  export FAKE_CLAUDE_DIR=$FAKE FAKE_CLAUDE_REPO=/opt/my-harness-wrapper PATH=$FAKE/bin:$PATH
+  mkdir -p "$FAKE/bin" && cp "$TREE/probe/fake-claude.sh" "$FAKE/bin/claude" && chmod +x "$FAKE/bin/claude"
+  export HARNESS_REPO_URL=$SRC
+  limited "$LOGS/setup.log" bash "$SRC/env/setup.sh"
+  cat "$LOGS/setup.log" /home/user/bootstrap.log
+  limited "$LOGS/verify.log" bash /opt/my-harness-wrapper/scripts/verify.sh
   code=$?
   cat "$LOGS/verify.log"
   echo "bash /opt/my-harness-wrapper/scripts/verify.sh -> exit=$code, last line [$(last_line "$LOGS/verify.log")]"

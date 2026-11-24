@@ -3079,6 +3079,7 @@ This repository's own A/B probe, under the contract in "The probe contract".
 | `probe/Dockerfile` | `debian:13-slim` with `bash`, `coreutils`, `diffutils`, `findutils`, `gawk`, `git`, `grep`, `jq`, `procps` and `sed`, and no Claude Code. It sets `safe.directory` to `*` in the system git config, since the tree is owned by a host uid. |
 | `probe/compose.yaml` | The one service `checks`, running `bash probe/checks.sh` in `/work`. |
 | `probe/checks.sh` | The checks. |
+| `probe/fake-claude.sh` | The fake `claude` CLI the install check puts on `PATH`. |
 
 The image is Debian 13, the release of the Linux test host the hidden-character
 records in `docs/environment.md` name. The cloud sessions' release is not
@@ -3090,6 +3091,11 @@ recorded, so the image is not known to match it.
 check there, so nothing writes to the read-only tree. It writes one line per
 check to `/results/checks.jsonl`, with `seconds` the check's wall-clock time to
 the millisecond, and prints each check's output on standard output.
+
+Each test script, `env/setup.sh` and `scripts/verify.sh` runs under
+`timeout -k 10 600`. A command still running after 600 seconds is stopped, its
+log and standard output get the line `<command> -> timed out after 600s`, and
+its check reads `fail`.
 
 | Check id | Passes where |
 | --- | --- |
@@ -3105,13 +3111,33 @@ reads `absent` on the baseline.
 | --- | --- |
 | 1 | Clones the copied tree to `/tmp/probe-install-src` and checks its commit out as branch `main`, since `env/setup.sh` clones branch `main` and the runner's clones are detached. |
 | 2 | Exports `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` as `Probe` and `probe@example.com`, and `HARNESS_ASSIGNEE` as `probe`, in place of the environment variables panel. |
-| 3 | Creates `/home/user` and runs the tree's `env/setup.sh` with `HARNESS_REPO_URL=/tmp/probe-install-src`, which clones it to `/opt/my-harness-wrapper` and runs `scripts/bootstrap.sh` into the empty `/root/.claude`. It prints `/home/user/bootstrap.log`. |
-| 4 | Runs `/opt/my-harness-wrapper/scripts/verify.sh` and prints its output. |
+| 3 | Copies `probe/fake-claude.sh` to `/tmp/probe-fake-claude/bin/claude` and puts that directory first on `PATH`, for this check only. |
+| 4 | Creates `/home/user` and runs the tree's `env/setup.sh` with `HARNESS_REPO_URL=/tmp/probe-install-src`, which clones it to `/opt/my-harness-wrapper` and runs `scripts/bootstrap.sh` into the empty `/root/.claude`. It prints `/home/user/bootstrap.log`. |
+| 5 | Runs `/opt/my-harness-wrapper/scripts/verify.sh` and prints its output. |
 
-The check reads `fail` on every tree whose `config/plugins.tsv` names a plugin.
-The image has no `claude` CLI and the
-container no network: `scripts/bootstrap.sh` step 6 counts each `claude plugin`
-call and each `scripts/plugin-dependencies.sh` run as a failure, and
-`scripts/verify.sh` fails its live config directory agreement and plugin checks,
-each of which reads `claude plugin list --json`. Every other step of both scripts
-passes offline.
+### The fake claude CLI
+
+`probe/fake-claude.sh` keeps its installed plugins in
+`/tmp/probe-fake-claude/plugins.json`, a JSON array, empty at the start, and the
+marketplace sources it was given in `/tmp/probe-fake-claude/marketplaces`, one
+per line.
+
+| Call | Answer |
+| --- | --- |
+| `claude --version` | Prints `0.0.0 (probe fake claude)`, exit 0. |
+| `claude plugin list --json` | Prints the array, exit 0. Each entry holds `id`, `version`, `scope` `user`, `enabled` `true` and `installPath`. |
+| `claude plugin marketplace add <source>` | Appends `<source>` to the marketplaces file, exit 0; exit 1 where `<source>` is empty. |
+| `claude plugin install <id> --scope user --yes` | Exit 1 unless the arguments after `<id>` are exactly `--scope user --yes`, `<name>`, the id's text before the `@`, is not empty and holds no `/` or leading `.`, and the marketplaces file holds more lines than the array holds entries. Otherwise creates `/tmp/probe-fake-claude/plugins/<name>`. Where the deployed copy has `plugins/<name>`, copies that directory into it and takes `version` from its `.claude-plugin/plugin.json`; otherwise the directory stays empty and `version` is `0.0.0`. Adds the entry to the array and sets `enabledPlugins.<id>` to `true` in `$HOME/.claude/settings.json`. |
+| Anything else, `claude plugin update` and `claude plugin marketplace update` included | Prints `probe fake claude: unsupported arguments: ...` on standard error, exit 1. |
+
+`scripts/bootstrap.sh` takes its update path only for a plugin installed before
+its run, which the empty `/root/.claude` never holds.
+
+The install check therefore covers every step of `env/setup.sh`,
+`scripts/bootstrap.sh` and `scripts/verify.sh` except the real plugin installs.
+It does not cover:
+
+- that any marketplace or plugin is fetched;
+- that a marketplace source names the marketplace after the `@` of the plugin id installed from it;
+- the third-party plugins' contents, versions and npm dependencies;
+- that the `my-harness` plugin the real CLI installs from `PvtKaefsky/my-harness-wrapper` equals the tree's `plugins/my-harness/`, which the fake copies.
