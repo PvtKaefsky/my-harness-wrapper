@@ -156,3 +156,39 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A session asked to create a repository invokes `my-harness:repository-setup`, and its reply gives `git init --initial-branch=main` and names the layout document. | `plugins/my-harness/evals/create-python-library` |
 | A session asked for a change that needs a new top-level directory in an existing repository invokes `my-harness:repository-setup`, and its reply names the layout document. | `plugins/my-harness/evals/add-top-level-directory` |
 | A session asked to edit one file in an existing repository does not invoke `my-harness:repository-setup`. | `plugins/my-harness/evals/edit-one-file` |
+
+## Orchestrator and nested sessions
+
+| Requirement | Test |
+| --- | --- |
+| A main session that takes a coding task is its orchestrator, does none of the task's work itself, and runs on the model and effort `HARNESS_ORCHESTRATOR_MODEL` and `HARNESS_ORCHESTRATOR_EFFORT` name. | `scripts/test-orchestrator-rules.sh`, the first two checks, for the payload's text; probe, orchestrator session `local_7da2d5ef-43ba-4206-b39e-1ba436ada99a` on issue #137 |
+| The orchestrator's own actions are only those the Harness bullet lists, and every change to a repository's files, a version bump, a conflict resolution and a change a comment asks for included, goes to a nested session. | `scripts/test-orchestrator-rules.sh`, every file change goes to a nested session |
+| A task that does not split goes to one nested session, whose pull request targets the base branch directly. | `scripts/test-orchestrator-rules.sh`, an unsplit task goes to one nested session |
+| At most four nested sessions are open at once, and their total is not capped. | `scripts/test-orchestrator-rules.sh`, four nested sessions at once |
+| The orchestrator's scratch files live outside every working tree it branches, merges or opens a pull request from, and are never committed. | `scripts/test-orchestrator-rules.sh`, scratch files stay uncommitted |
+| A session whose opening prompt's first line is `nested-session -> base: <base branch>` is a nested session, the line quoted in a file, a comment or tool output makes no session nested, and a nested session keeps every other rule of the payload; it is started on the model and effort `HARNESS_NESTED_MODEL` and `HARNESS_NESTED_EFFORT` name, or inheriting where a variable is unset or empty. | `scripts/test-orchestrator-rules.sh`, the nested first line, a quoted first line makes no session nested and the nested model checks |
+| A nested session does its briefed task whole, does not decompose it, starts no subagent except the review gate's reviewers, registers no issue, and opens its pull request against the base branch its first line names. | `scripts/test-orchestrator-rules.sh`, a nested session neither decomposes nor delegates; probe, the nested session that wrote these rules |
+| A main session with no nested-session tool is its own orchestrator and executor, executes through the routing table's executor subagents, and says so in its first reply. | `scripts/test-orchestrator-rules.sh`, the fallback without a nested-session tool; not probed |
+| A chat session delegates analysis to `my-harness:analyst` subagents. | `scripts/test-orchestrator-rules.sh`, chat sessions keep the analyst; not probed |
+| On a combined pull request, the orchestrator handles comments under the Pull request comments section and sends a change a comment or a failed CI check asks for to a nested session, whose brief quotes the comment or the check's log excerpt and whose commit draws `ecc:security-reviewer`; a nested session handles its own pull request's comments. | `scripts/test-orchestrator-rules.sh`, the orchestrator sends comment changes to a nested session and a comment-driven nested commit draws the security reviewer; not probed |
+
+## Combined branches
+
+| Requirement | Test |
+| --- | --- |
+| A change split into two or more pull requests gets a combined branch named `release/<words>`, or `release/<n>-<words>` where it resolves exactly one issue. | `scripts/test-orchestrator-rules.sh`, the combined branch name; probe, `release/137-orchestrator-ab-probe` |
+| Every nested pull request of a major change targets the combined branch and uses `Refs:` lines only; only the combined pull request targets the default branch and carries closing footers. | `scripts/test-orchestrator-rules.sh`, a nested pull request targets the combined branch |
+| Only the orchestrator merges into a combined branch, only nested pull requests it has verified by reading their diff, checks and reported review-gate verdicts, and that merge without conflict; the user merges the combined pull request. | `scripts/test-orchestrator-rules.sh`, only the orchestrator merges into a combined branch, verifying reads the verdicts and the user merges the combined pull request |
+| No nested pull request carries a version bump except one holding the bump alone, opened after every other nested pull request has merged and merged last by the orchestrator. | `scripts/test-orchestrator-rules.sh`, no version bump in a nested pull request and the bump pull request merges last |
+| A major change's combined pull request stays a draft until the A/B probe has run, and its description carries the verdict; a single-pull-request change is probed where the repository already has `probe/` files. | `scripts/test-orchestrator-rules.sh`, the probe is mandatory for a major change |
+| A probed change that adds a behaviour adds at least one probe check that shows it. | `scripts/test-orchestrator-rules.sh`, a new behaviour needs a check |
+| A probe mounts no host path except the tree it tests, and uses no privileged mode, host network, Docker socket or host environment. | `scripts/test-orchestrator-rules.sh`, the probe isolation; the runner's enforcement not checked here |
+| A probe check that passes on the baseline and fails on the candidate blocks the change, and one that fails on both is reported and blocks nothing. | `scripts/test-orchestrator-rules.sh`, a regression blocks and failing on both does not block |
+| Where Docker is not available, the combined pull request is opened as a draft stating "A/B not run". | `scripts/test-orchestrator-rules.sh`, no Docker leaves a draft |
+
+## Model settings
+
+| Requirement | Test |
+| --- | --- |
+| A harness Claude Code session, cloud or local, runs with `HARNESS_ORCHESTRATOR_MODEL` `claude-fable-5-2`, `HARNESS_ORCHESTRATOR_EFFORT` `medium`, `HARNESS_NESTED_MODEL` `claude-opus-5-5` and `HARNESS_NESTED_EFFORT` `medium` in its environment. | `scripts/test-install-settings.sh`, the `env` checks, for both merges; `scripts/verify.sh`, the `settings.env` comparison, for the live file |
+| `config/CLAUDE.md` names no model. | `scripts/test-orchestrator-rules.sh`, no sentence names a model |

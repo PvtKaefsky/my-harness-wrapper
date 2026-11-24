@@ -790,6 +790,28 @@ rule, of the `~/` form, for a stand-in settings file:
 | `cp <file> <stand-in>`, `echo x > <stand-in>` | refused, with the Bash message |
 | `sh -c "cat .env"`, `/usr/bin/cat .env`, `grep -r PROBE_VALUE .` | the file's text |
 
+## Merging a combined branch
+
+A major change, one the orchestrator splits into two or more pull requests,
+lands through a combined branch, `release/<words>` or `release/<n>-<words>`.
+
+1. The orchestrator creates the combined branch from `main` and pushes it.
+2. Each nested session works in its own worktree, cut from the combined branch,
+   and opens its pull request against the combined branch with `Refs:` lines
+   and no closing keyword. No nested pull request bumps
+   `export BOOTSTRAP_VERSION=` in `env/setup.sh`, except the one in step 4.
+3. The orchestrator verifies each nested pull request and merges it into the
+   combined branch once it merges without conflict, after reading its diff, its
+   checks and the review-gate verdicts the nested session reports. A conflict resolution goes
+   to a nested session.
+4. After every other nested pull request merges, one nested session opens a
+   pull request against the combined branch holding only the
+   `BOOTSTRAP_VERSION` bump, and the orchestrator merges it last.
+5. The orchestrator opens the combined pull request against `main`, with the
+   closing footers and the A/B verdict, as a draft until the probe has run.
+6. You merge the combined pull request, then deploy it under "Deploying a
+   change" from step 3.
+
 ## Before every commit
 
 Hand-run `scripts/bootstrap.sh`, `scripts/verify.sh` and
@@ -808,7 +830,10 @@ committing a change to `plugins/my-harness/hooks/web-guidance-gate.sh`, to
 only where every case passes. Run `scripts/test-pr-comment-rules.sh` before
 committing a change to `config/CLAUDE.md`'s Pull request comments section or to
 the test script itself; it exits 0 only where every check passes. Run
-`scripts/test-install-settings.sh` before committing a change to the settings
+`scripts/test-orchestrator-rules.sh` before committing a change to
+`config/CLAUDE.md`'s Harness, Git workflow, A/B probes or Pull request comments
+section or to the test script itself; it exits 0 only where every check passes.
+Run `scripts/test-install-settings.sh` before committing a change to the settings
 merge of `scripts/install-local.sh` or to the test script itself; it exits 0
 only where every check passes. Run `scripts/test-session-check.sh` before
 committing a change to `scripts/session-check.sh`, to
