@@ -15,6 +15,13 @@ if [ -n "$LOCAL_CHECKOUT" ]; then LOG="$CONFIG_DIR/session-check.log"; else LOG=
 VERIFY_TIMEOUT=${SESSION_CHECK_VERIFY_TIMEOUT:-75}
 VERIFY_KILL_AFTER=${SESSION_CHECK_VERIFY_KILL_AFTER:-5}
 OUT_LINE_CAP=${SESSION_CHECK_OUT_LINE_CAP:-40}
+case "${BASH_SOURCE[0]}" in */*) SELF_DIR=${BASH_SOURCE[0]%/*} ;; *) SELF_DIR=. ;; esac
+HIDDEN_LIB="$SELF_DIR/../git-hooks/lib/hidden-chars.sh"
+HIDDEN_FILE="$SELF_DIR/../git-hooks/lib/hidden-chars.tsv"
+HIDDEN_MAX_FILES=200
+HIDDEN_MAX_BYTES=5242880
+HIDDEN_MAX_NOTES=50
+HOOK_BUDGET=85
 
 emit() {
   printf '%s\n' "$1"
@@ -26,6 +33,89 @@ emit_hooks_path() {
   out=$(git -C "$1" config --show-origin --get core.hooksPath 2>/dev/null); rc=$?
   emit "git -C $1 config --show-origin --get core.hooksPath -> exit=$rc value=[$(printf '%s' "$out" | LC_ALL=C tr '\t\n' '  ' | LC_ALL=C tr '\000-\037\177' '?')]"
 }
+
+clean() { printf '%s' "$1" | LC_ALL=C tr '\000-\037\177-\377' '?'; }
+
+hidden_notes() {
+  local top rc f prev="" total=0 i bytes=0 capped="" found action line cp label notes=0 start=0 off
+  local cand=() sizes=() files=() names=() counts=()
+  top=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); rc=$?
+  if [ "$rc" -ne 0 ] || [ -z "$top" ]; then
+    emit "git -C $(clean "$PWD") rev-parse --show-toplevel -> exit=$rc, hidden-character scan not run"
+    return
+  fi
+  if ! . "$HIDDEN_LIB" 2>/dev/null; then
+    emit "hidden-character scan -> not run, $(clean "$HIDDEN_LIB") could not be read"
+    return
+  fi
+  while IFS= read -r -d '' f; do
+    if [ "$f" = "$prev" ]; then continue; fi
+    prev=$f
+    total=$((total + 1))
+    if [ "${#cand[@]}" -le "$HIDDEN_MAX_FILES" ] && [ -f "$top/$f" ] && [ -r "$top/$f" ]; then cand+=("$f"); fi
+  done < <(git -C "$top" -c core.fsmonitor=false ls-files -z --cached --others --exclude-standard -- \
+    ':(top,glob)**/CLAUDE.md' ':(top,glob)**/AGENTS.md' ':(top,glob).claude/**/*.md' ':(top,glob).mcp.json' 2>/dev/null)
+  wait $!; rc=$?
+  if [ "${#cand[@]}" -gt 0 ]; then
+    mapfile -t sizes < <(stat -L -c %s -- "${cand[@]/#/"$top"/}" 2>/dev/null)
+    if [ "${#sizes[@]}" -ne "${#cand[@]}" ]; then
+      emit "hidden-character scan -> not run, stat gave ${#sizes[@]} sizes for ${#cand[@]} files"
+      return
+    fi
+  fi
+  for i in "${!cand[@]}"; do
+    if [ "${#files[@]}" -ge "$HIDDEN_MAX_FILES" ]; then capped="$HIDDEN_MAX_FILES files"; break; fi
+    if [ "$((bytes + sizes[i]))" -gt "$HIDDEN_MAX_BYTES" ]; then capped="$HIDDEN_MAX_BYTES bytes (5 MiB)"; break; fi
+    files+=("$top/${cand[i]}")
+    names+=("${cand[i]}")
+    bytes=$((bytes + sizes[i]))
+  done
+  if [ "${#files[@]}" -gt 0 ]; then
+    mapfile -t counts < <(LC_ALL=C grep -a -c -h '' -- "${files[@]}" 2>/dev/null)
+    if [ "${#counts[@]}" -ne "${#files[@]}" ]; then
+      emit "hidden-character scan -> not run, grep gave ${#counts[@]} line counts for ${#files[@]} files"
+      return
+    fi
+  fi
+  while [ "$start" -lt "${#files[@]}" ]; do
+    if ! found=$({ LC_ALL=C grep -a -h '' -- "${files[@]:start}" 2>/dev/null || :; } | hidden_swap | hidden_scan "$HIDDEN_FILE"); then
+      emit "hidden-character scan -> not run, $(clean "$HIDDEN_FILE") could not be applied"
+      return
+    fi
+    if [ -z "$found" ]; then break; fi
+    IFS=$'\t' read -r action line cp <<< "$found"
+    off=0
+    i=$start
+    while [ "$i" -lt "$((${#files[@]} - 1))" ] && [ "$((off + counts[i]))" -lt "$line" ]; do
+      off=$((off + counts[i]))
+      i=$((i + 1))
+    done
+    while IFS=$'\t' read -r action line cp; do
+      if [ "$line" -gt "$((off + counts[i]))" ]; then continue; fi
+      case "$action" in block) label="hidden character" ;; warn) label="zero-width character" ;; *) continue ;; esac
+      if [ "$notes" -ge "$HIDDEN_MAX_NOTES" ]; then
+        emit "NOTE hidden-character scan stopped at the cap of $HIDDEN_MAX_NOTES NOTE lines, in $(clean "${names[i]}")"
+        break 2
+      fi
+      emit "NOTE $label $cp at $(clean "${names[i]}"):$((line - off))"
+      notes=$((notes + 1))
+    done <<< "$found"
+    start=$((i + 1))
+  done
+  if [ -n "$capped" ]; then
+    emit "NOTE hidden-character scan stopped at the cap of $capped, before $(clean "${cand[${#files[@]}]}"); ${#files[@]} of $total files scanned"
+  fi
+  emit "hidden-character scan $(clean "$top") -> git ls-files exit=$rc files=${#files[@]} bytes=$bytes notes=$notes"
+}
+
+bounded_hidden_notes() {
+  local left=${SESSION_CHECK_HIDDEN_TIMEOUT:-$((HOOK_BUDGET - SECONDS))} rc
+  case "$left" in -*|0) left=1 ;; esac
+  timeout -k 2 "$left" bash "${BASH_SOURCE[0]}" hidden-notes; rc=$?
+  if [ "$rc" -ne 0 ]; then emit "NOTE hidden-character scan stopped at the cap of ${left}s (exit=$rc)"; fi
+}
+
+if [ "${1:-}" = hidden-notes ]; then hidden_notes; exit 0; fi
 
 if : >> "$LOG" 2>/dev/null; then LOG_STATE=appendable; else LOG_STATE="not appendable"; fi
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null); NOW_RC=$?
@@ -92,6 +182,7 @@ else
   OUTFILE=$(mktemp 2>/dev/null)
   if [ -z "${OUTFILE:-}" ]; then
     emit "mktemp -> empty, verify.sh not run"
+    bounded_hidden_notes
     exit 0
   fi
   timeout -k "$VERIFY_KILL_AFTER" "$VERIFY_TIMEOUT" bash "$VERIFY" > "$OUTFILE" 2>&1 &
@@ -124,4 +215,5 @@ else
   rm -f "$OUTFILE"
 fi
 
+bounded_hidden_notes
 exit 0

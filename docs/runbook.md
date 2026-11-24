@@ -701,12 +701,18 @@ later, inside the `SessionStart` hook timeout of 90 seconds that
 | `log mtime >= boot time -> yes` | `/home/user/bootstrap.log` was last written at or after `uptime -s`'s boot time. | That this session built the snapshot: any write to the log after boot, such as a hand-run of the init script, also reads `yes`. |
 | `log mtime >= boot time -> no` | The log was last written before the boot time. | That this session restored a snapshot: any log last written before the boot time reads `no`, whatever wrote it. |
 | `git -C <dir> config --show-origin --get core.hooksPath -> exit=N value=[<origin> <value>]` | The value git uses in that repository and the file that sets it. In the cloud, an origin inside the repository's own `.git/config` means the harness hooks do not run there. Locally, the origin `command line:` is the session's `GIT_CONFIG_*` triple, which outranks the repository's own value. | That the directory it names holds the harness hooks, or that they work. `scripts/verify.sh` checks that for the deployed copy only. |
+| `NOTE hidden character U+<code point> at <path>:<line>`, or `NOTE zero-width character ...` | That file of the working repository, one of `CLAUDE.md` or `AGENTS.md` at any depth, a Markdown file under `.claude/`, or `.mcp.json`, carries that character, first on that line. Open the file in an editor that shows the character before trusting its text. | That the character was planted, that the line holds no second one, or that a file with no `NOTE` is safe: characters outside the classes of `git-hooks/lib/hidden-chars.tsv` are not reported. |
+| `NOTE hidden-character scan stopped at the cap of 200 files`, or `of 5242880 bytes (5 MiB)` | The scan stopped before the file the line names. | Anything about that file or the files git lists after it. |
+| `NOTE hidden-character scan stopped at the cap of 50 NOTE lines, in <path>` | That file and the files before it gave 50 `NOTE` lines, and the scan stopped. | Anything about the rest of that file or the files after it. |
+| `NOTE hidden-character scan stopped at the cap of <N>s (exit=124)`, or `(exit=137)` | The scan ran past its time bound, 85 seconds less the time the check had already run, and was killed, 2 seconds later where the status is 137. | Anything about a file with no `NOTE` above the line. |
+| `hidden-character scan <top> -> git ls-files exit=0 files=N bytes=N notes=0` | The scan read N files of that repository and found no character of the classes. | That the repository has no other instruction file: an ignored file, a submodule's file and a file under another name are not scanned. |
+| `git -C <dir> rev-parse --show-toplevel -> exit=N, hidden-character scan not run`, or `hidden-character scan -> not run, ...` | Nothing was scanned: git names no work tree for the working directory, or the scanner, the pattern file, a file size or a line count could not be read. | That the instruction files are clean. |
 
 `/home/user/session-check.log` holds every run's output, appended. Locally the
 file is `session-check.log` in the config directory.
 
 `config/CLAUDE.md` requires a session whose check reports a `FAIL` to name it in
-its first reply.
+its first reply. A hidden-character `NOTE` is never a `FAIL`.
 
 ## Auto-fix on pull requests
 
@@ -804,7 +810,10 @@ committing a change to `config/CLAUDE.md`'s Pull request comments section or to
 the test script itself; it exits 0 only where every check passes. Run
 `scripts/test-install-settings.sh` before committing a change to the settings
 merge of `scripts/install-local.sh` or to the test script itself; it exits 0
-only where every check passes. Run
+only where every check passes. Run `scripts/test-session-check.sh` before
+committing a change to `scripts/session-check.sh`, to
+`git-hooks/lib/hidden-chars.sh` or `git-hooks/lib/hidden-chars.tsv`, or to the
+test script itself; it exits 0 only where every case passes. Run
 `scripts/test-hook-forwarding.sh` before committing a change to `git-hooks/`
 or to that script. It exits 0 only where every case passes, and it needs a
 checkout holding commit `5f3f87a`. `bash -n` is not

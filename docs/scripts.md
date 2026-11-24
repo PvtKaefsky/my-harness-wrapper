@@ -1596,6 +1596,11 @@ session was quiet.
 | `verify.sh -> not run, ... absent` | `scripts/verify.sh` is not at the path this script reads. |
 | `verify.sh -> timed out ...` | The inner bound elapsed and the process group was killed. |
 | `mktemp -> empty, verify.sh not run` | No temporary file could be made for the output, so the check was skipped. |
+| `NOTE hidden character U+<code point> at <path>:<line>`, `NOTE zero-width character U+<code point> at <path>:<line>` | A block-class or a warn-class character in a scanned instruction file. "The hidden-character scan" below sets out what one line covers. |
+| `NOTE hidden-character scan stopped at the cap of ...` | The scan stopped at 200 files, at 5 MiB, at 50 `NOTE` lines or at its time bound. The line names the cap. For the file and byte caps it also names the first file not scanned and how many of the listed files were scanned, and for the `NOTE` cap the file it stopped in. |
+| `hidden-character scan <top> -> git ls-files exit=N files=N bytes=N notes=N` | The scan ran in the repository whose top directory is `<top>`: `git ls-files`' exit status, the files and bytes scanned, and the `NOTE` lines printed for characters. |
+| `git -C <dir> rev-parse --show-toplevel -> exit=N, hidden-character scan not run` | Git names no work tree for the working directory, so nothing was scanned. |
+| `hidden-character scan -> not run, ...` | The scanner, the pattern file, a file size or a line count could not be read. The line names which. |
 
 An absent `/home/user/bootstrap.log`, an absent `scripts/verify.sh`, and a
 directory git would not read each produce a line naming the path or the
@@ -1659,6 +1664,77 @@ and the read blocks after `timeout` has exited.
 Without the group kill a `SIGTERM`-ignoring grandchild outlives the check and
 the script does not return. With it the script returns at the inner bound and no
 such process remains.
+
+### The hidden-character scan
+
+The function `hidden_notes` runs after the `verify.sh` block, so a slow scan
+cannot cost the `verify.sh` report. It scans the repository that holds the
+working directory, from that repository's top directory. It never changes the
+exit status and prints no `FAIL` line.
+
+`bounded_hidden_notes` runs it as `bash <the script> hidden-notes` under
+`timeout -k 2`, for 85 seconds less the seconds the script has already run, and
+1 second at least, against the hook's 90. `SESSION_CHECK_HIDDEN_TIMEOUT`
+replaces that duration. Where `timeout` exits non-zero, one `NOTE` names the
+bound and the exit status; the lines the scan had printed stay.
+
+| Scanned | Pathspec |
+| --- | --- |
+| `CLAUDE.md` and `AGENTS.md` at any depth | `**/CLAUDE.md`, `**/AGENTS.md` |
+| Markdown files under the top-level `.claude/` | `.claude/**/*.md` |
+| The top-level `.mcp.json` | `.mcp.json` |
+
+`git ls-files --cached --others --exclude-standard` lists the files, so a file
+git ignores and anything under `.git/` is not scanned. The call passes
+`-c core.fsmonitor=false`, since `git ls-files` otherwise runs the command a
+repository's `core.fsmonitor` names. A tracked file is
+scanned whether or not an ignore rule matches it. A submodule's files are not
+listed. A symbolic link is followed. Where `git rev-parse --show-toplevel`
+fails, as it does outside a git repository, in a bare repository and in a
+repository git refuses over its ownership, nothing is scanned and one line
+states git's exit status.
+
+The files are taken in the order git lists them, untracked files first, each
+group sorted by path. The scan stops before the 201st file, or before the first
+file that would take the total past 5,242,880 bytes, and prints one `NOTE`
+naming the cap. A file is scanned whole or not at all.
+
+The scanner is `hidden_scan` of `git-hooks/lib/hidden-chars.sh` with the
+classes of `git-hooks/lib/hidden-chars.tsv`, both read from beside the script's
+own directory, as `scripts/attribution-guard.sh` reads them. Both classes give
+a `NOTE`: `hidden character` for the block class and `zero-width character` for
+the warn class.
+
+One `NOTE` covers one distinct character in one file and names the line of its
+first occurrence in that file. A second occurrence of that character in the
+same file prints nothing more. The scan stops at 50 such lines with one `NOTE`
+naming that cap and the file it stopped in.
+
+`clean` replaces each control byte and each byte from 0x7F up in a printed
+path with `?`, so a path prints no hidden character and a non-ASCII name
+prints as `?` bytes.
+
+Each `hidden_scan` call reads every taken file not yet settled, joined by
+`grep -a -h ''`, which ends each file's last line with a newline. The first
+row it prints names the lowest line, and the per-file line counts of
+`grep -a -c -h ''` place that line in a file. The rows that fall in that file
+become its `NOTE` lines, and the next call starts at the file after it. The
+scan therefore makes one call more than the number of files that hold a
+character, and one call fewer where the last taken file holds one: one call for
+a repository with none, however many files it has.
+
+Measured in Git Bash on Windows 11 at the commit that adds this paragraph, with
+200 one-line `AGENTS.md` files scanned: 1.6 to 1.7 s with no character, and 2.0 s
+with U+202E in one file, for `bash scripts/session-check.sh hidden-notes`.
+
+| Not reported | Why |
+| --- | --- |
+| A character outside the classes, such as U+200E, U+200F or U+FEFF | The pattern file holds no row for it. |
+| A character in a file name | Only file contents are scanned. |
+| A character in a file past a cap, or a character after the 50th `NOTE` | The scan stopped before it. |
+| An instruction file under another name, such as `CLAUDE.local.md`, `claude.md`, a nested `.claude/` or a nested `.mcp.json` | No pathspec names it, and the pathspecs match case. |
+| A file of a nested repository or a submodule | `git ls-files` does not list it. |
+| Whether the `git ls-files` listing was complete | `exit=N` on the summary line is its only report; `files=0` with `exit=0` means no listed file matched. |
 
 ### The SessionStart hook
 
@@ -2185,6 +2261,38 @@ With `git-hooks/lib/dispatch.sh` at the `5f3f87a` version, T1, T2 and T3 print
 `add=124 commit=124` and `FAIL`, and the script prints `fail -> 3`.
 
 The script exits 0 only where every case passes, and 1 otherwise.
+
+## scripts/test-session-check.sh
+
+Runs the `scripts/session-check.sh` beside it in scratch repositories under a
+`mktemp -d` directory, one line per case. It is run by hand only. Each run sets
+`CLAUDE_CONFIG_DIR` and `HARNESS_DIR` to scratch directories, so the script
+under test writes its log there and finds no `verify.sh`, and sets
+`GIT_CEILING_DIRECTORIES` to the scratch directory. The fixtures build their
+hidden characters at run time with `printf`, so the script holds none.
+
+A case passes where the script exits 0, prints the expected number of lines
+starting `NOTE `, prints no line starting `FAIL`, and prints each expected line
+whole.
+
+| Case | Expected |
+| --- | --- |
+| A repository whose four scanned files are clean, with U+202E in `README.md`, in an ignored `AGENTS.md`, in `a/NOTAGENTS.md` and in `.claude/notes.txt` | No `NOTE`; the summary line reads `files=4 bytes=27 notes=0`. |
+| U+202E on lines 3 and 4 of `a/b/AGENTS.md`, run from the top directory and from `a/b` | One `NOTE`, naming `a/b/AGENTS.md:3`. |
+| A repository in a directory named `a&b`, U+202E in `AGENTS.md` under a directory whose name carries U+202E | One `NOTE`, the directory printed as `x???y`. |
+| That repository with `core.fsmonitor` naming a `touch` command | One `NOTE`, and the file the command would create is absent. |
+| 60 distinct tag characters in `CLAUDE.md`, U+202E in `z/CLAUDE.md` | 50 `NOTE` lines for `CLAUDE.md` and the `50 NOTE lines` cap `NOTE`. |
+| That repository with `SESSION_CHECK_HIDDEN_TIMEOUT=0.001` | The `NOTE` reading `stopped at the cap of 0.001s`, with `exit=124` or `exit=137`, and fewer than 51 `NOTE` lines. |
+| U+202E in an indexed `CLAUDE.md` and in `a/CLAUDE.md` beside U+2066, U+200B in `.claude/agents/r.md`, U+0000 in `.mcp.json` | Five `NOTE` lines, the U+200B one reading `zero-width character`. |
+| 201 `AGENTS.md` files, U+202E in the 51st, the 200th and the 201st | One `NOTE` each for the 51st and the 200th, and the `200 files` cap `NOTE` naming the 201st. |
+| That repository through a copy of the script whose `hidden_scan` appends a line to a file on each run | The same `NOTE` lines, and 2 runs. |
+| `a/AGENTS.md` with no final newline, an empty `b/AGENTS.md`, U+202E on the unterminated line 2 of `c/AGENTS.md` and on line 1 of `d/AGENTS.md` | Two `NOTE` lines, naming `c/AGENTS.md:2` and `d/AGENTS.md:1`. |
+| A 6-byte `AGENTS.md`, a 5,242,880-byte `m/CLAUDE.md` and `z/AGENTS.md`, U+202E in the first and the third | One `NOTE` for the first and the `5242880 bytes (5 MiB)` cap `NOTE` naming `m/CLAUDE.md`. |
+| A directory outside a git repository holding an `AGENTS.md` with U+202E | No `NOTE`; the `rev-parse --show-toplevel -> exit=128` line. |
+| A copy of the script with no `git-hooks/lib/hidden-chars.sh` beside it, then with no `hidden-chars.tsv` | No `NOTE`; the `not run` line naming the file. |
+
+The last line is `fail -> N`, and the exit status is 0 only where N is 0. The
+run takes about one minute in Git Bash.
 
 ## scripts/check-hook-matchers.sh
 

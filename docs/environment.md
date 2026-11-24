@@ -1330,6 +1330,10 @@ per range, plus the range ends in the guard suite. No live session was run in
 which Claude Code delivered the `additionalContext` warning, so that the
 warning reaches the model is stated by the hooks reference and was not observed.
 
+The session-start scan, `hidden_notes` in `scripts/session-check.sh`, is not a
+control and has no record: it adds no hook, rule or permission and blocks no
+input. Issue #124 asks for it.
+
 ## Permission deny rules
 
 `config/settings.json` carries fourteen `permissions.deny` rules, added by
