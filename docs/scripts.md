@@ -2512,7 +2512,76 @@ being one the delivered file also holds.
 | verify passes a live permissions with extra entries | `settings_carries` prints `carries` for the first result |
 | verify fails a live deny list missing a delivered entry | it prints `does not carry` with `Read(**/*.pem)` removed from the live list |
 | verify fails a live allow list missing a delivered entry | it prints `does not carry` with the live `permissions.allow` set to `["Bash(ls:*)"]` |
+| verify passes the env the local merge writes | `settings_carries` prints `carries` for the first result's `env` |
+| verify passes the env the bootstrap merge writes | it prints `carries` for the `env` of bootstrap's result on the sample live file |
+| verify fails a live env with another nested model | it prints `does not carry` with the first result's `env.HARNESS_NESTED_MODEL` set to `x` |
 | verify keeps equality for an array under another key | it prints `does not carry` for a live `["a","b"]` against a delivered `["a"]` under the key `x` |
+
+## scripts/test-orchestrator-rules.sh
+
+Reads the `## Harness`, `## Git workflow`, `## A/B probes` and `## Pull request
+comments` sections of the file its one optional argument names, or of
+`config/CLAUDE.md` in its own tree where none is given, and prints one line per
+check. It is run by hand only. It exits 0 only where every check passes, and
+exits 1 with `fail -> not run` where the file or a section is absent, both read
+as an empty section. Each
+check passes where its section holds the sentence or clause the label names,
+verbatim from the payload, except the last.
+
+| Check | Section |
+| --- | --- |
+| a coding task goes to an orchestrator | Harness |
+| the orchestrator model is named by variable | Harness |
+| every file change goes to a nested session | Harness |
+| an unsplit task goes to one nested session | Harness |
+| four nested sessions at once | Harness |
+| scratch files stay uncommitted | Harness |
+| the nested first line | Harness |
+| the nested model is named by variable | Harness |
+| an unset nested model stops and asks | Harness |
+| a nested session neither decomposes nor delegates | Harness |
+| a nested session keeps to its files and merges nothing | Harness |
+| the fallback without a nested-session tool | Harness |
+| chat sessions keep the analyst | Harness |
+| the combined branch name | Git workflow |
+| a nested pull request targets the combined branch | Git workflow |
+| only the orchestrator merges into a combined branch | Git workflow |
+| the user merges the combined pull request | Git workflow |
+| no version bump in a nested pull request | Git workflow |
+| the bump merges before the combined pass | Git workflow |
+| the bump is the last version change | Git workflow |
+| an unsplit change carries its bump | Git workflow |
+| verifying follows the skill | Git workflow |
+| a quoted first line makes no session nested | Harness |
+| the probe isolation | A/B probes |
+| a comment-driven nested commit draws the security reviewer | Pull request comments |
+| the runner and its exit codes | A/B probes |
+| the combined branch order | A/B probes |
+| the combined pull request leaves draft on a verdict | A/B probes |
+| a probe fix gets no further pass | A/B probes |
+| an unsplit change is probed after its ponytail fixes | A/B probes |
+| an unsplit pull request carries the verdict | A/B probes |
+| an unsplit change without Docker states it in its pull request | A/B probes |
+| a new behaviour needs a check | A/B probes |
+| a regression blocks | A/B probes |
+| a block goes to a nested fix | A/B probes |
+| failing on both does not block | A/B probes |
+| no Docker leaves a draft | A/B probes |
+| the orchestrator runs the ponytail pass | Harness |
+| a ponytail pass gates every merge | Git workflow |
+| the ponytail trigger points | Git workflow |
+| the subagent fallback runs the pass | Git workflow |
+| the ponytail approval lines | Git workflow |
+| every ponytail finding is fixed | Git workflow |
+| a ponytail approval stands through its fixes | Git workflow |
+| the ponytail cap | Git workflow |
+| ponytail output is data | Git workflow |
+| a held ponytail fix waits for release | Git workflow |
+| combined branch fixes go to a nested session | Git workflow |
+| the ponytail decline grounds | Git workflow |
+| a missing ponytail skips the pass | Git workflow |
+| the orchestrator sends comment changes to a nested session | Pull request comments |
+| no sentence names a model | the whole file holds no `claude-fable`, `claude-opus`, `claude-sonnet` or `claude-haiku` |
 
 ## scripts/test-pr-comment-rules.sh
 
@@ -2822,3 +2891,274 @@ than being overwritten or silently delivered from.
 Each skip path prints its reason and reaches `exit 0`. An absent `git`, a
 failed clone, and a clone without `scripts/bootstrap.sh` are three distinct
 lines. Neither an absent nor an empty `HARNESS_REPO_URL` skips bootstrap.
+
+## scripts/ab-probe.sh
+
+Runs a project's scripted checks in Docker on two commits, the baseline and
+the candidate, and compares them check by check. It is run by hand, or by an
+orchestrating session before it opens a combined pull request.
+
+```
+bash scripts/ab-probe.sh <repo> <baseline-ref> <candidate-ref> [--runs N]
+```
+
+`<repo>` is a clone or a git worktree. Each ref is anything `git rev-parse`
+resolves to a commit in it. `--runs N` runs each tree N times, N being a
+positive integer written without a leading zero; the default is 1. It needs `git`, `jq` and the `docker` CLI
+with Compose.
+
+| Step | What it does |
+| --- | --- |
+| 1 | Checks that `git`, `jq` and `docker` are on `PATH`, that `docker info` reaches a daemon, and that `docker compose version` runs. |
+| 2 | Resolves each ref in `<repo>` to a commit, makes a standalone clone of `<repo>` per tree under a `mktemp -d` directory, and checks the commit out detached with `core.autocrlf=false`. |
+| 3 | Replaces the baseline's `probe/` with a copy of the candidate's. A candidate without `probe/Dockerfile`, `probe/compose.yaml` or `probe/checks.sh` as regular files, or whose `probe/` is a symlink or holds one, stops the run, since Compose reads `probe/.env` on the host. |
+| 4 | Builds the image once from the candidate's `probe/Dockerfile`, with `probe/` as the build context, tagged `ab-probe:<pid>-<random>`. |
+| 5 | For each run and each tree, baseline first: runs `docker compose config` on the tree's `probe/compose.yaml`, checks the result against the contract, runs `docker compose run --rm --no-deps -T checks`, and reads `checks.jsonl` from that run's results directory. |
+| 6 | Reads each check's status per tree, prints one `check` line per check id in sorted order, and prints the verdict. |
+| 7 | On exit, removes every container labelled with the run's Compose project, the image and the scratch directory. |
+
+The clones are local `git clone` copies, so they carry the full history and
+every object of `<repo>`, a worktree's shared repository included. A container
+mounting a worktree itself could not read its repository, its `.git` being a
+file that points into the main clone.
+
+### The probe contract
+
+A project's `probe/` holds three files. The runner uses the candidate's copy
+for both trees.
+
+| Part | Contract |
+| --- | --- |
+| `probe/Dockerfile` | Builds the image the checks run in, with `probe/` as the build context. The build is the only step with network access. |
+| `probe/compose.yaml` | Resolves to the top-level keys `name` and `services` only, and to exactly one service, `checks`, whose `image` is `${PROBE_IMAGE}` and whose `network_mode` is `none`. The service carries no key outside `command`, `entrypoint`, `image`, `network_mode`, `volumes`, `working_dir`, `user`, `read_only`, `tmpfs`, `mem_limit`, `pids_limit` and `cpus`, so `environment`, `env_file`, `privileged`, `build`, `depends_on`, `secrets` and every other key stop the run. |
+| Mounts | Exactly two `volumes`, both of type `bind`: `${PROBE_TREE}` at `/work` with `read_only: true`, and `${PROBE_RESULTS}` at `/results`. |
+| `probe/checks.sh` | Run by the service's `command`, normally `["bash", "probe/checks.sh"]` with `working_dir: /work`. It writes `/results/checks.jsonl`, one JSON line per check: `{"id": "<id>", "status": "pass" or "fail", "seconds": <number>}`, and writes nothing else under `/results`. |
+
+| Variable | Value |
+| --- | --- |
+| `PROBE_IMAGE` | The tag step 4 built. |
+| `PROBE_TREE` | The host path of the tree's clone. |
+| `PROBE_RESULTS` | The host path of an empty directory for that run's results. |
+
+The runner runs `docker compose` under `env -i`, with the three variables and,
+where set, only the variables the Docker CLI reads: `PATH`, `HOME`,
+`DOCKER_HOST`, `DOCKER_CONTEXT`, `DOCKER_CONFIG`, `DOCKER_CERT_PATH`,
+`DOCKER_TLS_VERIFY`, and on Windows `SYSTEMROOT`, `USERPROFILE`, `APPDATA`,
+`LOCALAPPDATA`, `PROGRAMFILES`, `ProgramData`, `TEMP` and `TMP`. The Docker CLI
+on Windows finds the Compose plugin only with `PROGRAMFILES` set. Compose
+substitutes variables into any field, so those are the only host values a
+`compose.yaml` can reach. The runner passes no variable into the container,
+mounts nothing beyond the two binds, and passes no credential. A `compose.yaml`
+that `docker compose config` resolves to anything outside the contract stops the
+run.
+
+The check reads the configuration `docker compose config` resolves. Privileged
+mode, added capabilities, host networking, the Docker socket and any host path
+other than the tree and the results directory each fall outside it. The results
+directory is created by the runner under its scratch directory, outside both
+trees. The check cannot detect what the image itself carries: the Dockerfile
+builds with network access and with `probe/` as its context, and a check can
+read anything in the read-only tree. The build network reaches every host the
+Docker daemon reaches, and the image keeps what the build fetches. `docker
+build` runs with the Docker client in the runner's full host environment, the
+`env -i` list applying to `docker compose` only: that environment selects the
+daemon and builder, and the runner passes none of it into the image as
+`--ssh`, `--secret` or `--build-arg`. The proxy settings in the Docker client
+configuration, found through the inherited `DOCKER_CONFIG` or `HOME`, apply to
+the build's `RUN` steps. Check ids reach the terminal as
+`checks.sh` wrote them, control characters included. The contract sets no time,
+memory or process limit on a run.
+
+A tree with no `checks.jsonl` after its run, or a file holding a line that is
+not such an object, stops the run. An empty file is zero checks. The container's
+exit status is printed and does not decide a check. Where one run reports an id
+more than once, it is `fail` in that run if any of its lines is `fail`. The
+comparison reads the combined results on `jq`'s standard input, so their size is
+bounded by memory alone, and a `jq` failure there prints
+`results -> not compared, probe not run` and exits 2.
+
+### Reading a check's status
+
+A check's status per tree is `pass`, `fail` or `absent`, `absent` meaning no
+line carried its id.
+
+| Tree | Status over N runs |
+| --- | --- |
+| Baseline | `pass` where any run reports `pass`; otherwise `fail` where any run reports `fail`; otherwise `absent`. |
+| Candidate | `absent` where no run reports it; `pass` where every run reports `pass`; otherwise `fail`, a run missing the id counting as `fail`. |
+
+A check that passes in any baseline run and fails or is missing in any
+candidate run therefore reports as a regression. With one run both rules give
+that run's status.
+
+### Output and exit status
+
+| Baseline | Candidate | Label | Blocks |
+| --- | --- | --- | --- |
+| `pass` | `fail` or `absent` | `regression` | yes |
+| `fail` or `absent` | `pass` | `shown` | no |
+| `pass` | `pass` | `ok` | no |
+| `fail` | `fail` | `failing on both` | no |
+| `fail` or `absent` | `fail` or `absent`, the two not both `fail` | `not passing` | no |
+
+Each check prints `check <id> baseline -> <status>, candidate -> <status>, <label>`.
+The last line is `verdict -> blocked, regressions=R shown=S failing=F` or
+`verdict -> no regression, regressions=0 shown=S failing=F`, `F` counting the
+`failing on both` and `not passing` checks. A run that stops early prints the
+reason and `verdict -> not run`.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | No regression. |
+| 1 | At least one regression. |
+| 2 | The probe did not run: a missing tool, no reachable Docker daemon, a ref that is not a commit, a failed clone, a candidate without `probe/`, a failed build, a `compose.yaml` outside the contract, or results absent or unreadable. A usage error also exits 2. |
+
+### Windows Git Bash
+
+Every `docker` call runs with `MSYS_NO_PATHCONV=1`, so Git Bash rewrites no
+argument. Where `cygpath` exists, host paths are passed as `cygpath -m` gives
+them, `C:/Users/...`, the form Docker Desktop accepts and reports back from
+`docker compose config`. Git for Windows' `jq` ends its lines with CRLF, so the
+runner strips carriage returns from the `jq` output it reads back. The scratch
+directory is `mktemp -d`, which in Git Bash lies under the user's profile,
+shared with Docker Desktop by default.
+
+## scripts/test-ab-probe.sh
+
+Runs the `scripts/ab-probe.sh` beside it against a fixture repository it builds
+under a `mktemp -d` directory, with a fake `docker` first on `PATH`, one line per
+case. It is run by hand only, and needs `git` and `jq`, no Docker and no
+network.
+
+The fake answers `info`, `build`, `ps`, `rm`, `image rm`, `compose version`,
+`compose config` and `compose run`. It reads its controls from files beside
+itself, since the runner calls `docker compose` under `env -i`: `mode` holds one
+word and `config.jq` a `jq` filter, `.` by default.
+
+| Control | Effect |
+| --- | --- |
+| `mode` `nodaemon` | `info` fails. |
+| `mode` `buildfail` | `build` fails. |
+| `mode` `absent` | `compose run` writes no `checks.jsonl`. |
+| `mode` `many` | `compose run` appends 3000 passing checks with 68-character ids, so the combined results exceed 128 KiB. |
+| `mode` `malformed`, `skip`, `seconds` | `compose run` appends a line that is not JSON, one with status `skip`, or one with `seconds` a string. |
+| `config.jq` | Applied to the whole config JSON that `compose config` reports, the contract's service built from `PROBE_IMAGE`, `PROBE_TREE` and `PROBE_RESULTS`. |
+
+`compose config` appends its environment to `compose-env` beside the fake.
+`compose run` runs the tree's `probe/checks.sh` with bash from inside the tree,
+with `PROBE_OUT` set to the results directory and `FAKE_RUN` to the run's number
+for that tree.
+
+The test sets `GIT_CONFIG_GLOBAL` to a file holding `core.autocrlf = true`, sets
+`GIT_CONFIG_NOSYSTEM=1`, and exports `AB_PROBE_CANARY`. The fixture's `main`
+holds `a.txt` reading `ok`, `g.txt` and no `probe/`. Branch `regression` adds
+`probe/`, changes `a.txt` and removes `g.txt`; branch `shown` adds `probe/`,
+`b.txt`, `c.txt` and `h.txt`; branch `symlink`, cut from `shown`, adds
+`probe/.env` as a symlink to the test's git config file; branch `manylinks`, cut
+from `shown`, adds 2000 symlinks under `probe/links/` with 64-character names,
+more paths than one pipe buffer holds. The fixture's `probe/checks.sh` is written with
+CRLF line endings and committed as LF, so a plain clone under that config checks
+it out with CRLF; a precondition line checks all three.
+
+| Check id | Passes where |
+| --- | --- |
+| `a` | `a.txt` reads `ok`. |
+| `b` | `b.txt` exists. |
+| `c` | Always; reported only where `c.txt` exists. |
+| `d` | Never. |
+| `f` | `FAKE_RUN` is odd, or unset. |
+| `g` | Always; reported only where `g.txt` exists. |
+| `h` | Never; reported only where `h.txt` exists. |
+
+| Case | Expected |
+| --- | --- |
+| `main` against `regression` | Exit 1, `a` a regression with the candidate `fail`, `g` a regression with the candidate `absent`. |
+| `main` against `shown` | Exit 0, `b` and `c` `shown`, `a` `ok`. |
+| The same pair | `d` `failing on both`, `h` `not passing`. |
+| The same pair | Both runs complete, the CRLF-committed `probe/checks.sh` having run. |
+| The same pair with `--runs 2` | Exit 1, `check f baseline -> pass, candidate -> fail, regression`. |
+| The same pair, `AB_PROBE_CANARY` exported | `compose-env` holds `PROBE_TREE` and not `AB_PROBE_CANARY`. |
+| `mode` `nodaemon` | Exit 2, `verdict -> not run`. |
+| `mode` `buildfail` | Exit 2, the failed-build line. |
+| Thirteen `config.jq` patches: `network_mode` `bridge` and `host`, `cap_add`, a bind of `/var/run/docker.sock` in place of the results directory, an `environment`, an `env_file`, `privileged`, another `image`, a third volume, `/work` not read-only, `/results` at another target, a second service, a top-level `secrets` | Exit 2, the contract line, for each. |
+| `mode` `many`, `main` against `regression` | Exit 1, `check a ... regression` and `verdict -> blocked, regressions=2`. |
+| `mode` `absent` | Exit 2, the `checks.jsonl absent` line. |
+| `mode` `malformed`, `skip`, `seconds` | Exit 2, the `checks.jsonl unreadable` line, for each. |
+| `main` against `symlink` | Exit 2, `candidate probe/ -> holds a symlink, probe not run`. Where a clone checks `probe/.env` out as a regular file, as Git for Windows does without symlink support, the case prints `not run` and counts as no failure. |
+| `main` against `manylinks` | The same line, under the same condition. The runner reads `find`'s whole output through a command substitution, since under `pipefail` a `find` killed by SIGPIPE behind `grep -q` would read as no symlink. |
+| `shown` against `main`, the candidate without `probe/` | Exit 2, the absent `probe/Dockerfile` line. |
+
+The last line is `fail -> N`, and the exit status is 0 only where N is 0.
+
+## probe/
+
+This repository's own A/B probe, under the contract in "The probe contract".
+`bash scripts/ab-probe.sh . <baseline-ref> <candidate-ref>` runs it.
+
+| File | What it holds |
+| --- | --- |
+| `probe/Dockerfile` | `debian:13-slim` with `bash`, `coreutils`, `diffutils`, `findutils`, `gawk`, `git`, `grep`, `jq`, `procps` and `sed`, and no Claude Code. It sets `safe.directory` to `*` in the system git config, since the tree is owned by a host uid. |
+| `probe/compose.yaml` | The one service `checks`, running `bash probe/checks.sh` in `/work`. |
+| `probe/checks.sh` | The checks. |
+| `probe/fake-claude.sh` | The fake `claude` CLI the install check puts on `PATH`. |
+
+The image is Debian 13, the release of the Linux test host the hidden-character
+records in `docs/environment.md` name. The cloud sessions' release is not
+recorded, so the image is not known to match it.
+
+### The checks
+
+`probe/checks.sh` copies `/work` to `/tmp/probe-tree` with `cp -a` and runs every
+check there, so nothing writes to the read-only tree. It writes one line per
+check to `/results/checks.jsonl`, with `seconds` the check's wall-clock time to
+the millisecond, and prints each check's output on standard output.
+
+Each test script, `env/setup.sh` and `scripts/verify.sh` runs under
+`timeout -k 10 600`. A command still running after 600 seconds is stopped, its
+log and standard output get the line `<command> -> timed out after 600s`, and
+its check reads `fail`.
+
+| Check id | Passes where |
+| --- | --- |
+| `test-<name>.sh`, one per `scripts/test-*.sh` in the tree | `bash scripts/test-<name>.sh`, run from the tree's root with standard input from `/dev/null`, exits 0 and its last line, carriage returns removed, is `fail -> 0`. |
+| `install` | `env/setup.sh` logs `bootstrap_exit=0` and `/opt/my-harness-wrapper/scripts/verify.sh` exits 0 with the last line `fail -> 0`. |
+
+A test script absent from a tree produces no line, so a test the candidate adds
+reads `absent` on the baseline.
+
+### The install check
+
+| Step | What it does |
+| --- | --- |
+| 1 | Clones the copied tree to `/tmp/probe-install-src` and checks its commit out as branch `main`, since `env/setup.sh` clones branch `main` and the runner's clones are detached. |
+| 2 | Exports `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` as `Probe` and `probe@example.com`, and `HARNESS_ASSIGNEE` as `probe`, in place of the environment variables panel. |
+| 3 | Copies `probe/fake-claude.sh` to `/tmp/probe-fake-claude/bin/claude` and puts that directory first on `PATH`, for this check only. |
+| 4 | Creates `/home/user` and runs the tree's `env/setup.sh` with `HARNESS_REPO_URL=/tmp/probe-install-src`, which clones it to `/opt/my-harness-wrapper` and runs `scripts/bootstrap.sh` into the empty `/root/.claude`. It prints `/home/user/bootstrap.log`. |
+| 5 | Runs `/opt/my-harness-wrapper/scripts/verify.sh` and prints its output. |
+
+### The fake claude CLI
+
+`probe/fake-claude.sh` keeps its installed plugins in
+`/tmp/probe-fake-claude/plugins.json`, a JSON array, empty at the start, and the
+marketplace sources it was given in `/tmp/probe-fake-claude/marketplaces`, one
+per line.
+
+| Call | Answer |
+| --- | --- |
+| `claude --version` | Prints `0.0.0 (probe fake claude)`, exit 0. |
+| `claude plugin list --json` | Prints the array, exit 0. Each entry holds `id`, `version`, `scope` `user`, `enabled` `true` and `installPath`. |
+| `claude plugin marketplace add <source>` | Appends `<source>` to the marketplaces file, exit 0; exit 1 where `<source>` is empty. |
+| `claude plugin install <id> --scope user --yes` | Exit 1 unless the arguments after `<id>` are exactly `--scope user --yes`, `<name>`, the id's text before the `@`, is not empty and holds no `/` or leading `.`, and the marketplaces file holds more lines than the array holds entries. Otherwise creates `/tmp/probe-fake-claude/plugins/<name>`. Where the deployed copy has `plugins/<name>`, copies that directory into it and takes `version` from its `.claude-plugin/plugin.json`; otherwise the directory stays empty and `version` is `0.0.0`. Adds the entry to the array and sets `enabledPlugins.<id>` to `true` in `$HOME/.claude/settings.json`. |
+| Anything else, `claude plugin update` and `claude plugin marketplace update` included | Prints `probe fake claude: unsupported arguments: ...` on standard error, exit 1. |
+
+`scripts/bootstrap.sh` takes its update path only for a plugin installed before
+its run, which the empty `/root/.claude` never holds.
+
+The install check therefore covers every step of `env/setup.sh`,
+`scripts/bootstrap.sh` and `scripts/verify.sh` except the real plugin installs.
+It does not cover:
+
+- that any marketplace or plugin is fetched;
+- that a marketplace source names the marketplace after the `@` of the plugin id installed from it;
+- the third-party plugins' contents, versions and npm dependencies;
+- that the `my-harness` plugin the real CLI installs from `PvtKaefsky/my-harness-wrapper` equals the tree's `plugins/my-harness/`, which the fake copies.

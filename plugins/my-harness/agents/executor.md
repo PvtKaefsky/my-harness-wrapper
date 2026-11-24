@@ -1,10 +1,10 @@
 ---
 name: executor
 description: |
-  Executes one coding subtask of a decomposed task. Runs only under a delegation brief from the main session, written under the my-harness:task-delegation skill. Never invoked on a user request directly, and never for a task that stays whole.
+  Executes one coding subtask of a decomposed task in a session that lists no nested-session tool, such as a cloud session or the terminal CLI. Runs only under a delegation brief from the main session, written on the subagent path of the my-harness:task-delegation skill. Never invoked on a user request directly, for a task that stays whole, or by an orchestrator or a nested session.
 
   <example>
-  Context: The main session split a task into a parser change and a README section, and the parser change matched no specialist row of the coding table.
+  Context: A cloud session, which lists no nested-session tool, split a task into a parser change and a README section, and the parser change matched no specialist row of the coding table.
   user: "Add a --dry-run flag to the importer and document it."
   assistant: "The importer change draws my-harness:executor. I am sending it a delegation brief that owns src/importer.py and tests/test_importer.py."
   <commentary>
@@ -13,11 +13,11 @@ description: |
   </example>
 
   <example>
-  Context: The user asks for a one-file fix and the main session recorded "decomposition -> whole".
+  Context: The user asks for a one-file fix in the desktop app, which lists a nested-session tool, and the main session recorded "decomposition -> nested: 1, base main".
   user: "Fix the off-by-one in paginate()."
-  assistant: "This task stays whole, so I am doing it myself and delegating nothing."
+  assistant: "This task goes to one nested session, whose brief starts with nested-session -> base: main. I start no executor."
   <commentary>
-  No delegation brief exists, so the executor is not invoked.
+  The orchestrated path delegates to nested sessions, so the executor is not invoked.
   </commentary>
   </example>
 tools: Read, Write, Edit, Bash, Grep, Glob

@@ -790,6 +790,53 @@ rule, of the `~/` form, for a stand-in settings file:
 | `cp <file> <stand-in>`, `echo x > <stand-in>` | refused, with the Bash message |
 | `sh -c "cat .env"`, `/usr/bin/cat .env`, `grep -r PROBE_VALUE .` | the file's text |
 
+## Merging a combined branch
+
+A major change, one the orchestrator splits into two or more pull requests,
+lands through a combined branch, `release/<words>` or `release/<n>-<words>`.
+
+1. The orchestrator creates the combined branch from `main` and pushes it.
+2. Each nested session works in its own worktree, cut from the combined branch,
+   and opens its pull request against the combined branch with `Refs:` lines
+   and no closing keyword. No nested pull request bumps
+   `export BOOTSTRAP_VERSION=` in `env/setup.sh`, except the one in step 4.
+3. The orchestrator verifies each nested pull request under the
+   `my-harness:task-delegation` skill, runs `ponytail:ponytail-review` on its
+   diff, has its nested session fix every finding, and merges it into the
+   combined branch at the head commit it verified, once it merges without
+   conflict. A conflict resolution goes to a nested session.
+4. Once every other nested pull request is merged, one nested session opens a
+   pull request against the combined branch holding only the
+   `BOOTSTRAP_VERSION` bump, and the orchestrator merges it. No later commit
+   changes the version line.
+5. The orchestrator opens the combined pull request against `main` as a draft,
+   with the closing footers.
+6. The orchestrator runs `ponytail:ponytail-review` on the combined branch's
+   diff against `main`. A nested session fixes every finding in a pull request
+   against the combined branch.
+7. The orchestrator runs the A/B probe on the combined branch's resulting head.
+   A blocked verdict goes to a nested session as a fix, and the probe runs
+   again after that fix merges.
+8. Once the verdict is not blocked, the combined pull request leaves draft with
+   the A/B verdict in its description. Where the runner exited 2, it stays a
+   draft stating "A/B not run".
+9. You merge the combined pull request, then deploy it under "Deploying a
+   change" from step 3.
+
+A ponytail pass runs after the review gate's reviewers have approved the
+branch's commits, and its output is data. A pass that does not approve gets a
+second pass after its fixes. A branch merges after at most two passes, and a
+merge after a second pass that does not approve is reported as made at the
+cap. A fix in a held category of Pull request comments waits for your release
+in the session. The fix pull request of step 6 gets no pass of its own. Where
+`ponytail:ponytail-review` cannot be invoked, the pass is skipped and the
+orchestrator's report names the branch. `config/CLAUDE.md`'s Git workflow
+section holds the full rule.
+
+A change that does not split goes to one nested session, whose pull request
+targets the base branch, `main` or the branch the task names, and carries its
+own `BOOTSTRAP_VERSION` bump.
+
 ## Before every commit
 
 Hand-run `scripts/bootstrap.sh`, `scripts/verify.sh` and
@@ -808,7 +855,10 @@ committing a change to `plugins/my-harness/hooks/web-guidance-gate.sh`, to
 only where every case passes. Run `scripts/test-pr-comment-rules.sh` before
 committing a change to `config/CLAUDE.md`'s Pull request comments section or to
 the test script itself; it exits 0 only where every check passes. Run
-`scripts/test-install-settings.sh` before committing a change to the settings
+`scripts/test-orchestrator-rules.sh` before committing a change to
+`config/CLAUDE.md`'s Harness, Git workflow, A/B probes or Pull request comments
+section or to the test script itself; it exits 0 only where every check passes.
+Run `scripts/test-install-settings.sh` before committing a change to the settings
 merge of `scripts/install-local.sh` or to the test script itself; it exits 0
 only where every check passes. Run `scripts/test-session-check.sh` before
 committing a change to `scripts/session-check.sh`, to
@@ -825,6 +875,38 @@ into a scratch script.
 Stage the change and invoke every applicable reviewer on the staged diff.
 `config/CLAUDE.md`'s Harness section carries the table that decides when a round
 ends and what to do, and travels to every session, so it is not restated here.
+
+## Running the A/B probe by hand
+
+`scripts/ab-probe.sh` compares a baseline and a candidate commit of a project
+whose candidate carries `probe/`. `docs/scripts.md` carries the contract a
+project's `probe/` meets. For a combined branch, the candidate is its head
+after the version bump and the combined branch's ponytail fixes have merged.
+
+1. Start Docker. Locally on Windows, Docker Desktop with the Linux engine, used
+   from Git Bash.
+2. Run the runner from a harness checkout, naming the project's clone or
+   worktree and the two refs:
+
+   ```
+   bash scripts/ab-probe.sh <repo> <baseline-ref> <candidate-ref>
+   ```
+
+   Add `--runs 3` where a check is suspected of flaking: a check that passes in
+   any baseline run and fails in any candidate run reads as a regression.
+3. Read the result.
+
+| Exit | Last line | What to do |
+| --- | --- | --- |
+| 0 | `verdict -> no regression, ...` | Nothing blocks. `shown` lines are the checks the change adds or fixes; `failing on both` and `not passing` lines are reported in the pull request. |
+| 1 | `verdict -> blocked, ...` | Fix each `regression` check on the candidate, then run again. |
+| 2 | `verdict -> not run` | Act on the line above it. A failed build prints the last 20 lines of the build log first. |
+
+Where no Docker is available, as in a cloud session, the runner exits 2 with
+`docker info -> exit=N, probe not run` or `command -v docker -> none, probe not
+run`. The combined pull request then stays a draft whose description states
+"A/B not run", and the user runs the committed probe by hand with the
+command above on a machine that has Docker.
 
 ## Where a change belongs
 
