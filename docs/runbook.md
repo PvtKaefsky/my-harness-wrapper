@@ -859,6 +859,37 @@ Stage the change and invoke every applicable reviewer on the staged diff.
 `config/CLAUDE.md`'s Harness section carries the table that decides when a round
 ends and what to do, and travels to every session, so it is not restated here.
 
+## Running the A/B probe by hand
+
+`scripts/ab-probe.sh` compares a baseline and a candidate commit of a project
+whose candidate carries `probe/`. `docs/scripts.md` carries the contract a
+project's `probe/` meets.
+
+1. Start Docker. Locally on Windows, Docker Desktop with the Linux engine, used
+   from Git Bash.
+2. Run the runner from a harness checkout, naming the project's clone or
+   worktree and the two refs:
+
+   ```
+   bash scripts/ab-probe.sh <repo> <baseline-ref> <candidate-ref>
+   ```
+
+   Add `--runs 3` where a check is suspected of flaking: a check that passes in
+   any baseline run and fails in any candidate run reads as a regression.
+3. Read the result.
+
+| Exit | Last line | What to do |
+| --- | --- | --- |
+| 0 | `verdict -> no regression, ...` | Nothing blocks. `shown` lines are the checks the change adds or fixes; `failing on both` and `not passing` lines are reported in the pull request. |
+| 1 | `verdict -> blocked, ...` | Fix each `regression` check on the candidate, then run again. |
+| 2 | `verdict -> not run` | Act on the line above it. A failed build prints the last 20 lines of the build log first. |
+
+Where no Docker is available, as in a cloud session, the runner exits 2 with
+`docker info -> exit=N, probe not run` or `command -v docker -> none, probe not
+run`. The combined pull request is then opened as a draft whose description
+states "A/B not run", and the user runs the committed probe by hand with the
+command above on a machine that has Docker.
+
 ## Where a change belongs
 
 | Change | Repository | File |
