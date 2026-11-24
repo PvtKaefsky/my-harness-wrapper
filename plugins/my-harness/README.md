@@ -147,14 +147,14 @@ skill that is missing.
 
 The `task-delegation` cases were measured on 2026-11-24 with CLI 2.1.317,
 `--model claude-opus-5-5`, `--ablation none`, `--runs 3` and
-`--case 'delegation-*'`, against this plugin at version 0.5.0. The run cost
-$1.40 and exited 0.
+`--case 'delegation-*'`, against this plugin at version 0.5.0 at commit
+`5f52555`. The run cost $1.54 and exited 0.
 
 | Case | Score | Runs passed | Cost (USD) |
 | --- | --- | --- | --- |
-| `delegation-coding-task` | 1.0 | 3 of 3 | 0.52 |
-| `delegation-analysis-question` | 1.0 | 3 of 3 | 0.41 |
-| `delegation-no-nested-tool` | 1.0 | 3 of 3 | 0.47 |
+| `delegation-coding-task` | 1.0 | 3 of 3 | 0.60 |
+| `delegation-analysis-question` | 1.0 | 3 of 3 | 0.44 |
+| `delegation-no-nested-tool` | 1.0 | 3 of 3 | 0.50 |
 
 The other cases were measured on 2026-11-23 with CLI 2.1.317,
 `--model claude-opus-5-5`, `--ablation none` and `--runs 3`, against this
