@@ -116,6 +116,7 @@ every session.
 | `scripts/check-hook-matchers.sh` | Compares the tool names the attribution guard's hook matchers name with a file of a session's tool names. Run by hand only. |
 | `scripts/ab-probe.sh` | The A/B probe runner. Runs a project's `probe/checks.sh` in Docker on a baseline and a candidate commit of a repository, using the candidate's `probe/` for both, prints one line per check and a verdict, and exits 1 on a regression and 2 where the probe could not run. Run by hand. |
 | `scripts/test-ab-probe.sh` | Runs the `scripts/ab-probe.sh` of its own tree against a fixture repository with a fake `docker`, one line per case. Needs no Docker and no network. Run by hand only. |
+| `probe/` | This repository's A/B probe: `Dockerfile`, `compose.yaml`, `checks.sh` and `fake-claude.sh`, which `scripts/ab-probe.sh` runs on two commits. Its checks are one per `scripts/test-*.sh` and an install check, which runs `env/setup.sh` and `scripts/verify.sh` with a fake `claude` CLI. `docs/scripts.md` describes it. |
 | `.gitattributes` | The line-ending rule. Git checks out every file it detects as text with LF line endings, on every platform. |
 | `README.md` | This file. |
 | `docs/` | Documentation. |
@@ -171,6 +172,15 @@ d="${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper"; HARNESS_DIR="$d" bash
 Exit 0 means no check failed. A `NOTE` line can appear alongside it and does
 not set the exit status. `docs/runbook.md` decodes each `FAIL` and `NOTE`
 line.
+
+### Probe two commits
+
+```
+bash scripts/ab-probe.sh . origin/main HEAD
+```
+
+It needs Docker with Compose. A `regression` line and exit 1 mean a check
+passing on the first commit fails or is missing on the second.
 
 ### Make an environment change
 

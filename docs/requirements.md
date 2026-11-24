@@ -174,6 +174,11 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A regression among results larger than 128 KiB still prints its `regression` line and exits 1. | `scripts/test-ab-probe.sh`, the `many` case |
 | A variable exported in the runner's environment outside the documented list does not reach `docker compose`. | `scripts/test-ab-probe.sh`, the `AB_PROBE_CANARY` case |
 | A candidate whose `probe/` is a symlink or holds one stops the run with exit 2 and `candidate probe/ -> holds a symlink, probe not run`, also where `probe/` holds more symlink paths than one pipe buffer. | `scripts/test-ab-probe.sh`, `main` against `symlink` and against `manylinks`, run where the checkout creates symlinks, as on Linux |
+| `bash scripts/ab-probe.sh . <baseline-ref> <candidate-ref>` in this repository runs its `probe/`, whose `probe/compose.yaml` the runner accepts under the probe contract. | not tested by a script; run by hand on Docker |
+| `probe/checks.sh` reports one check per `scripts/test-*.sh` in the tree, `pass` only where the script exits 0 and its last line is `fail -> 0`, and no line for a test script the tree lacks. | not tested by a script; run by hand on Docker |
+| A candidate that breaks a behaviour a `scripts/test-*.sh` checks gets a `regression` line for that script's check and exit 1 against a baseline where it passes. | not tested by a script; run by hand on Docker with a scratch candidate |
+| `probe/checks.sh` reports the check `install`, `pass` only where `env/setup.sh` logs `bootstrap_exit=0` and `scripts/verify.sh` then ends `fail -> 0`, with `probe/fake-claude.sh` as the `claude` CLI; a candidate that breaks a step of either script other than the real plugin installs, or that installs a plugin without a `claude plugin marketplace add` before it or without exactly `--scope user --yes`, reads `regression` for `install`. | not tested by a script; run by hand on Docker with a scratch candidate |
+| A test script, `env/setup.sh` or `scripts/verify.sh` still running after 600 seconds in `probe/checks.sh` is stopped, prints `<command> -> timed out after 600s`, and its check reads `fail`. | not tested by a script; run by hand in the probe image with `LIMIT` in `probe/checks.sh` set to 1 |
 
 ## Task delegation
 
