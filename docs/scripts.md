@@ -2538,6 +2538,7 @@ verbatim from the payload, except the last.
 | scratch files stay uncommitted | Harness |
 | the nested first line | Harness |
 | the nested model is named by variable | Harness |
+| an unset nested model stops and asks | Harness |
 | a nested session neither decomposes nor delegates | Harness |
 | the fallback without a nested-session tool | Harness |
 | chat sessions keep the analyst | Harness |

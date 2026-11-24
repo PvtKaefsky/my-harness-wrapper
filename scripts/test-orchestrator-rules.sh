@@ -30,6 +30,7 @@ check 'four nested sessions at once' in_section HARNESS 'At most four nested ses
 check 'scratch files stay uncommitted' in_section HARNESS 'and are never committed. A change they show is needed goes to a nested session.'
 check 'the nested first line' in_section HARNESS 'A session whose opening prompt'"'"'s first line is `nested-session -> base: <base branch>`'
 check 'the nested model is named by variable' in_section HARNESS '`HARNESS_NESTED_MODEL` and `HARNESS_NESTED_EFFORT`'
+check 'an unset nested model stops and asks' in_section HARNESS 'where either is unset or empty, the orchestrator starts no nested session and stops and asks the user.'
 check 'a nested session neither decomposes nor delegates' in_section HARNESS 'it does not decompose it and starts no subagent except the review gate'"'"'s reviewers'
 check 'the fallback without a nested-session tool' in_section HARNESS 'Where a main session lists no nested-session tool, as in a cloud session or the terminal CLI, it is its own orchestrator and executor'
 check 'chat sessions keep the analyst' in_section HARNESS 'A chat session delegates analysis to `my-harness:analyst` subagents.'
