@@ -78,6 +78,7 @@ scores `1.0` only where every grader passes.
 | `graders/initial-branch.md` | `create-python-library` | holds `git init --initial-branch=main` |
 | `graders/decomposition.md` | `delegation-coding-task` | holds `decomposition -> nested: 1` |
 | `graders/brief.md` | `delegation-coding-task` | holds `nested-session -> base: main` |
+| `graders/ponytail.md` | `delegation-coding-task` | holds `ponytail-review` followed later by "merg" or the word "ready", in any casing |
 | `graders/decomposition.md` | `delegation-analysis-question` | holds `decomposition -> whole` |
 | `graders/unavailable.md` | `delegation-no-nested-tool` | holds `nested-sessions -> unavailable` |
 | `graders/no-nested-brief.md` | `delegation-analysis-question`, `delegation-no-nested-tool` | does not hold `nested-session -> base:` |
@@ -87,14 +88,15 @@ read in it.
 
 `claude plugin eval` cannot start nested sessions: a run lists no
 nested-session tool. The `task-delegation` graders therefore check the
-decomposition line and the briefs the final reply states, never the tool calls.
-The `delegation-coding-task` prompt states that the session is an orchestrator
-in the desktop app and asks for the decomposition and briefs in place of the
-calls.
+decomposition line, the briefs and the steps to the merge the final reply
+states, never the tool calls. The `delegation-coding-task` prompt states that
+the session is an orchestrator in the desktop app and asks for the
+decomposition, the briefs and each step from the nested pull request to its
+merge in place of the calls.
 
 | Case | Skill | Expected | The prompt carries |
 | --- | --- | --- | --- |
-| `delegation-coding-task` | `task-delegation` | invoke | a statement that the session is an orchestrator in the desktop app, a Python script, and a request to add a `--dry-run` flag and document it |
+| `delegation-coding-task` | `task-delegation` | invoke | a statement that the session is an orchestrator in the desktop app, a Python script, a request to add a `--dry-run` flag and document it, and a request for each step up to the merge |
 | `delegation-analysis-question` | `task-delegation` | invoke | a short Python function and a question about why it returns `None` for an empty list |
 | `delegation-no-nested-tool` | `task-delegation` | invoke | a statement that the session is the terminal CLI with no nested-session tool, a Python script, and a request to plan a `--limit` flag and its test |
 | `property-tests-serializer` | `python-property-model-tests` | invoke | a Python `encode`/`decode` pair and a request for tests |
