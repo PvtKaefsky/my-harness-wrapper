@@ -1422,6 +1422,8 @@ descriptions an orchestrator session listed and from its own calls.
 | The caller's own model | `mcp__ccd_session_mgmt__get_session` with `self` reported `model` `claude-fable-5-2` and `effort` `medium` for the orchestrator. |
 | Hand-back | The app continues the starting session when a started session ends its turn (`wake_when_done`). |
 | Where absent | Cloud sessions and the terminal CLI list no such tool. |
+| Start refused in an event turn | On 2026-11-24, a call with `initiation: "user_asked"` in a turn a started session's notice opened was refused with "Start sessions only on the user's own words to you here; this turn runs an automated event, another session's message, or the task another session gave you. Propose the session instead (initiation "own_initiative"), or start it once the user asks you here." |
+| A proposed session | On 2026-11-24, the same brief with `initiation: "own_initiative"` became a card the user starts, and the result stated "branch_name / source_branch don't apply to a card and were dropped". |
 
 Not probed: whether a `model` id above the caller's is refused or silently
 ignored.
