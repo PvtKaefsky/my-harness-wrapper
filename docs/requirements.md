@@ -156,3 +156,13 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | A session asked to create a repository invokes `my-harness:repository-setup`, and its reply gives `git init --initial-branch=main` and names the layout document. | `plugins/my-harness/evals/create-python-library` |
 | A session asked for a change that needs a new top-level directory in an existing repository invokes `my-harness:repository-setup`, and its reply names the layout document. | `plugins/my-harness/evals/add-top-level-directory` |
 | A session asked to edit one file in an existing repository does not invoke `my-harness:repository-setup`. | `plugins/my-harness/evals/edit-one-file` |
+| A session adding the A/B probe's files places `probe/Dockerfile`, `probe/compose.yaml` and `probe/checks.sh` in one top-level `probe/` directory, in both layouts. | not tested; no eval case adds probe files |
+
+## Task delegation
+
+| Requirement | Test |
+| --- | --- |
+| A main session given a coding task, where a nested-session tool is listed, invokes `my-harness:task-delegation`, writes `decomposition -> nested: <count>, base <base branch>`, and writes each nested-session brief with the first line `nested-session -> base: <base branch>`. | `plugins/my-harness/evals/delegation-coding-task` |
+| A main session given a coding task, where no nested-session tool is listed, invokes `my-harness:task-delegation`, writes `nested-sessions -> unavailable: <reason>`, and writes no nested-session brief. | `plugins/my-harness/evals/delegation-no-nested-tool` |
+| A main session given a question invokes `my-harness:task-delegation`, writes `decomposition -> whole: <reason>`, and writes no nested-session brief. | `plugins/my-harness/evals/delegation-analysis-question` |
+| A session whose brief starts with `nested-session -> base: <base branch>` commits, pushes and opens one pull request against that base, starts only the review gate's reviewer subagents, and does not decompose, merge its pull request, register an issue, or change a version number unless its brief makes it the version-bump session. | not tested; `claude plugin eval` cannot start a nested session |
