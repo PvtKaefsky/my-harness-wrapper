@@ -3068,3 +3068,50 @@ it out with CRLF; a precondition line checks all three.
 | `shown` against `main`, the candidate without `probe/` | Exit 2, the absent `probe/Dockerfile` line. |
 
 The last line is `fail -> N`, and the exit status is 0 only where N is 0.
+
+## probe/
+
+This repository's own A/B probe, under the contract in "The probe contract".
+`bash scripts/ab-probe.sh . <baseline-ref> <candidate-ref>` runs it.
+
+| File | What it holds |
+| --- | --- |
+| `probe/Dockerfile` | `debian:13-slim` with `bash`, `coreutils`, `diffutils`, `findutils`, `gawk`, `git`, `grep`, `jq`, `procps` and `sed`, and no Claude Code. It sets `safe.directory` to `*` in the system git config, since the tree is owned by a host uid. |
+| `probe/compose.yaml` | The one service `checks`, running `bash probe/checks.sh` in `/work`. |
+| `probe/checks.sh` | The checks. |
+
+The image is Debian 13, the release of the Linux test host the hidden-character
+records in `docs/environment.md` name. The cloud sessions' release is not
+recorded, so the image is not known to match it.
+
+### The checks
+
+`probe/checks.sh` copies `/work` to `/tmp/probe-tree` with `cp -a` and runs every
+check there, so nothing writes to the read-only tree. It writes one line per
+check to `/results/checks.jsonl`, with `seconds` the check's wall-clock time to
+the millisecond, and prints each check's output on standard output.
+
+| Check id | Passes where |
+| --- | --- |
+| `test-<name>.sh`, one per `scripts/test-*.sh` in the tree | `bash scripts/test-<name>.sh`, run from the tree's root with standard input from `/dev/null`, exits 0 and its last line, carriage returns removed, is `fail -> 0`. |
+| `install` | `env/setup.sh` logs `bootstrap_exit=0` and `/opt/my-harness-wrapper/scripts/verify.sh` exits 0 with the last line `fail -> 0`. |
+
+A test script absent from a tree produces no line, so a test the candidate adds
+reads `absent` on the baseline.
+
+### The install check
+
+| Step | What it does |
+| --- | --- |
+| 1 | Clones the copied tree to `/tmp/probe-install-src` and checks its commit out as branch `main`, since `env/setup.sh` clones branch `main` and the runner's clones are detached. |
+| 2 | Exports `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` as `Probe` and `probe@example.com`, and `HARNESS_ASSIGNEE` as `probe`, in place of the environment variables panel. |
+| 3 | Creates `/home/user` and runs the tree's `env/setup.sh` with `HARNESS_REPO_URL=/tmp/probe-install-src`, which clones it to `/opt/my-harness-wrapper` and runs `scripts/bootstrap.sh` into the empty `/root/.claude`. It prints `/home/user/bootstrap.log`. |
+| 4 | Runs `/opt/my-harness-wrapper/scripts/verify.sh` and prints its output. |
+
+The check reads `fail` on every tree whose `config/plugins.tsv` names a plugin.
+The image has no `claude` CLI and the
+container no network: `scripts/bootstrap.sh` step 6 counts each `claude plugin`
+call and each `scripts/plugin-dependencies.sh` run as a failure, and
+`scripts/verify.sh` fails its live config directory agreement and plugin checks,
+each of which reads `claude plugin list --json`. Every other step of both scripts
+passes offline.

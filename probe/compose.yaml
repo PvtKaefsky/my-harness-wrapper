@@ -1,0 +1,14 @@
+services:
+  checks:
+    image: ${PROBE_IMAGE}
+    network_mode: none
+    working_dir: /work
+    command: ["bash", "probe/checks.sh"]
+    volumes:
+      - type: bind
+        source: ${PROBE_TREE}
+        target: /work
+        read_only: true
+      - type: bind
+        source: ${PROBE_RESULTS}
+        target: /results
