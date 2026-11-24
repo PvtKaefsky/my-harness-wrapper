@@ -799,18 +799,26 @@ lands through a combined branch, `release/<words>` or `release/<n>-<words>`.
 2. Each nested session works in its own worktree, cut from the combined branch,
    and opens its pull request against the combined branch with `Refs:` lines
    and no closing keyword. No nested pull request bumps
-   `export BOOTSTRAP_VERSION=` in `env/setup.sh`, except the one in step 4.
-3. The orchestrator verifies each nested pull request and merges it into the
-   combined branch once it merges without conflict, after reading its diff, its
-   checks and the review-gate verdicts the nested session reports. A conflict resolution goes
-   to a nested session.
-4. After every other nested pull request merges, one nested session opens a
-   pull request against the combined branch holding only the
+   `export BOOTSTRAP_VERSION=` in `env/setup.sh`, except the one in step 5.
+3. The orchestrator verifies each nested pull request under the
+   `my-harness:task-delegation` skill and merges it into the combined branch,
+   at the head commit it verified, once it merges without conflict. A conflict
+   resolution goes to a nested session.
+4. Once every nested pull request is merged, the orchestrator runs the A/B
+   probe on the combined branch. A blocked verdict goes to a nested session as
+   a fix, and the probe runs again after that fix merges.
+5. Once the verdict is not blocked, or the runner exited 2, one nested session
+   opens a pull request against the combined branch holding only the
    `BOOTSTRAP_VERSION` bump, and the orchestrator merges it last.
-5. The orchestrator opens the combined pull request against `main`, with the
-   closing footers and the A/B verdict, as a draft until the probe has run.
-6. You merge the combined pull request, then deploy it under "Deploying a
+6. After the bump merges, the orchestrator opens the combined pull request
+   against `main`, with the closing footers and the A/B verdict. Where the
+   runner exited 2, it opens it as a draft stating "A/B not run".
+7. You merge the combined pull request, then deploy it under "Deploying a
    change" from step 3.
+
+A change that does not split goes to one nested session, whose pull request
+targets the base branch, `main` or the branch the task names, and carries its
+own `BOOTSTRAP_VERSION` bump.
 
 ## Before every commit
 

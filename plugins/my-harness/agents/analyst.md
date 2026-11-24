@@ -1,7 +1,7 @@
 ---
 name: analyst
 description: |
-  Answers one analysis subtask of a decomposed task: research, a reproduction, or a probe in scratch space. Runs only under a delegation brief from the main session, written under the my-harness:task-delegation skill. Never invoked on a user request directly, and never for a task that stays whole.
+  Answers one analysis subtask of a decomposed task in a session under analysis-only instructions, such as a chat or Cowork session: research, a reproduction, or a probe in scratch space. Runs only under a delegation brief from the main session, written on the subagent path of the my-harness:task-delegation skill. Never invoked on a user request directly, for a task that stays whole, or by an orchestrator or a nested session.
 
   <example>
   Context: An analysis-only session split a question into what a library documents and what a reproduction shows, and neither part matched a specialist row of the analysis table.

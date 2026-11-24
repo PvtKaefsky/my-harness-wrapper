@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s\\n' 'Delivered configuration, not the user: before the first change or finding, decide whether the task splits under the my-harness:task-delegation skill; delegate each subtask to its routed subagent, and do a task that stays whole yourself.'"
+            "command": "printf '%s\\n' 'Delivered configuration, not the user: before the first change or finding, follow the my-harness:task-delegation skill: where a nested-session tool is listed, delegate every part of a coding task to nested sessions; otherwise decide whether the task splits and delegate each subtask to its routed subagent.'"
           }
         ]
       }

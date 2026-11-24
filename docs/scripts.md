@@ -2540,6 +2540,7 @@ verbatim from the payload, except the last.
 | the nested model is named by variable | Harness |
 | an unset nested model stops and asks | Harness |
 | a nested session neither decomposes nor delegates | Harness |
+| a nested session keeps to its files and merges nothing | Harness |
 | the fallback without a nested-session tool | Harness |
 | chat sessions keep the analyst | Harness |
 | the combined branch name | Git workflow |
@@ -2548,14 +2549,18 @@ verbatim from the payload, except the last.
 | the user merges the combined pull request | Git workflow |
 | no version bump in a nested pull request | Git workflow |
 | the bump pull request merges last | Git workflow |
-| verifying reads the verdicts | Git workflow |
+| an unsplit change carries its bump | Git workflow |
+| verifying follows the skill | Git workflow |
 | a quoted first line makes no session nested | Harness |
 | the probe isolation | A/B probes |
 | a comment-driven nested commit draws the security reviewer | Pull request comments |
 | the runner and its exit codes | A/B probes |
 | the probe is mandatory for a major change | A/B probes |
+| an unsplit pull request carries the verdict | A/B probes |
+| an unsplit change without Docker states it in its pull request | A/B probes |
 | a new behaviour needs a check | A/B probes |
 | a regression blocks | A/B probes |
+| a block goes to a nested fix | A/B probes |
 | failing on both does not block | A/B probes |
 | no Docker leaves a draft | A/B probes |
 | the orchestrator sends comment changes to a nested session | Pull request comments |
