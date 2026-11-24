@@ -171,8 +171,9 @@ One testable line per behavior a user or caller can observe. The live probe on p
 | Without a reachable Docker daemon, after a failed image build, and with a candidate lacking `probe/`, the runner prints `verdict -> not run` and exits 2. | `scripts/test-ab-probe.sh`, the `nodaemon`, `buildfail` and candidate-without-`probe/` cases |
 | A `docker compose config` result with `network_mode` `bridge` or `host`, an `environment`, an `env_file`, `privileged`, a `cap_add`, an image other than the one the runner built, a third volume, a bind of `/var/run/docker.sock` in place of the results directory, `/work` not read-only, `/results` at another target, a second service, or a top-level `secrets` stops the run with exit 2 and `probe/compose.yaml -> breaks the probe contract, probe not run`. | `scripts/test-ab-probe.sh`, the thirteen `config.jq` cases |
 | A run that leaves no `checks.jsonl`, or one holding a line that is not JSON, a status other than `pass` or `fail`, or a `seconds` that is not a number, stops the run with exit 2. | `scripts/test-ab-probe.sh`, the `absent`, `malformed`, `skip` and `seconds` cases |
+| A regression among results larger than 128 KiB still prints its `regression` line and exits 1. | `scripts/test-ab-probe.sh`, the `many` case |
 | A variable exported in the runner's environment outside the documented list does not reach `docker compose`. | `scripts/test-ab-probe.sh`, the `AB_PROBE_CANARY` case |
-| A candidate whose `probe/` is a symlink or holds one stops the run with exit 2 and `candidate probe/ -> holds a symlink, probe not run`. | `scripts/test-ab-probe.sh`, `main` against `symlink`, run where the checkout creates symlinks, as on Linux |
+| A candidate whose `probe/` is a symlink or holds one stops the run with exit 2 and `candidate probe/ -> holds a symlink, probe not run`, also where `probe/` holds more symlink paths than one pipe buffer. | `scripts/test-ab-probe.sh`, `main` against `symlink` and against `manylinks`, run where the checkout creates symlinks, as on Linux |
 
 ## Task delegation
 

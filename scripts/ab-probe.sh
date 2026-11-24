@@ -73,7 +73,7 @@ clone candidate "$CAND_REF"
 for f in Dockerfile compose.yaml checks.sh; do
   [ -f "$SCRATCH/candidate/probe/$f" ] || notrun "candidate probe/$f -> absent, probe not run"
 done
-if [ -L "$SCRATCH/candidate/probe" ] || find "$SCRATCH/candidate/probe" -type l | grep -q .; then
+if [ -L "$SCRATCH/candidate/probe" ] || [ -n "$(find "$SCRATCH/candidate/probe" -type l)" ]; then
   notrun "candidate probe/ -> holds a symlink, probe not run"
 fi
 rm -rf -- "$SCRATCH/baseline/probe"
@@ -124,22 +124,26 @@ while [ "$i" -le "$RUNS" ]; do
   i=$((i + 1))
 done
 
-READ='def runs($t): [$all[] | select(.tree == $t)];
-  def statuses($t; $id): [runs($t)[] | ([.checks[] | select(.id == $id) | .status]
-    | if length == 0 then "absent" elif index("fail") then "fail" else "pass" end)];
-  def baseline($id): statuses("baseline"; $id)
-    | if index("pass") then "pass" elif index("fail") then "fail" else "absent" end;
-  def candidate($id): statuses("candidate"; $id)
-    | if all(. == "absent") then "absent" elif all(. == "pass") then "pass" else "fail" end;
-  [$all[].checks[].id] | unique[] as $id | [$id, baseline($id), candidate($id)] | @tsv'
+READ='. as $all
+  | def runs($t): [$all[] | select(.tree == $t) | .checks | group_by(.id)
+      | map({key: .[0].id, value: (if any(.[]; .status == "fail") then "fail" else "pass" end)}) | from_entries];
+  runs("baseline") as $b | runs("candidate") as $c
+  | [$all[].checks[].id] | unique[] as $id
+  | [$b[] | .[$id] // "absent"] as $bs | [$c[] | .[$id] // "absent"] as $cs
+  | [$id,
+     (if $bs | index("pass") then "pass" elif $bs | index("fail") then "fail" else "absent" end),
+     (if all($cs[]; . == "absent") then "absent" elif all($cs[]; . == "pass") then "pass" else "fail" end)]
+  | @tsv'
 
 all=$(cd "$SCRATCH/results" && for d in */; do
   d=${d%/}
   jq -c -s --arg tree "${d%-*}" '{tree: $tree, checks: .}' "$d/checks.jsonl"
 done | jq -s -c .) || notrun "results -> unreadable, probe not run"
+rows=$(printf '%s\n' "$all" | jq -r "$READ" | tr -d '\r') || notrun "results -> not compared, probe not run"
 
 regressions=0 shown=0 failing=0
 while IFS=$'\t' read -r id b c; do
+  [ -n "$id" ] || continue
   if [ "$b" = pass ] && [ "$c" != pass ]; then
     label=regression regressions=$((regressions + 1))
   elif [ "$b" != pass ] && [ "$c" = pass ]; then
@@ -152,7 +156,7 @@ while IFS=$'\t' read -r id b c; do
     label="not passing" failing=$((failing + 1))
   fi
   echo "check $id baseline -> $b, candidate -> $c, $label"
-done < <(jq -n -r --argjson all "$all" "$READ" | tr -d '\r')
+done <<<"$rows"
 
 if [ "$regressions" -gt 0 ]; then
   echo "verdict -> blocked, regressions=$regressions shown=$shown failing=$failing"

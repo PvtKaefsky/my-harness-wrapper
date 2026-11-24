@@ -2951,7 +2951,10 @@ memory or process limit on a run.
 A tree with no `checks.jsonl` after its run, or a file holding a line that is
 not such an object, stops the run. An empty file is zero checks. The container's
 exit status is printed and does not decide a check. Where one run reports an id
-more than once, it is `fail` in that run if any of its lines is `fail`.
+more than once, it is `fail` in that run if any of its lines is `fail`. The
+comparison reads the combined results on `jq`'s standard input, so their size is
+bounded by memory alone, and a `jq` failure there prints
+`results -> not compared, probe not run` and exits 2.
 
 ### Reading a check's status
 
@@ -3016,6 +3019,7 @@ word and `config.jq` a `jq` filter, `.` by default.
 | `mode` `nodaemon` | `info` fails. |
 | `mode` `buildfail` | `build` fails. |
 | `mode` `absent` | `compose run` writes no `checks.jsonl`. |
+| `mode` `many` | `compose run` appends 3000 passing checks with 68-character ids, so the combined results exceed 128 KiB. |
 | `mode` `malformed`, `skip`, `seconds` | `compose run` appends a line that is not JSON, one with status `skip`, or one with `seconds` a string. |
 | `config.jq` | Applied to the whole config JSON that `compose config` reports, the contract's service built from `PROBE_IMAGE`, `PROBE_TREE` and `PROBE_RESULTS`. |
 
@@ -3029,7 +3033,9 @@ The test sets `GIT_CONFIG_GLOBAL` to a file holding `core.autocrlf = true`, sets
 holds `a.txt` reading `ok`, `g.txt` and no `probe/`. Branch `regression` adds
 `probe/`, changes `a.txt` and removes `g.txt`; branch `shown` adds `probe/`,
 `b.txt`, `c.txt` and `h.txt`; branch `symlink`, cut from `shown`, adds
-`probe/.env` as a symlink to the test's git config file. The fixture's `probe/checks.sh` is written with
+`probe/.env` as a symlink to the test's git config file; branch `manylinks`, cut
+from `shown`, adds 2000 symlinks under `probe/links/` with 64-character names,
+more paths than one pipe buffer holds. The fixture's `probe/checks.sh` is written with
 CRLF line endings and committed as LF, so a plain clone under that config checks
 it out with CRLF; a precondition line checks all three.
 
@@ -3054,9 +3060,11 @@ it out with CRLF; a precondition line checks all three.
 | `mode` `nodaemon` | Exit 2, `verdict -> not run`. |
 | `mode` `buildfail` | Exit 2, the failed-build line. |
 | Thirteen `config.jq` patches: `network_mode` `bridge` and `host`, `cap_add`, a bind of `/var/run/docker.sock` in place of the results directory, an `environment`, an `env_file`, `privileged`, another `image`, a third volume, `/work` not read-only, `/results` at another target, a second service, a top-level `secrets` | Exit 2, the contract line, for each. |
+| `mode` `many`, `main` against `regression` | Exit 1, `check a ... regression` and `verdict -> blocked, regressions=2`. |
 | `mode` `absent` | Exit 2, the `checks.jsonl absent` line. |
 | `mode` `malformed`, `skip`, `seconds` | Exit 2, the `checks.jsonl unreadable` line, for each. |
 | `main` against `symlink` | Exit 2, `candidate probe/ -> holds a symlink, probe not run`. Where a clone checks `probe/.env` out as a regular file, as Git for Windows does without symlink support, the case prints `not run` and counts as no failure. |
+| `main` against `manylinks` | The same line, under the same condition. The runner reads `find`'s whole output through a command substitution, since under `pipefail` a `find` killed by SIGPIPE behind `grep -q` would read as no symlink. |
 | `shown` against `main`, the candidate without `probe/` | Exit 2, the absent `probe/Dockerfile` line. |
 
 The last line is `fail -> N`, and the exit status is 0 only where N is 0.

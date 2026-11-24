@@ -52,6 +52,7 @@ case $1 in
           malformed) echo 'not json' >> "$out" ;;
           skip) echo '{"id":"z","status":"skip","seconds":0}' >> "$out" ;;
           seconds) echo '{"id":"z","status":"pass","seconds":"1"}' >> "$out" ;;
+          many) seq -f "{\"id\":\"pad-$(printf 'x%.0s' $(seq 60))-%04g\",\"status\":\"pass\",\"seconds\":0}" 3000 >> "$out" ;;
         esac ;;
       *) exit 1 ;;
     esac ;;
@@ -123,6 +124,10 @@ printf 'b\n' > b.txt && printf 'c\n' > c.txt && printf 'h\n' > h.txt && git add 
 git checkout -q -b symlink shown
 link=$(printf '%s' "$WORK/gitconfig" | git hash-object -w --stdin)
 git update-index --add --cacheinfo "120000,$link,probe/.env" && git commit -q -m symlink
+git checkout -q -b manylinks shown
+long=$(printf 'x%.0s' $(seq 60))
+for i in $(seq 2000); do printf '120000 %s\tprobe/links/%s%04d\n' "$link" "$long" "$i"; done | git update-index --index-info
+git commit -q -m manylinks
 git checkout -q shown
 
 cr=$'\r'
@@ -144,7 +149,7 @@ expect() {
   out=$(PATH="$BIN:$PATH" bash "$RUNNER" "${args[@]}" 2>&1); got=$?
   [ "$got" -eq "$want" ] || verdict=FAIL
   for line in "$@"; do
-    if ! printf '%s\n' "$out" | grep -q -x -F -- "$line"; then verdict=FAIL; label="$label, line [$line]"; fi
+    if ! grep -q -x -F -- "$line" <<<"$out"; then verdict=FAIL; label="$label, line [$line]"; fi
   done
   if [ "$verdict" = FAIL ]; then
     fails=$((fails + 1))
@@ -212,6 +217,11 @@ for patch in \
     'probe/compose.yaml -> breaks the probe contract, probe not run'
 done
 
+fake many
+expect 'a regression among 3000 more checks, results above 128 KiB' 1 "$R" main regression -- \
+  'check a baseline -> pass, candidate -> fail, regression' \
+  'verdict -> blocked, regressions=2 shown=0 failing=2'
+
 fake absent
 expect 'a run that writes no checks.jsonl' 2 "$R" main shown -- \
   'run baseline 1 -> exit=0, checks.jsonl absent, probe not run'
@@ -227,8 +237,11 @@ git clone -q "$R" "$WORK/links" && git -C "$WORK/links" checkout -q symlink
 if [ -L "$WORK/links/probe/.env" ]; then
   expect 'a candidate whose probe/.env is a symlink' 2 "$R" main symlink -- \
     'candidate probe/ -> holds a symlink, probe not run'
+  expect 'a candidate whose probe/ holds 2000 symlinks, more paths than a pipe buffer' 2 "$R" main manylinks -- \
+    'candidate probe/ -> holds a symlink, probe not run'
 else
   echo "a candidate whose probe/.env is a symlink -> not run, this checkout creates no symlinks"
+  echo "a candidate whose probe/ holds 2000 symlinks -> not run, this checkout creates no symlinks"
 fi
 
 expect 'a candidate without probe/' 2 "$R" shown main -- \
