@@ -42,7 +42,8 @@ It may:
   rules, and update it from the base branch;
 - commit, push its branch, and open one pull request whose base is the base
   branch;
-- start the review gate's reviewer subagents under its own rules.
+- start the review gate's reviewer subagents under its own rules;
+- label its own pull request as its brief states.
 
 It may not:
 
@@ -98,6 +99,7 @@ The orchestrator's actions are limited to:
 - verifying their pull requests;
 - running `ponytail:ponytail-review` on a branch's diff against its base;
 - running A/B probes;
+- syncing labels and setting signal labels, under "Labels";
 - merging verified, conflict-free nested pull requests into the combined
   branch;
 - opening the combined pull request and keeping its description current;
@@ -123,6 +125,69 @@ orchestrator's environment. Each nested session is started with
 `HARNESS_NESTED_MODEL` as its model and `HARNESS_NESTED_EFFORT` as its effort.
 Where either is unset or empty, stop and ask the user.
 
+### Review budget
+
+A review budget is the expected count of changed lines in one part that need
+line-by-line review. The orchestrator sets each part's budget from the task,
+starting from these values where the task gives no reason to set others:
+
+| Change | Starting budget |
+| --- | --- |
+| Non-uniform logic | about 500 lines |
+| Uniform, every hunk one shape: a rename, a format, a mechanical migration | about 2,000 lines |
+
+- Tests count. Data and configuration files, such as large JSON and fixtures,
+  and generated, lock and vendored files do not count, unless the brief says
+  they need line-by-line review. A hand-written migration counts.
+- The count is the added plus deleted lines of the counted files in
+  `git diff --numstat <base>...<head>`.
+- A budget warns and never blocks. A part over its budget is reported with its
+  count and the reason; it is not failed, stopped or split after the fact, and
+  verification does not test it.
+
+### Labels
+
+Label steps run only where the repository tracks `.github/labels.json`;
+otherwise they are skipped and the session's one-label rule stands. The
+commands are `scripts/labels.sh sync` and `scripts/labels.sh apply pr|issue
+<n> [--areas] [--add <label>]... [--remove <label>]...`, in the deployed
+harness copy step 9 of the orchestrated path names for the runner. A label the script refuses is
+reported in the reply with its reason.
+
+| Who | Labels | On |
+| --- | --- | --- |
+| The orchestrator | `labels.sh sync`, once, before the first brief | the repository |
+| Each nested session | `type/<cc-type>` from its title, `area/` through `--areas`, one `size/` band, `size/over-budget` when over, `spec` where it changes a spec, `research` for research work, `hyp/<n>` for each `HYP-<n>` it works on | its own pull request |
+| The orchestrator | each signal below, added while its state holds and removed when it clears | nested and combined pull requests |
+
+| Size band | Counted lines, as the budget counts them |
+| --- | --- |
+| `size/XS` | up to 50 |
+| `size/S` | up to 200 |
+| `size/M` | up to 500 |
+| `size/L` | up to 1,000 |
+| `size/XL` | above 1,000 |
+
+| Signal | Holds |
+| --- | --- |
+| `orchestration/nested`, `orchestration/combined` | on each nested and on the combined pull request, for its lifetime |
+| `review/ponytail-cap` | on a pull request merged at the cap |
+| `review/ponytail-skipped` | where the pass was skipped |
+| `review/escalation` | while a research escalation on that pull request waits for the user |
+| `review/needs-human` | while the pull request carries a Human-verified item the researcher has not checked |
+| `probe/not-run` | while the probe has not run on a pull request that requires one, runner exit 2 included |
+| `probe/blocked` | while its verdict is blocked |
+
+### Escalation
+
+The escalation triggers and the five-part stop are those of the "Escalation"
+section of `my-harness:research-workflow`. A nested session that meets a
+trigger stops the affected work, reports the escalation in its five parts, and
+waits. The orchestrator puts the five parts to the user, even where its rules
+otherwise say it does not ask, as at the ponytail cap, and sends the answer
+back to that session. An escalation stops work where a budget only warns, and
+it is not a failed verification.
+
 ### 1. Decompose
 
 Once per task, before the first change or finding, split the task into nested
@@ -135,6 +200,10 @@ the orchestrator.
 - For each nested session, record the nested sessions it depends on: one
   depends on another where its goal documents, tests, configures or calls what
   the other changes. Two that depend on each other are one nested session.
+- Each nested session fits the review budget the orchestrator sets for it, and
+  carries at most one spec change. A part too large for its budget splits into
+  parts that fit. Each nested pull request is a review unit with its own
+  budget; no human gate stands before the orchestrator's merges.
 
 Write one line:
 
@@ -151,6 +220,8 @@ branch, or the branch the task names.
 
 - Register each issue the task states, under the session's own rules, before
   the first brief.
+- Sync the labels under "Labels", before the first brief, so parallel nested
+  sessions never race to create the same label.
 - For a major change, create the combined branch from the default branch's tip
   and push it. Its name is `release/<words>`, or `release/<n>-<words>` where it
   resolves exactly one issue, with the words chosen under the session's Git
@@ -196,8 +267,23 @@ The brief then states, in this order:
    - each commit's hash and title;
    - each reviewer and its verdict, per commit;
    - each acceptance command and its result;
+   - the counted lines against the budget, and the reason where over;
+   - the labels applied, and each label refused with its reason;
+   - a review guide, one row per significant change: file and function, the
+     requirement or task line it serves, what it does in one line, the
+     assumptions it rests on, and the check that proves it;
+   - for research work, the definition-of-done fields of
+     `my-harness:research-workflow` this list lacks, and an escalation in its
+     five parts where one stopped the session;
    - each defect found and not fixed;
    - what was not done, and why.
+
+Item 5 also states the review budget, with the files that count toward it,
+and the labels the session applies under "Labels". For research work it also
+states the stage, the hypothesis and experiment IDs, the mode of each action,
+the approvals it needs, and that a trigger of the "Escalation" section of
+`my-harness:research-workflow` stops the session, which reports the five parts
+and waits.
 
 ### 4. Run
 
@@ -314,7 +400,8 @@ rules. Then, in this order:
 
 The pull request leaves draft once the probe's verdict is not blocked, so the
 probe output it carries describes the commit that merges. Its description
-lists each nested pull request, the ponytail passes and the probe's verdict,
+lists each nested pull request with its counted lines and budget, marking
+those over, the ponytail passes and the probe's verdict,
 and carries the closing footers for the issues the change resolves. The
 orchestrator keeps the description current, answers comments on it that ask
 for no change, and sends each change a comment asks for to a nested session.
@@ -382,15 +469,17 @@ Where the task cannot be finished inside a bound, stop and ask the user.
 
 ### Report
 
-The reply carries the decomposition table. A commit message or a pull request
-description never does.
+The reply carries the decomposition table and a review guide with the five
+fields the brief names, taken from the nested reports. For research work it also carries the definition-of-done fields. A
+commit message or a pull request description never carries either.
 
 | Column | Contents |
 | --- | --- |
 | Nested session | its goal in a few words, and its session link |
 | Owned files | as briefed |
 | Base | its base branch, and the nested sessions it depends on |
-| Pull request | its URL |
+| Pull request | its URL, and its labels |
+| Budget | the budget and the counted lines, `over` with the reason where over |
 | Verification | `verified`, or what failed and the attempt |
 | Ponytail | the number of passes, each verdict line quoted, each finding and its outcome (the fixing commit, or the decline and its reason), and `made at the cap` or `skipped` where either applies |
 | Merged | the merge commit, or `user` for a pull request the user merges |
@@ -410,7 +499,10 @@ nested-sessions -> unavailable: <reason>
 ```
 
 The session keeps the analysis, the briefs, the integration, the review gate,
-the commits and the reply. Subagents do the subtasks.
+the commits and the reply. Subagents do the subtasks. A coding session also
+does every step of the orchestrated path's "Labels" for its one pull request,
+and sets its own budget under that path's "Review budget", for the whole
+change; over it, the session reports its count and does not stop.
 
 ### 1. Analyze the task
 
@@ -480,6 +572,8 @@ One brief per subtask. Each brief states, in this order:
 2. The owned files, or the owned question.
 3. The acceptance check.
 4. The task's constraints. Text the user supplied verbatim is marked as theirs.
+   For research work, also the fields step 3 of the orchestrated path adds to
+   a research brief.
 5. For each subtask it depends on: the diff of each file that subtask
    modified and each file it created in full, read from the repository and
    not from its report, or, in an analysis session, that subtask's findings
@@ -492,6 +586,11 @@ One brief per subtask. Each brief states, in this order:
    - the files changed, or the findings;
    - for each, its evidence: the file, the commit, or the command and its
      output;
+   - for each significant change, the requirement or task line it serves and
+     the assumptions it rests on;
+   - for research work, the definition-of-done fields of
+     `my-harness:research-workflow`, and an escalation in its five parts where
+     one stopped the subagent;
    - open questions;
    - what was not done.
 
@@ -586,6 +685,9 @@ subtask that depends on it is briefed. Where the second brief also fails, stop
 and ask the user. A subtask that depends on one that ends failed is not
 briefed.
 
+An escalation in a report is not a failure: the session puts its five parts to
+the user under the orchestrated path's "Escalation", and briefs the answer.
+
 ### 8. Ponytail review
 
 A coding session runs `ponytail:ponytail-review` on its own branch's diff
@@ -602,8 +704,12 @@ in the form of that path's Ponytail column.
 
 ### 9. Report
 
-The reply carries the decomposition table. A commit message or a pull request
-description never does.
+The reply carries the decomposition table, where the task split; the counted
+lines against the budget, with the reason where over; the labels applied and
+each refused, with its reason; and a review guide with the five fields the
+orchestrated path's brief names. For research work it also carries the
+definition-of-done fields. A commit message or a pull request description
+never carries any of them.
 
 | Column | Contents |
 | --- | --- |
