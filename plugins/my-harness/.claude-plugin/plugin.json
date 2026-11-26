@@ -1,6 +1,6 @@
 {
   "name": "my-harness",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Six skills (task delegation to nested sessions or subagents, Python property and model tests, Russian technical text, stage summaries, separating decisions from I/O in Python, and repository creation and layout), two agents for the subagent path, a per-prompt reminder, and a gate limiting the Modern Web Guidance plugin to web front-end work with its telemetry off and keeping its reply section out.",
   "author": {
     "name": "PvtKaefsky"

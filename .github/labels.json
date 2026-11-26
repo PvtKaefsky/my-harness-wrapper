@@ -1,0 +1,84 @@
+{
+  "families": [
+    {
+      "name": "type",
+      "mode": "single",
+      "labels": [
+        { "name": "type/feat", "color": "a2eeef", "description": "Conventional Commits type feat" },
+        { "name": "type/fix", "color": "d73a4a", "description": "Conventional Commits type fix" },
+        { "name": "type/docs", "color": "0075ca", "description": "Conventional Commits type docs" },
+        { "name": "type/refactor", "color": "c5def5", "description": "Conventional Commits type refactor" },
+        { "name": "type/perf", "color": "fbca04", "description": "Conventional Commits type perf" },
+        { "name": "type/test", "color": "bfd4f2", "description": "Conventional Commits type test" },
+        { "name": "type/build", "color": "d4c5f9", "description": "Conventional Commits type build" },
+        { "name": "type/ci", "color": "5319e7", "description": "Conventional Commits type ci" },
+        { "name": "type/chore", "color": "ededed", "description": "Conventional Commits type chore" },
+        { "name": "type/style", "color": "f9d0c4", "description": "Conventional Commits type style" },
+        { "name": "type/revert", "color": "b60205", "description": "Conventional Commits type revert" }
+      ]
+    },
+    {
+      "name": "area",
+      "mode": "several",
+      "paths": {
+        "config/": "area/config",
+        "scripts/": "area/scripts",
+        "plugins/": "area/plugins",
+        "docs/": "area/docs",
+        "probe/": "area/probe",
+        "env/": "area/env",
+        "git-hooks/": "area/git-hooks"
+      },
+      "labels": [
+        { "name": "area/config", "color": "1d76db", "description": "Changes under config/" },
+        { "name": "area/scripts", "color": "1d76db", "description": "Changes under scripts/" },
+        { "name": "area/plugins", "color": "1d76db", "description": "Changes under plugins/" },
+        { "name": "area/docs", "color": "1d76db", "description": "Changes under docs/" },
+        { "name": "area/probe", "color": "1d76db", "description": "Changes under probe/" },
+        { "name": "area/env", "color": "1d76db", "description": "Changes under env/" },
+        { "name": "area/git-hooks", "color": "1d76db", "description": "Changes under git-hooks/" }
+      ]
+    },
+    {
+      "name": "size",
+      "mode": "single",
+      "labels": [
+        { "name": "size/XS", "color": "c2e0c6", "description": "Review-budget band XS" },
+        { "name": "size/S", "color": "9ed6a5", "description": "Review-budget band S" },
+        { "name": "size/M", "color": "fef2c0", "description": "Review-budget band M" },
+        { "name": "size/L", "color": "f9c48c", "description": "Review-budget band L" },
+        { "name": "size/XL", "color": "e99695", "description": "Review-budget band XL" }
+      ]
+    },
+    {
+      "name": "budget",
+      "mode": "several",
+      "labels": [
+        { "name": "size/over-budget", "color": "b60205", "description": "Changed lines exceed the review budget" }
+      ]
+    },
+    {
+      "name": "research",
+      "mode": "several",
+      "labels": [
+        { "name": "spec", "color": "0e8a16", "description": "Changes a specification" },
+        { "name": "research", "color": "0e8a16", "description": "Research Workflow work" }
+      ],
+      "pattern": { "name": "hyp/<n>", "color": "006b75", "description": "Works on hypothesis HYP-<n>" }
+    },
+    {
+      "name": "signal",
+      "mode": "several",
+      "labels": [
+        { "name": "review/needs-human", "color": "d93f0b", "description": "Holds items a human must verify" },
+        { "name": "review/escalation", "color": "d93f0b", "description": "A research escalation on this item waits for the user" },
+        { "name": "review/ponytail-cap", "color": "e4e669", "description": "Merged at the ponytail pass cap" },
+        { "name": "review/ponytail-skipped", "color": "e4e669", "description": "The ponytail pass was skipped" },
+        { "name": "probe/not-run", "color": "fbca04", "description": "The A/B probe did not run" },
+        { "name": "probe/blocked", "color": "b60205", "description": "The A/B probe found a regression" },
+        { "name": "orchestration/combined", "color": "5319e7", "description": "Combined pull request of a major change" },
+        { "name": "orchestration/nested", "color": "5319e7", "description": "Nested pull request of a major change" }
+      ]
+    }
+  ]
+}
