@@ -1,12 +1,12 @@
 ---
 name: repository-setup
-description: Sets how a session creates a repository, on GitHub or locally, and which top-level layout a repository holding application or library source takes. Use before creating a repository, and before adding a top-level directory to an existing repository; not for a change inside directories a repository already has.
+description: Sets how a session creates a repository, on GitHub or locally, which top-level layout a repository holding application or library source takes, and the templates it applies for specs, glossary, architecture and its test, research records, the Python experiment layer, benchmark records, probe checks and project labels. Use before creating a repository, before adding a top-level directory to an existing repository, and when the user asks for one of those layers or records; not for other changes inside directories a repository already has.
 ---
 
 # Repository setup
 
-This skill governs two actions: creating a repository, and adding a top-level
-directory to an existing one. The Git workflow rules it names are the
+This skill governs three actions: creating a repository, adding a top-level
+directory to an existing one, and applying a template. The Git workflow rules it names are the
 session's own instructions. Where this skill and the session's instructions
 conflict, the instructions win.
 
@@ -30,3 +30,27 @@ conflict, the instructions win.
 - `LICENSE` is added only where the user names a license.
 - In an existing repository the session keeps the layout the repository has. In one that holds application or library source, a top-level directory the session must add takes the layout's name for that role, unless the repository already has one serving it; the session reads the layout document before adding it. A repository is restructured only when the user asks.
 - Where the layout document cannot be read, the session stops and asks.
+
+## Templates
+
+- The templates are files under `templates/` in this skill's directory. Each lands at its path relative to the template directory named below, with every `<placeholder>` replaced. The layout document states each file's role and the probe checks' rules.
+- A template is applied when the session creates a repository it applies to, or when the user asks for its layer or record. In an existing repository a template is applied only on the user's request, and a file the repository already has is kept.
+
+| Template | Applies to | Lands at |
+| --- | --- | --- |
+| `templates/docs/specs/component.md` | a repository with components to specify, one file per component | `docs/specs/<component>.md` |
+| `templates/docs/requirements.md` | a repository with `docs/specs/`; it replaces the requirement lines of `docs/requirements.md` | `docs/requirements.md` |
+| `templates/docs/glossary.md` | every repository with a domain; the `Kind` column only where the repository has `research/` | `docs/glossary.md` |
+| `templates/docs/architecture.md` | every repository holding application or library source | `docs/architecture.md` |
+| `templates/architecture-test/tests/test_architecture.py` | a Python repository whose `docs/architecture.md` states a dependency rule | `tests/test_architecture.py` |
+| `templates/python-experiment/` | a Python repository that runs experiments; its `README.md` lists the files and placeholders and is not copied | the project root |
+| `templates/research/` | a repository with research hypotheses; the `HYP-n-slug/` files are created per hypothesis, each when it is needed | `research/`, and `research/HYP-<n>-<slug>/` for each hypothesis |
+| `templates/docs/benchmarks/benchmark.md` | a benchmark, in any ecosystem | `docs/benchmarks/<benchmark>.md` |
+| `templates/probe/checks.sh` | every repository with `probe/`; the project's own checks follow its two | `probe/checks.sh` |
+| `templates/github/labels.json` | every repository on GitHub; its `area` paths match the repository's top-level directories | `.github/labels.json` |
+
+- A spec's first line is `Status: active`, `Status: rejected` or `Status: superseded by <path>`. Its `Decisions` table holds only what review established. A test covering a scenario carries the scenario's ID in its name. Where the team names a spec decider, `CODEOWNERS` lists them for `docs/specs/`.
+- A glossary row's definition is one sentence. A noun gets one row per state with its own meaning and one row per context where it means something else. `Code name` is the identifier, table or module carrying the term, and `Avoid` lists rejected synonyms. A research glossary has no rows for classes or helpers.
+- Each dependency rule in `docs/architecture.md` gets one entry in the architecture test's `RULES`, and the test fails where a path a rule names is missing. The `Naming` table applies only where the project models events, commands or policies. The glossary and the context map are text, never images.
+- In a research repository, `HYP-<n>` takes the number of the issue tracking the hypothesis, hypothesis code lives in `src/<package>/<hypothesis>/` with tests mirrored under `tests/<hypothesis>/`, and its module docstring names its `HYP-<n>`. Records name the role behind each decision and change, `researcher` or `agent`, with no model name or session link. There is no `formulation.md`. The `my-harness:research-workflow` skill governs how the records are filled.
+- Where the project also runs `actions/labeler` with `sync-labels`, the labeler's labels take a family other than `area`.
