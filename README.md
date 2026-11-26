@@ -1,12 +1,14 @@
 # my-harness-wrapper
 
 A configuration source for Claude Code sessions, cloud and local. It is not
-an application. It has no build, no package manifest and no CI. Its eight test
+an application. It has no build, no package manifest and no CI. Its twelve test
 scripts, `scripts/test-attribution-guard.sh`,
 `scripts/test-web-guidance-gate.sh`, `scripts/test-pr-comment-rules.sh`,
-`scripts/test-orchestrator-rules.sh`, `scripts/test-install-settings.sh`,
-`scripts/test-hook-forwarding.sh`, `scripts/test-session-check.sh` and
-`scripts/test-ab-probe.sh`, are run by hand.
+`scripts/test-orchestrator-rules.sh`, `scripts/test-team-practice-rules.sh`,
+`scripts/test-install-settings.sh`, `scripts/test-hook-forwarding.sh`,
+`scripts/test-session-check.sh`, `scripts/test-ab-probe.sh`,
+`scripts/test-labels.sh`, `scripts/test-experiment-template.sh` and
+`scripts/test-repository-templates.sh`, are run by hand and by the A/B probe.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
 into a session's Claude config directory. It also holds one plugin,
@@ -97,7 +99,7 @@ every session.
 | `config/settings.json` | Settings merged into the config directory's `settings.json`. It turns Claude Code's telemetry and error reports off and empties ponytail's webhook. Its `permissions.deny` rules refuse reads of secret files and edits of the deployed harness, and both installers add its `permissions.allow` and `permissions.deny` entries to the live lists without removing any. Its hook commands run the scripts under `${HARNESS_DIR:-/opt/my-harness-wrapper}`. |
 | `config/plugins.tsv` | The plugins bootstrap installs. |
 | `.claude-plugin/marketplace.json` | The plugin marketplace `my-harness-wrapper`. It lists the one plugin under `plugins/`. `claude plugin marketplace add` reads it. |
-| `plugins/my-harness/` | The `my-harness` plugin: the `task-delegation`, `python-property-model-tests`, `edit-russian-technical-text`, `quick-human-readable-review`, `python-fp-refactor` and `repository-setup` skills, the `executor` and `analyst` agents, a `UserPromptSubmit` hook, a `PreToolUse` hook running the Modern Web Guidance gate `hooks/web-guidance-gate.sh`, and an eval suite under `evals/`. `plugins/my-harness/README.md` describes it. |
+| `plugins/my-harness/` | The `my-harness` plugin: the `task-delegation`, `python-property-model-tests`, `edit-russian-technical-text`, `quick-human-readable-review`, `python-fp-refactor`, `repository-setup` and `research-workflow` skills, the project templates under `skills/repository-setup/templates/`, the `executor` and `analyst` agents, a `UserPromptSubmit` hook, a `PreToolUse` hook running the Modern Web Guidance gate `hooks/web-guidance-gate.sh`, and an eval suite under `evals/`. `plugins/my-harness/README.md` describes it. |
 | `env/setup.sh` | The init script pasted into the environment dialog. It clones this repository and is the only version source. |
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config's signing keys. |
@@ -110,6 +112,12 @@ every session.
 | `scripts/test-web-guidance-gate.sh` | Runs the Modern Web Guidance gate of its own tree in scratch repositories against a fixed set of cases, directly and through the `PreToolUse` hook `plugins/my-harness/hooks/hooks.json` registers, one line per case. Run by hand only. |
 | `scripts/test-pr-comment-rules.sh` | Checks the Pull request comments section of a `config/CLAUDE.md`, its own tree's unless an argument names another, for the subscription, the 30-minute check, the rules issue #113 adds and the cloud and local paths issue #111 adds, one line per check. Run by hand only. |
 | `scripts/test-orchestrator-rules.sh` | Checks the Harness, Git workflow, A/B probes and Pull request comments sections of a `config/CLAUDE.md`, its own tree's unless an argument names another, for the orchestrator, nested-session, combined-branch and probe rules issue #137 adds, and checks that the file names no model, one line per check. Run by hand only. |
+| `scripts/test-team-practice-rules.sh` | Checks the Language, Claims, Documentation, Writing code, Harness, Git workflow, Pull request comments and Issues sections of a `config/CLAUDE.md`, its own tree's unless an argument names another, for the team practice and label rules issue #146 adds, one line per check. Run by hand only. |
+| `scripts/labels.sh` | Syncs a repository's `.github/labels.json` to the forge with `sync`, and applies its labels to one pull request or issue with `apply`, refusing a label a workflow triggers on or tests. Run by sessions from the deployed copy, and by hand. |
+| `scripts/test-labels.sh` | Runs the `scripts/labels.sh` of its own tree with a stub `gh`, one line per case. Run by hand only. |
+| `scripts/test-experiment-template.sh` | Runs the `repository-setup` skill's Python experiment template on a fixture project, one line per case. Needs Python with `hydra-core` and `python-dotenv`, and skips every case without them. Run by hand only. |
+| `scripts/test-repository-templates.sh` | Checks that every template the `repository-setup` skill or `docs/repository-layouts.md` names exists, and runs the template probe checks and architecture test on fixtures, one line per case. Run by hand only. |
+| `.github/labels.json` | This repository's label families, in the schema `scripts/labels.sh` reads. |
 | `scripts/test-install-settings.sh` | Runs the settings merge programs of its own tree's `scripts/install-local.sh` and `scripts/bootstrap.sh`, and the `settings_carries` function of its `scripts/verify.sh`, on sample live files. It checks that existing allow and deny entries survive, that each delivered entry is added once, that a second run changes nothing, that a shape that is not an array fails, that `verify.sh` passes a live list with extra entries and fails one missing a delivered entry, and that it passes the `env` both merges write and fails one with another value, one line per check. Three optional arguments name other copies of the three scripts. Run by hand only. |
 | `scripts/test-hook-forwarding.sh` | Runs the `git-hooks/` of its own tree in scratch repositories through six `core.hooksPath` cases, six commit-message cases and the hidden-character cases C1 to C11 and F1 to F22, one line per case. Run by hand only. |
 | `git-hooks/` | The git hooks `core.hooksPath` names: globally in the cloud, and locally only for the git commands Claude Code sessions start. One file per hook name git looks up. `commit-msg` rejects a message carrying a Claude Code attribution line or a block-class hidden character, and `pre-commit` rejects a staged change that adds one; every hook then runs the hook of that name git would run without the harness. `git-hooks/lib/attribution.ere` is the pattern both it and the attribution guard read. |
@@ -181,6 +189,17 @@ bash scripts/ab-probe.sh . origin/main HEAD
 
 It needs Docker with Compose. A `regression` line and exit 1 mean a check
 passing on the first commit fails or is missing on the second.
+
+### Sync a repository's labels
+
+From a checkout of a repository that tracks `.github/labels.json`:
+
+```
+bash <harness>/scripts/labels.sh sync
+```
+
+It creates each listed label the repository lacks and updates each that
+differs, and touches no other label.
 
 ### Make an environment change
 

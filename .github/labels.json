@@ -71,7 +71,7 @@
       "mode": "several",
       "labels": [
         { "name": "review/needs-human", "color": "d93f0b", "description": "Holds items a human must verify" },
-        { "name": "review/escalation", "color": "d93f0b", "description": "A review finding was escalated" },
+        { "name": "review/escalation", "color": "d93f0b", "description": "A research escalation on this item waits for the user" },
         { "name": "review/ponytail-cap", "color": "e4e669", "description": "Merged at the ponytail pass cap" },
         { "name": "review/ponytail-skipped", "color": "e4e669", "description": "The ponytail pass was skipped" },
         { "name": "probe/not-run", "color": "fbca04", "description": "The A/B probe did not run" },

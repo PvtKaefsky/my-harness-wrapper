@@ -2731,6 +2731,254 @@ The script exits 0 where every case and check passed, and 1 otherwise.
 | `PostToolUse` after `modern-web-guidance:chrome-extensions` | the context |
 | `PostToolUse` after `humanizer:humanizer`, and on input that is not valid JSON | no stdout, exit 0 |
 
+## scripts/labels.sh
+
+Syncs a repository's label file to the forge, and applies its labels to one
+pull request or issue, through `gh`. It needs `git`, `jq` and `gh`. The
+Issues section of `config/CLAUDE.md` and the `my-harness:task-delegation`
+skill run it from the deployed harness copy.
+
+```
+labels.sh sync [--file FILE] [--repo OWNER/REPO]
+labels.sh apply pr <n> [--file FILE] [--repo OWNER/REPO] [--areas] [--add LABEL]... [--remove LABEL]...
+labels.sh apply issue <n> [--file FILE] [--repo OWNER/REPO] [--add LABEL]... [--remove LABEL]...
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--file FILE` | The label file. Default: `.github/labels.json` under `git rev-parse --show-toplevel`. |
+| `--repo OWNER/REPO` | Exported as `GH_REPO` for every `gh` call. It must match `^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$`, with a repository name other than `.` and `..`. Default: `gh`'s repository for the current directory. |
+| `--areas` | `apply pr` only. Adds the area labels the paths of `gh pr diff <n> --name-only` map to, and removes the item's other labels of the family that has `paths`. Where no family has `paths`, it removes none. |
+| `--add LABEL` | `apply` only, repeatable. A label to add. |
+| `--remove LABEL` | `apply` only, repeatable. A label to remove where the item carries it, listed in the file or not. |
+
+`<n>` is a positive integer with no leading zero. Any other argument is a usage
+error.
+
+### The label file
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `families` | array, required | One object per family. |
+| `families[].name` | string, required | The family's id, used in messages and for the one-per-family rule. |
+| `families[].mode` | `single` or `several`, required | `single`: at most one label of the family on an item. |
+| `families[].labels` | array of `{name, color, description}` | The labels `sync` creates. `color` is six hex digits without `#`. |
+| `families[].pattern` | `{name, color, description}`, optional | `name` holds `<n>`, as in `hyp/<n>`, and matches a positive integer with no leading zero there; `<n>` in `description` is replaced by that number. `apply` creates a matching label on first use; `sync` does not. |
+| `families[].paths` | object, optional | A map from a path prefix, such as `config/`, to an area label, read by `apply pr --areas`. |
+
+A file whose `families` is missing, is not an array, or holds a family without
+a name or a `single` or `several` mode stops the run. This repository's
+`.github/labels.json` holds the families `type` (single, eleven Conventional
+Commits types), `area` (several, with paths for `config/`, `scripts/`,
+`plugins/`, `docs/`, `probe/`, `env/` and `git-hooks/`), `size` (single, `XS`,
+`S`, `M`, `L`, `XL`), `budget` (several, `size/over-budget`), `research`
+(several, `spec`, `research` and the pattern `hyp/<n>`) and `signal` (several,
+eight `review/`, `probe/` and `orchestration/` labels): 34 listed labels.
+
+### sync
+
+`sync` reads the repository's labels with `gh label list --limit 1000 --json
+name,color,description`. For each listed label, names compared
+case-insensitively, it creates a missing one with `gh label create`, updates
+one whose colour or description differs with `gh label create --force`, and
+leaves an equal one. It never edits or deletes a label the file does not list,
+and never deletes a label.
+
+### apply
+
+`apply` reads the item's labels with `gh pr view <n> --json
+labels,headRefOid,baseRefName` or `gh issue view <n> --json labels`. A label
+to add must be listed in the file or match a pattern. A missing one is created
+first; where creation fails, the label is refused and the labels that exist are
+still applied. Adding a label of a `single` family removes the item's other
+labels of that family; a second label of one `single` family in one call is
+refused, and a refused removal of a sibling refuses the added label. One `gh
+pr|issue edit` call applies every addition and removal.
+
+### The refusals
+
+| Reason | Applies to |
+| --- | --- |
+| `name is empty, starts with a dash or holds a comma or control character` | `apply`, added and removed names |
+| `on the never-apply list` | `duplicate`, `invalid`, `wontfix`, `question`, `good first issue` and `help wanted`, in any casing |
+| `name or description refers to AI, an agent, Claude or a model` | a name or description holding, as a word in any casing, `ai`, `a.i.`, `agent`, `agents`, `agentic`, `claude`, `anthropic`, `model`, `models`, `llm`, `llms`, `gpt`, `chatgpt`, `copilot`, `bot` or `bots`; `sync` and `apply` |
+| `not listed in <file>` | `apply`, an added label the file neither lists nor matches by pattern |
+| `workflow scan incomplete` | `apply`, every added and removed label |
+| `a workflow triggers on or tests this label` | `apply`, under the workflow scan below |
+| `family <f> already takes <label> in this call` | `apply`, a second label of one `single` family |
+| `removing another <f> label: <reason>` | `apply`, a `single`-family label whose sibling cannot be removed |
+| `missing from the repository and not created: <gh error>` | `apply` |
+| `colour is not six hex digits` | `sync` and `apply`, a label to create |
+
+### The workflow scan
+
+Before `apply` changes anything, it reads `.github/workflows/` at the default
+branch, from `gh api repos/{owner}/{repo}`, and for a pull request also at its
+head commit and at its base branch where that differs from the default. Each
+ref is first read with `gh api repos/{owner}/{repo}/commits/<ref>`; a 404 on
+`contents/.github/workflows` then means no workflows. A ref that is not usable,
+an unreadable commit, a failed listing, a path outside
+`.github/workflows/<name>` or an unreadable workflow file leaves the scan
+incomplete, and an incomplete scan refuses every label.
+
+| A workflow file holding | Refuses |
+| --- | --- |
+| the word `labeled` or `unlabeled`, anywhere, a comment included | every label |
+| for `apply issue`, the word `issues`, anywhere, `permissions: issues: write` included | every label |
+| a label reference (`github.event.label`, `github.event[`, `.labels`, `['label']`, `['labels']`) outside an `if:` line that is one positive literal comparison | every label |
+| an `if:` line that is exactly `github.event.label.name == '<x>'`, in either order, or `contains(github.event.pull_request.labels.*.name, '<x>')` or its `issue` form, optionally inside `${{ }}` | the label `<x>`, matched case-insensitively |
+
+The scan does not read workflows on the `label` event, which fires when a label
+is created or edited, so a `sync` can start one.
+
+### Output and exit status
+
+| Line | Meaning |
+| --- | --- |
+| `label file -> <path>` | The label file read. |
+| `label <name> -> created`, `updated`, `unchanged` | `sync`'s result for a listed label. |
+| `label <name> -> not created: <reason>`, `not updated: <reason>` | A `sync` create that failed. |
+| `area labels from gh pr diff <n> -> <labels or none>` | The area labels `--areas` mapped. |
+| `commit <ref> -> not found: <gh error>`, `workflows at <ref> -> none` | The scan's read of one ref. |
+| `workflow <path> at <ref> -> label trigger=<0 or 1>, label test=<0 or 1>` | One workflow file the scan read. |
+| `workflow scan -> complete` or `incomplete` | The scan's result. |
+| `label <name> -> created`, `added`, `removed`, `already present`, `not present` | `apply`'s result for one label. |
+| `label <name> -> refused: <reason>` | A refusal, one line each. |
+| `gh pr edit <n> -> exit=<code>`, `gh issue edit <n> -> exit=<code>` | The one edit call. |
+| `labels sync -> refused or failed=<n>`, `labels apply -> refused or failed=<n>` | The last line: the count of refused and failed labels. |
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Every requested label was handled. |
+| 1 | At least one label was refused or a `gh` call failed, each on its own line. |
+| 2 | Not run. A usage error prints the usage on standard error. A missing `git`, `jq` or `gh`, a bad label file or a failed `gh` read prints its line and then `labels -> not run`. |
+
+`jq` output is stripped of carriage returns, since `jq` in Git Bash on Windows
+prints CRLF.
+
+## scripts/test-labels.sh
+
+Runs `scripts/labels.sh` of its own tree with a stub `gh` first on `PATH`, in a
+`mktemp -d` directory removed on exit. The stub logs every call, answers
+`label list`, `pr view`, `issue view` and `pr diff` from fixture files, accepts
+`label create` and `edit`, and serves workflow listings and files per ref;
+marker files make it refuse label creation, fail a commit read or fail the
+workflow listing. It needs `jq` and `git`, prints one line per case, and exits 0
+only where every case passes; it exits 1 with `fail -> not run` where
+`labels.sh`, `jq` or `git` is absent. Each case checks the exit code, output
+lines and logged `gh` calls.
+
+| Case | Passes where |
+| --- | --- |
+| `sync creates missing labels, updates changed ones and leaves unlisted ones` | `sync` creates `size/M`, updates `type/fix` with `--force`, leaves `type/feat` unchanged, refuses `agent/reviewed`, and makes no call for the unlisted `keep-me`, no delete and no edit; exit 1 |
+| `sync reports a listed label without a colour` | a listed label with no colour reads `not updated: colour is not six hex digits`; exit 1 |
+| `apply replaces the label of each single family and removes a cleared signal` | one edit adds `type/feat` and `size/L` and removes `type/fix`, `size/M` and `review/escalation`; exit 0 |
+| `apply refuses a second label of one single family in one call` | `size/M` is refused after `size/L`, and `size/L` is added |
+| `apply refuses attribution, never-apply and unlisted labels` | `agent/reviewed`, `wontfix` and an unlisted label are refused, and `type/feat` is added |
+| `apply refuses every label while a head workflow triggers on labeled` | a head workflow on `labeled` refuses both labels, with no edit |
+| `apply refuses only the label a workflow tests, matching its name case-insensitively` | a `contains(...)` test of `TYPE/FEAT` refuses `type/feat` alone |
+| `apply refuses every label while a workflow tests label names other than by a literal compare` | a `startsWith(...)` test refuses every label |
+| `apply refuses every label while a labeled workflow tests [<condition>]`, four cases | a `!=`, a negated `contains`, an `\|\| true` and a `github.event['label']` condition each refuse every label |
+| `apply refuses a label a base-branch workflow triggers on` | a `pull_request_target` workflow on `labeled` at the base branch refuses the label |
+| `apply refuses issue labels while a workflow names the issues event` | an `issues` workflow refuses an issue label |
+| `apply refuses labels when the head commit cannot be read` | an unreadable head commit leaves the scan incomplete |
+| `apply refuses every label while a default-branch workflow fires on any label` | a default-branch workflow on `labeled` refuses the label |
+| `apply refuses a label whose removal a workflow tests` | adding `size/L` is refused where a workflow tests `size/M`, which the add would remove |
+| `apply refuses labels when the workflow scan fails` | a failed workflow listing leaves the scan incomplete |
+| `without permission to create labels apply adds only existing ones` | with creation refused, `hyp/12` is refused and `size/L` is added |
+| `without permission to create labels sync reports each one` | each missing label reads `not created` |
+| `a single-family label that cannot be created leaves the family label in place` | the family's current label stays |
+| `apply refuses to remove a name holding a comma` | the name is refused |
+| `apply creates a pattern label on an issue, scanning the default branch only` | `hyp/<n>` is created and added, and only the default branch is scanned |
+| `apply sets the area labels from the pull request diff, not the local checkout` | the area labels follow `gh pr diff`, and a stale area label is removed |
+| `apply ignores the paths the local HEAD changes` | a local commit's paths add no area label |
+| `apply refuses --areas on an issue` | exit 2 |
+| `apply --areas with no path map removes no label` | `area labels from gh pr diff 7 -> none`, with no edit |
+| `the harness label file passes every check and creates its <n> labels` | `sync` on this repository's `.github/labels.json` against an empty repository creates every listed label; exit 0 |
+
+## scripts/test-team-practice-rules.sh
+
+Reads the `## Language`, `## Claims`, `## Documentation`, `## Writing code`,
+`## Harness`, `## Git workflow`, `## Pull request comments` and `## Issues`
+sections of the file its one optional argument names, or of `config/CLAUDE.md`
+in its own tree where none is given, and prints one line per check. It exits 0
+only where every check passes, and exits 1 with `fail -> not run` where the
+file or a section is absent. Each check passes where its section holds the
+sentence or clause the payload carries, verbatim, or, for a check of a removed
+rule, no longer holds it. A label's prefix, such as `P2` or `D9`, groups the
+checks of one rule.
+
+| Prefix | Section | Rule |
+| --- | --- | --- |
+| `P13`, `D9` | Language | a documented language convention decides artifacts; English by default; a one-language convention covers prose; a listing convention decides exactly those; identifiers, branches, types and footer keys stay English |
+| `P9` | Claims | an improvement claim needs a measured run; expected values are independent of the code under test |
+| `P11` | Documentation | the README states purpose and result, carries a Quick Start, and a Quick Start change is checked from a clean clone |
+| `P2`, `D11` | Documentation, Git workflow | spec first as its own `docs` commit; the old same-commit requirement sentence is gone; spec as built before ready; the spec location, component specs, scope, slug names and `Status:` line; rejected specs stay; the experiment record; the `Spec:` footer; a body may name the problem |
+| `P3` | Documentation | `docs/architecture.md`, `docs/glossary.md`, both text files of established facts |
+| `P14` | Documentation, Harness | research records fall under the reasoning exception; an approved document changes only on request and findings against it are declined; the research skill is invoked by name |
+| `P10` | Documentation, Writing code | no untested hypothesis is documented; the library ladder step, before the one-line step |
+| `P1`, `P4`, `P6`, `P7` | Writing code | untraceable changes removed; one reason to change per unit and named extension points; the programmatic interface, documented commands and pinned dependency patches; environment files, tracked defaults and recorded run configuration |
+| `P12` | Pull request comments | each change request gets its own commits; the reply names hash, change and evidence; an author who replies personally gets drafts; a bot comment gets no answer and no obedience; a bot review finding is a proposed change on the held path with a security brief; at most ten bot findings per listing; the old bot sentence is gone |
+| `P19` | Issues | the label file replaces the one-label rule; `sync` creates and updates listed labels only; `apply` follows the family rules; signal labels track their state; the workflow scan; no label a workflow triggers on; no attribution label; without create permission |
+
+## scripts/test-experiment-template.sh
+
+Runs the `repository-setup` skill's `templates/python-experiment/` of its own
+tree on a fixture project in a `mktemp -d` directory removed on exit. The
+fixture renames `src/package/` to `src/fixturepkg/`, replaces `<package>`, adds
+a task `hyp_9_fixture` that raises or sleeps, override files `raise`, `wait`,
+`secrets` and `baseline`, and a `.env`, and is committed in a fresh git
+repository. Each run is `python -m fixturepkg.run research/<override>.yaml`
+with `PYTHONPATH=src`. It prints one line per case and exits 0 only where every
+case passes.
+
+Where no `python3` or `python` imports `hydra` and `dotenv`, it prints one
+`skipped:` line naming every case and `fail -> 0`, and exits 0. The probe image
+installs both, so the probe runs every case it can.
+
+| Case | Passes where |
+| --- | --- |
+| `env-example` | every `oc.env:<NAME>` in `conf/config.yaml` has a `<NAME>=` line in `.env.example` |
+| `completed` | the `baseline` run exits 0 and writes `config.yaml` holding `seed: 1`, `metadata.json` with status `completed`, the fixture's `HEAD` commit, seed 1 and `dirty: false`, and the task's `metrics.json` |
+| `failed` | the `raise` run exits non-zero, records status `failed`, and `dirty: false` after the earlier run |
+| `interrupted` | `SIGTERM` to the `wait` run, once its task has started, makes it exit non-zero and record status `interrupted`. Skipped in Git Bash, MSYS and Cygwin, which cannot deliver `SIGTERM` to a native Windows Python. |
+| `dirty` | a run with `README.md` changed exits 0 and records `dirty: true` |
+| `secrets` | the `secrets` run's `config.yaml` and `metadata.json` hold none of six fixture secret values; `config.yaml` holds `'***'` for `api_token`, `private_key`, `api-key`, `clientSecret`, a nested `password` and an `access_token` in a list, and keeps `max_tokens: 512`, `maxTokens: 256`, `data_dir` and a nested `host` |
+| `make experiment` | with `RUN=echo`, `EXP=baseline HYP=HYP-1-example` runs the one match; `EXP=missing` fails with `matches 0 override files`; `EXP=baseline`, matching two hypotheses, fails naming both. Skipped where `make` is not installed. |
+
+The template's run saves in clear a secret held under a key whose words are not
+on its list, and does not treat plural `keys` or `tokens` as secret.
+
+## scripts/test-repository-templates.sh
+
+Checks the `repository-setup` skill's templates of its own tree, in a
+`mktemp -d` directory removed on exit. It prints one line per case and exits 0
+only where every case passes.
+
+| Case | Passes where |
+| --- | --- |
+| `template <path> named by SKILL.md or docs/repository-layouts.md exists` | each `templates/` path the skill's `SKILL.md` or `docs/repository-layouts.md` names, and each template of the layout document's "Documentation roles" table, exists |
+| `template paths named` | at least ten template paths are named |
+| `github/labels.json parses and every area path maps to a listed label` | `jq` reads the file and each `paths` value is a label of its family |
+| `quickstart on a fixture whose Quick Start passes` | the template `probe/checks.sh` records `quickstart` `pass` for a fixture whose `sh quickstart` block exits 0 |
+| `quickstart with the README command broken` | `fail` |
+| `quickstart runs the offline block where README.md has one` | the `sh quickstart-offline` block runs in place of the `sh quickstart` block |
+| `quickstart ignores an untracked file in the working tree` | a file removed from the commit and left untracked fails the check, which runs in a clone |
+| `spec-trace on a fixture whose scenarios each name a test` | `pass` for the spec template with each scenario ID in a test name |
+| `spec-trace with a scenario's test renamed` | `fail`, with the line `spec-trace -> RATELIMIT-2 names no test` |
+| `spec-trace does not match RATELIMIT-1 to a test named for RATELIMIT-10` | the line `spec-trace -> RATELIMIT-1 names no test` |
+| `spec-trace with a scenario ID repeated` | `fail`, with the line `spec-trace -> RATELIMIT-1 repeated` |
+| `spec-trace skips a spec whose status is not active` | `pass` once the spec's first line is `Status: rejected` |
+| `architecture test on a fixture that keeps its rule` | `python -m unittest` passes on a fixture whose domain imports only `json` and a sibling module |
+| `architecture test with a relative import the rule forbids` | `from ..adapters import db` fails it |
+| `architecture test with a rule naming a missing path` | a rule naming `src/app/missing` fails it, with `src/app/missing named by a rule does not exist` |
+
+The architecture-test cases need a `python3` or `python` that imports `ast` and
+`unittest`; where none does, the script prints `python -> not found` and one
+`skipped:` line naming them. The template check `spec-trace` recognises test
+files by name pattern: a path under `test/`, `tests/` or `__tests__/`, or a file
+named `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`, `*Test.*` or `*Tests.*`.
+
 ## config/settings.json
 
 Both installers merge this file over the live `settings.json`, as their
@@ -3097,7 +3345,7 @@ This repository's own A/B probe, under the contract in "The probe contract".
 
 | File | What it holds |
 | --- | --- |
-| `probe/Dockerfile` | `debian:13-slim` with `bash`, `coreutils`, `diffutils`, `findutils`, `gawk`, `git`, `grep`, `jq`, `procps` and `sed`, and no Claude Code. It sets `safe.directory` to `*` in the system git config, since the tree is owned by a host uid. |
+| `probe/Dockerfile` | `debian:13-slim` with `bash`, `coreutils`, `diffutils`, `findutils`, `gawk`, `git`, `grep`, `jq`, `make`, `procps`, `python3`, `python3-pip` and `sed`, the pip packages `hydra-core` 1.3.2 and `python-dotenv` 1.0.1 for `scripts/test-experiment-template.sh`, and no Claude Code. It sets `safe.directory` to `*` in the system git config, since the tree is owned by a host uid. |
 | `probe/compose.yaml` | The one service `checks`, running `bash probe/checks.sh` in `/work`. |
 | `probe/checks.sh` | The checks. |
 | `probe/fake-claude.sh` | The fake `claude` CLI the install check puts on `PATH`. |
