@@ -10,7 +10,7 @@ for candidate in python3 python; do
 done
 echo "python with hydra-core and python-dotenv -> ${PY:-not importable}"
 if [ -z "$PY" ]; then
-  echo "skipped: env-example, completed, failed, interrupted, dirty, secrets; python with hydra-core and python-dotenv is not importable"
+  echo "skipped: env-example, completed, failed, interrupted, dirty, secrets, make experiment lookup; python with hydra-core and python-dotenv is not importable"
   echo "fail -> 0"
   exit 0
 fi
@@ -44,6 +44,7 @@ done
 printf 'max_tokens: 512\nmaxTokens: 256\nprivate_key: fixture-private-key\napi-key: fixture-hyphen-key\nclientSecret: fixture-camel-secret\ndb:\n  host: db.local\n  password: fixture-db-password\nservices:\n  - name: tracker\n    access_token: fixture-list-token\n' \
   > "$FIX/research/HYP-9-fixture/experiments/secrets.yaml"
 printf 'DATA_DIR=/fixture/data\nAPI_TOKEN=fixture-api-token\n' > "$FIX/.env"
+cp "$FIX/research/HYP-1-example/experiments/baseline.yaml" "$FIX/research/HYP-9-fixture/experiments/baseline.yaml"
 git -C "$FIX" init -q && git -C "$FIX" add -A &&
   git -C "$FIX" -c user.name=Fixture -c user.email=fixture@example.com commit -q -m fixture ||
   { echo "git init and commit $FIX -> failed, not run"; exit 1; }
@@ -127,6 +128,19 @@ done
 for line in "api_token: '***'" "private_key: '***'" "api-key: '***'" "clientSecret: '***'" 'max_tokens: 512' 'maxTokens: 256' "  password: '***'" "  access_token: '***'" 'data_dir: /fixture/data' '  host: db.local'; do
   expect "secrets: config.yaml holds [$line]" yes "$(has "$RUN/config.yaml" "$line")"
 done
+
+if command -v make > /dev/null 2>&1; then
+  for args in 'EXP=baseline' 'EXP=missing' 'EXP=baseline HYP=HYP-1-example'; do
+    out=$(cd "$FIX" && make -s experiment $args RUN=echo 2>&1); code=$?
+    case $args in
+      *HYP=*) expect "make experiment $args: runs the one match" "0 python -m fixturepkg.run research/HYP-1-example/experiments/baseline.yaml" "$code $out" ;;
+      *missing) expect "make experiment $args: fails naming no match" "yes yes" "$([ "$code" -ne 0 ] && echo yes || echo no) $(printf '%s' "$out" | grep -q 'matches 0 override files: \[\]' && echo yes || echo no)" ;;
+      *) expect "make experiment $args: fails naming both matches" "yes yes" "$([ "$code" -ne 0 ] && echo yes || echo no) $(printf '%s' "$out" | grep -q 'matches 2 override files: \[research/HYP-1-example/experiments/baseline.yaml research/HYP-9-fixture/experiments/baseline.yaml\]' && echo yes || echo no)" ;;
+    esac
+  done
+else
+  echo "skipped: make experiment lookup; make is not installed"
+fi
 
 echo "fail -> $fails"
 [ "$fails" -eq 0 ]

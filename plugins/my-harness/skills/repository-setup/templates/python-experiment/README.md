@@ -29,7 +29,7 @@ The `Makefile` assumes a root `Dockerfile` whose image has Python, `git`, the pr
 ## Layout rules
 
 - An experiment is an override file `research/HYP-<n>-<slug>/experiments/<name>.yaml` plus its runs.
-- `make experiment EXP=<name>` runs the override file named `<name>.yaml` in any hypothesis directory, so experiment names are unique across hypotheses.
+- `make experiment EXP=<name>` runs the override file named `<name>.yaml` in any hypothesis directory. `HYP=<directory>`, such as `HYP=HYP-1-example`, limits the search to one hypothesis directory and defaults to `*`. Where no file or more than one file matches, the target fails with a line naming the matches.
 - Hypothesis code lives in `src/<package>/<hypothesis>/`, its tests in `tests/<hypothesis>/`, and its module docstring names its `HYP-<n>`.
 - Run outputs go to the ignored `runs/` directory. A shared experiment tracker is added only where the team has agreed one; otherwise the session asks first.
 

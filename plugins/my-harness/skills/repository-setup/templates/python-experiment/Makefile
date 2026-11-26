@@ -1,6 +1,8 @@
 IMAGE ?= <image>
 NAME ?= <package>-dev
 RUN = docker run --rm -e PYTHONPATH=src -v "$(CURDIR)":/app -w /app $(IMAGE)
+HYP ?= *
+EXP_FILES = $(wildcard research/$(HYP)/experiments/$(EXP).yaml)
 
 .PHONY: build up down test experiment
 
@@ -17,4 +19,5 @@ test:
 	$(RUN) python -m pytest
 
 experiment:
-	$(RUN) python -m <package>.run $(wildcard research/*/experiments/$(EXP).yaml)
+	$(if $(filter 1,$(words $(EXP_FILES))),,$(error EXP=$(EXP) HYP=$(HYP) matches $(words $(EXP_FILES)) override files: [$(EXP_FILES)]; pass HYP=<hypothesis directory>))
+	$(RUN) python -m <package>.run $(EXP_FILES)
