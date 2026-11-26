@@ -186,7 +186,7 @@
         {
           "name": "review/escalation",
           "color": "d93f0b",
-          "description": "A review finding was escalated"
+          "description": "A research escalation on this item waits for the user"
         },
         {
           "name": "review/ponytail-cap",
