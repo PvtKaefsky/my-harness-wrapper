@@ -796,9 +796,14 @@ A major change, one the orchestrator splits into two or more pull requests,
 lands through a combined branch, `release/<words>` or `release/<n>-<words>`.
 
 1. The orchestrator creates the combined branch from `main` and pushes it.
+   Where the repository tracks `.github/labels.json`, it runs
+   `bash <harness>/scripts/labels.sh sync` from the project checkout once,
+   before the first brief, `<harness>` being the deployed harness copy.
 2. Each nested session works in its own worktree, cut from the combined branch,
    and opens its pull request against the combined branch with `Refs:` lines
-   and no closing keyword. No nested pull request bumps
+   and no closing keyword. It labels that pull request with
+   `bash <harness>/scripts/labels.sh apply pr <n> --areas --add type/<type> --add size/<band>`,
+   adding `size/over-budget` when over its review budget. No nested pull request bumps
    `export BOOTSTRAP_VERSION=` in `env/setup.sh`, except the one in step 4.
 3. The orchestrator verifies each nested pull request under the
    `my-harness:task-delegation` skill, runs `ponytail:ponytail-review` on its
@@ -858,6 +863,19 @@ the test script itself; it exits 0 only where every check passes. Run
 `scripts/test-orchestrator-rules.sh` before committing a change to
 `config/CLAUDE.md`'s Harness, Git workflow, A/B probes or Pull request comments
 section or to the test script itself; it exits 0 only where every check passes.
+Run `scripts/test-team-practice-rules.sh` before committing a change to
+`config/CLAUDE.md`'s Language, Claims, Documentation, Writing code, Harness,
+Git workflow, Pull request comments or Issues section or to the test script
+itself; it exits 0 only where every check passes. Run `scripts/test-labels.sh`
+before committing a change to `scripts/labels.sh`, to `.github/labels.json` or
+to the test script itself; it exits 0 only where every case passes. Run
+`scripts/test-repository-templates.sh` before committing a change to
+`plugins/my-harness/skills/repository-setup/`, to `docs/repository-layouts.md`
+or to the test script itself, and `scripts/test-experiment-template.sh` before
+committing a change to the `python-experiment/` template, to `probe/Dockerfile`
+or to the test script itself, in the probe image where the host lacks Python
+with `hydra-core` and `python-dotenv`; each exits 0 only where every case it
+runs passes.
 Run `scripts/test-install-settings.sh` before committing a change to the settings
 merge of `scripts/install-local.sh` or to the test script itself; it exits 0
 only where every check passes. Run `scripts/test-session-check.sh` before
