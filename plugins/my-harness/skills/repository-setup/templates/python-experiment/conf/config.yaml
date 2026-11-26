@@ -1,0 +1,7 @@
+seed: 0
+data_dir: ${oc.env:DATA_DIR}
+api_token: ${oc.env:API_TOKEN}
+task:
+  _target_: <package>.hyp_1_example.task.run
+  seed: ${seed}
+  data_dir: ${data_dir}
