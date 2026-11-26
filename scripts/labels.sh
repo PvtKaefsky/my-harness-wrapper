@@ -8,7 +8,8 @@ IFLINE="^[[:space:]]*if:[[:space:]]*(\\\$\\{\\{[[:space:]]*)?(github\.event\.lab
 
 usage() {
   echo "usage: labels.sh sync [--file FILE] [--repo OWNER/REPO]" >&2
-  echo "       labels.sh apply pr|issue <n> [--file FILE] [--repo OWNER/REPO] [--base REF] [--add LABEL]... [--remove LABEL]..." >&2
+  echo "       labels.sh apply pr <n> [--file FILE] [--repo OWNER/REPO] [--areas] [--add LABEL]... [--remove LABEL]..." >&2
+  echo "       labels.sh apply issue <n> [--file FILE] [--repo OWNER/REPO] [--add LABEL]... [--remove LABEL]..." >&2
   exit 2
 }
 
@@ -35,14 +36,19 @@ case $CMD in
   *) usage ;;
 esac
 
-FILE= REPO= BASE=
+FILE= REPO= AREAS_FROM_PR=
 ADD=() DEL=()
 while [ $# -gt 0 ]; do
+  if [ "$1" = --areas ]; then
+    [ "$KIND" = pr ] || usage
+    AREAS_FROM_PR=1
+    shift
+    continue
+  fi
   [ $# -ge 2 ] || usage
   case $1 in
     --file) FILE=$2 ;;
     --repo) REPO=$2 ;;
-    --base) BASE=$2 ;;
     --add) ADD+=("$2") ;;
     --remove) DEL+=("$2") ;;
     *) usage ;;
@@ -50,7 +56,6 @@ while [ $# -gt 0 ]; do
   [ "$CMD" = apply ] || [ "$1" = --file ] || [ "$1" = --repo ] || usage
   shift 2
 done
-case $BASE in -*) usage ;; esac
 
 for tool in git jq gh; do
   command -v "$tool" >/dev/null 2>&1 || notrun "command -v $tool -> none"
@@ -147,11 +152,11 @@ mapfile -t CURRENT < <(jqr -r '.labels[].name' <<<"$item")
 declare -A ON=()
 for l in "${CURRENT[@]}"; do ON[$l]=1; done
 
-if [ -n "$BASE" ]; then
-  changed=$(git -c core.quotePath=false diff --name-only "$BASE...HEAD" 2>&1 | tr -d '\r') || notrun "git diff --name-only $BASE...HEAD -> failed: $changed"
+if [ -n "$AREAS_FROM_PR" ]; then
+  changed=$(ghout pr diff "$NUM" --name-only | tr -d '\r') || notrun "gh pr diff $NUM --name-only -> failed: $(gherr)"
   mapfile -t AREAS < <(jqr -r --arg c "$changed" '[.families[] | .paths // {} | to_entries[] | . as $e |
     select(any($c | split("\n")[]; startswith($e.key))) | $e.value] | unique[]' "$FILE")
-  echo "area labels from $BASE...HEAD -> ${AREAS[*]:-none}"
+  echo "area labels from gh pr diff $NUM -> ${AREAS[*]:-none}"
   ADD+=("${AREAS[@]}")
   afam=$(jqr -r 'first(.families[] | select(.paths) | .name) // ""' "$FILE")
   if [ -n "$afam" ]; then

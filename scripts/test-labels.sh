@@ -29,6 +29,7 @@ case "$1 ${2:-}" in
     exit 0 ;;
   "pr view" | "issue view") cat "$FIX/item.json"; exit ;;
   "pr edit" | "issue edit") exit 0 ;;
+  "pr diff") cat "$FIX/diff.txt"; exit ;;
 esac
 [ "$1" = api ] || { echo "stub gh: unexpected call" >&2; exit 1; }
 case $path in
@@ -274,17 +275,29 @@ git -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base &
 touch config/a scripts/b
 git add . && git -c user.name=t -c user.email=t@example.com commit -q -m change
 fixture "$HAVE" '[{"name":"area/docs"},{"name":"area/config"}]'
-run apply pr 7 $L --base base
-expect 'apply sets the area labels from the changed paths' 0 \
-  out 'area labels from base...HEAD -> area/config area/scripts' \
+printf 'config/x\nscripts/y\n' > "$FIX/diff.txt"
+run apply pr 7 $L --areas
+expect 'apply sets the area labels from the pull request diff, not the local checkout' 0 \
+  out 'area labels from gh pr diff 7 -> area/config area/scripts' \
+  call 'gh pr diff 7 --name-only' \
   call 'gh pr edit 7 --add-label=area/scripts --remove-label=area/docs' \
   call 'gh label create area/scripts --color 1d76db --description Changes under scripts/'
 
+printf 'docs/z\n' > "$FIX/diff.txt"
+run apply pr 7 $L --areas
+expect 'apply ignores the paths the local HEAD changes' 0 \
+  out 'area labels from gh pr diff 7 -> area/docs' \
+  call 'gh pr edit 7 --remove-label=area/config'
+
+run apply issue 3 $L --areas
+expect 'apply refuses --areas on an issue' 2 nocall 'issue view'
+
 jq 'del(.families[].paths)' "$WORK/labels.json" > "$WORK/nopaths.json"
 fixture "$HAVE" '[{"name":"keep-me"},{"name":"area/docs"}]'
-run apply pr 7 --file "$WORK/nopaths.json" --base base
-expect 'apply with a base and no path map removes no label' 0 \
-  out 'area labels from base...HEAD -> none' nocall ' edit '
+printf 'config/x\n' > "$FIX/diff.txt"
+run apply pr 7 --file "$WORK/nopaths.json" --areas
+expect 'apply --areas with no path map removes no label' 0 \
+  out 'area labels from gh pr diff 7 -> none' nocall ' edit '
 
 fixture '[]'
 run sync --file "$REAL"
