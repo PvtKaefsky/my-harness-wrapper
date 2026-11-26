@@ -17,9 +17,12 @@ go. The top level always follows the layout.
 
 ```
 <repo>/
-├── .github/            # workflows, issue and pull request templates
+├── .github/            # workflows, issue and pull request templates, labels.json
+├── conf/               # Hydra base configuration, only with the experiment layer
 ├── docs/               # indexed by docs/README.md
 ├── probe/              # the A/B probe: Dockerfile, compose.yaml, checks.sh
+├── research/           # research records, only in a repository with research hypotheses
+├── runs/               # run outputs, ignored, only with the experiment layer
 ├── scripts/            # build, release and maintenance scripts
 ├── src/                # all source: see the toolchain table
 ├── tests/              # tests that live outside the source tree
@@ -108,6 +111,123 @@ checks in Docker on a baseline tree and a candidate tree.
 - The files are committed to the project.
 - Both layouts place `probe/` at the top level.
 - A grouped monorepo has one `probe/` for all its modules.
+- The image needs `bash`, `git`, `gawk`, `grep` and `coreutils`, plus whatever
+  the Quick Start command and the project's checks run.
+
+`probe/checks.sh` starts from the `repository-setup` skill's template, whose
+two checks come before the project's own. Each check appends one line
+`{"id": ..., "status": "pass" | "fail", "seconds": ...}` to
+`/results/checks.jsonl` through `record <id> <status> <seconds>`. The
+variables `CHECKS_WORK` and `CHECKS_OUT` replace `/work` and
+`/results/checks.jsonl` outside the container.
+
+| Check | Passes where |
+| --- | --- |
+| `quickstart` | the Quick Start command exits 0 in a fresh `git clone` of `/work`, with no network and a 600-second limit |
+| `spec-trace` | every scenario ID in a `docs/specs/*.md` file whose first line is `Status: active` appears in exactly one scenario row and matches at least one test file |
+
+- `README.md` marks the Quick Start command as a fenced code block whose info
+  string is `sh quickstart`. The check runs the block's lines with
+  `bash -euo pipefail`.
+- Where the Quick Start needs a secret or the network, `README.md` also
+  carries an offline mode in a block whose info string is
+  `sh quickstart-offline`, and the check runs that block instead. Where the
+  Quick Start has no offline mode, the project removes the check, since the
+  probe container has no network and no credential.
+- A scenario ID is the first cell of a row under the `## Scenarios` heading of
+  a spec: a prefix of capital letters and digits naming the component, a
+  hyphen and a number, such as `RATELIMIT-3`.
+- A test file is a tracked path under a `test/`, `tests/` or `__tests__/`
+  directory, or one named `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`,
+  `*Test.*` or `*Tests.*`.
+- An ID matches a test file whose content holds it as a whole token, in any
+  casing, with `-` or `_` between prefix and number: `RATELIMIT-3` matches
+  `test_ratelimit_3_rejects_burst` and `it("RATELIMIT-3 ...")`, and not
+  `RATELIMIT-30`.
+- The check prints `spec-trace -> <ID> repeated` or
+  `spec-trace -> <ID> names no test` for each failing ID.
+
+## Documentation roles
+
+| Path | Role | Template |
+| --- | --- | --- |
+| `docs/specs/<component>.md` | One component's spec: status, summary, motivation, contract, scenarios, requirements, alternatives, open questions and decisions | `docs/specs/component.md` |
+| `docs/requirements.md` | With `docs/specs/`, the index of specs, one row each; without it, the requirement lines | `docs/requirements.md` |
+| `docs/glossary.md` | `Term \| Context \| Definition \| Code name \| Avoid`, plus `Kind` where the repository has `research/` | `docs/glossary.md` |
+| `docs/architecture.md` | C4 diagram, context map, component edges, dependency rules, domain rules and naming | `docs/architecture.md` |
+| `docs/benchmarks/<benchmark>.md` | One benchmark: revision, inputs, configuration, hardware, build and run commands, expected result and a link to the actual run | `docs/benchmarks/benchmark.md` |
+| `tests/test_architecture.py` | The Python architecture test: one rule per dependency rule, each asserting its paths exist | `architecture-test/tests/test_architecture.py` |
+| `.github/labels.json` | The project's labels in the schema `scripts/labels.sh` reads, with an `area` path map | `github/labels.json` |
+
+- A spec file is named by its component's slug, with no number. Its first
+  line is `Status: active`, `Status: rejected` or
+  `Status: superseded by <path>`.
+- Each requirement line lives in one place: the component's spec where
+  `docs/specs/` exists, `docs/requirements.md` otherwise.
+- The glossary's `Kind` is `concept`, `quantity` or `hyperparameter`, and a
+  definition may carry a formula.
+- The glossary, the context map and the C4 diagram are text, never images.
+- The architecture test walks the imports of every `.py` file under a rule's
+  source directory with `ast`, resolving relative imports, and needs no
+  dependency.
+- The label file holds the families `type`, `area`, `size`, `budget`,
+  `research` and `signal`. Where the project also runs `actions/labeler` with
+  `sync-labels`, the labeler's labels take a family other than `area`, since
+  each tool removes the other's labels.
+
+## Research directory
+
+`research/` holds the records of a repository with research hypotheses.
+
+| Path | Content |
+| --- | --- |
+| `research/project.md` | Problem, motivation, objectives, scope and expected impact |
+| `research/state_of_art.md` | The field and its existing solutions |
+| `research/history.md` | Dated, append-only project log |
+| `research/project_summary.md` | Current state and each hypothesis's status |
+| `research/references.bib` | Shared bibliography |
+| `research/infrastructure/` | Shared datasets, baselines, configurations and tools, indexed by its `README.md` |
+| `research/HYP-<n>-<slug>/README.md` | The hypothesis document, indexing its directory: status, main hypothesis, motivation, scope, decomposition, dependencies, acceptance and refutation criteria |
+| `research/HYP-<n>-<slug>/design.md` | Mathematics, constraints and interface |
+| `research/HYP-<n>-<slug>/evaluation.md` | Metrics, repetitions, baselines, randomness control and the planned grid |
+| `research/HYP-<n>-<slug>/results.md` | Core and additional analysis, statistics, limits and anomalies, and the researcher's conclusion |
+| `research/HYP-<n>-<slug>/history.md` | Dated, append-only hypothesis log |
+| `research/HYP-<n>-<slug>/experiments/<name>.yaml` | One experiment, an override of `conf/config.yaml` |
+
+| Unit | Status values |
+| --- | --- |
+| Hypothesis, sub-hypothesis `H<n>` | `draft`, `approved`, `in progress`, `confirmed`, `refuted`, `inconclusive`, `abandoned` |
+| Step `S<n>` | `todo`, `in progress`, `done`, `blocked` |
+| Run | `completed`, `failed`, `interrupted` |
+
+- `<n>` in `HYP-<n>` is the number of the issue that tracks the hypothesis.
+- A hypothesis document's first line is `Status: <value>`.
+- A hypothesis directory's files are created when they are needed.
+- Hypothesis code lives in `src/<package>/<hypothesis>/`, its tests in
+  `tests/<hypothesis>/`, and its module docstring names its `HYP-<n>`.
+- Records name the role behind each decision and change, `researcher` or
+  `agent`, with no model name or session link.
+- There is no `formulation.md`.
+
+## Experiment layer
+
+The Python experiment layer is the `repository-setup` skill's
+`templates/python-experiment/`, whose `README.md` lists its files and
+placeholders.
+
+| Path | Role |
+| --- | --- |
+| `.env.example` | Every environment name with a safe value; `.env` is read through `python-dotenv` and ignored |
+| `conf/config.yaml` | Hydra base configuration, reading environment values with `${oc.env:<NAME>}` |
+| `research/HYP-<n>-<slug>/experiments/<name>.yaml` | Per-experiment override |
+| `runs/<run_id>/` | One run: `config.yaml`, the resolved configuration with secrets as `'***'`; `metadata.json`; the task's results |
+| `Makefile` | `build`, `up`, `down`, `test` and `experiment EXP=<name> [HYP=<directory>]`, run in the project's image |
+
+- `metadata.json` holds `run_id`, `experiment`, `commit`, `dirty`, `seed`,
+  `environment` and `status`.
+- A run with `dirty: true` is cited by no `results.md`.
+- `runs/` is ignored. A shared experiment tracker is added only where the team
+  has agreed one.
 
 ## Sources
 
