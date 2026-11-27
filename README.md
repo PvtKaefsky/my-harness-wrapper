@@ -11,9 +11,10 @@ scripts, `scripts/test-attribution-guard.sh`,
 `scripts/test-repository-templates.sh`, are run by hand and by the A/B probe.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
-into a session's Claude config directory. It also holds one plugin,
-`plugins/my-harness/`, which those scripts install from `config/plugins.tsv`
-and which is packaged for upload to claude.ai for Cowork sessions.
+into a session's Claude config directory. It also holds two plugins, which
+those scripts install from `config/plugins.tsv`: `plugins/my-harness/`, which
+is packaged for upload to claude.ai for Cowork sessions, and
+`plugins/deslop-please/`, which is not.
 `config/plugins.tsv` also names four third-party plugins, ECC, ponytail,
 humanizer and Modern Web Guidance, which those scripts install from their
 upstream marketplaces. Ponytail and humanizer are packaged for upload to
@@ -98,8 +99,9 @@ every session.
 | `config/CLAUDE.md` | The instruction payload, delivered as `CLAUDE.md` in the config directory: `/root/.claude` in the cloud, `${CLAUDE_CONFIG_DIR-$HOME/.claude}` locally. |
 | `config/settings.json` | Settings merged into the config directory's `settings.json`. It turns Claude Code's telemetry and error reports off and empties ponytail's webhook. Its `permissions.deny` rules refuse reads of secret files and edits of the deployed harness, and both installers add its `permissions.allow` and `permissions.deny` entries to the live lists without removing any. Its hook commands run the scripts under `${HARNESS_DIR:-/opt/my-harness-wrapper}`. |
 | `config/plugins.tsv` | The plugins bootstrap installs. |
-| `.claude-plugin/marketplace.json` | The plugin marketplace `my-harness-wrapper`. It lists the one plugin under `plugins/`. `claude plugin marketplace add` reads it. |
+| `.claude-plugin/marketplace.json` | The plugin marketplace `my-harness-wrapper`. It lists the two plugins under `plugins/`. `claude plugin marketplace add` reads it. |
 | `plugins/my-harness/` | The `my-harness` plugin: the `task-delegation`, `python-property-model-tests`, `edit-russian-technical-text`, `quick-human-readable-review`, `python-fp-refactor`, `repository-setup` and `research-workflow` skills, the project templates under `skills/repository-setup/templates/`, the `executor` and `analyst` agents, a `UserPromptSubmit` hook, a `PreToolUse` hook running the Modern Web Guidance gate `hooks/web-guidance-gate.sh`, and an eval suite under `evals/`. `plugins/my-harness/README.md` describes it. |
+| `plugins/deslop-please/` | The `deslop-please` plugin: the `deslop-please` skill, which runs the deslop pass with the third-party linter `deslop-please`, and an eval suite under `evals/`. It has no hook. `plugins/deslop-please/README.md` describes it. |
 | `env/setup.sh` | The init script pasted into the environment dialog. It clones this repository and is the only version source. |
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config's signing keys. |

@@ -1,0 +1,9 @@
+{
+  "name": "deslop-please",
+  "version": "0.1.0",
+  "description": "One skill telling a session when and how to run the deslop-please structure linter on a change in a Rust, Python, TypeScript or JavaScript repository, and what to do with each finding it introduces.",
+  "author": {
+    "name": "PvtKaefsky"
+  },
+  "repository": "https://github.com/PvtKaefsky/my-harness-wrapper"
+}
