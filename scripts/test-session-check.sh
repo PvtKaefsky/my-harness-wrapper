@@ -165,8 +165,8 @@ STUB_LIST="deslop-please v0.1.6 ($D_URL?rev=$D_REV#cfabfb9e):" PATH="$WORK/stubs
 STUB_LIST='deslop-please v0.1.6:' PATH="$WORK/stubs:$PATH" expect 'deslop-please installed from crates.io' 0 '' \
   'cargo install --list -> exit=0 line=[deslop-please v0.1.6:]' \
   "cargo install --list names $D_URL?rev=$D_REV -> no"
-rm -f "$WORK/stubs/scip-typescript"
-PATH="$WORK/stubs:$PATH" expect 'scip-typescript not on PATH' 0 '' 'command -v scip-typescript -> none'
+printf 'url=%s\nrev=%s\nindexer=@sourcegraph/deslop-test-absent@0.0.1\n' "$D_URL" "$D_REV" > "$WORK/harness/config/deslop-please.pins"
+PATH="$WORK/stubs:$PATH" expect 'an indexer not on PATH' 0 '' 'command -v deslop-test-absent -> none'
 rm -rf "$WORK/harness/config"
 
 mkdir -p "$WORK/copy/scripts" && cp "$CHECK" "$WORK/copy/scripts/session-check.sh"
