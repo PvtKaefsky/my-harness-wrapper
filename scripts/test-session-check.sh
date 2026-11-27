@@ -147,6 +147,28 @@ printf 'a%sb\n' "$RLO" > AGENTS.md
 expect 'a directory outside a git repository' 0 '' \
   "git -C $PWD rev-parse --show-toplevel -> exit=128, hidden-character scan not run"
 
+D_URL=https://github.com/Bor4brn/deslop-please
+D_REV=cfabfb9ee417e150d5342e8ef0d6a0fe725cc9a0
+mkdir -p "$WORK/harness/config" "$WORK/stubs"
+printf 'url=%s\nrev=%s\nindexer=@sourcegraph/scip-python@0.6.8\nindexer=@sourcegraph/scip-typescript@0.5.2\n' "$D_URL" "$D_REV" > "$WORK/harness/config/deslop-please.pins"
+printf '#!/bin/bash\nprintf "%%s\\n" "$STUB_LIST"\n' > "$WORK/stubs/cargo"
+printf '#!/bin/bash\necho "SyntaxError: Invalid regular expression"; exit 1\n' > "$WORK/stubs/scip-python"
+printf '#!/bin/bash\necho 0.5.2\n' > "$WORK/stubs/scip-typescript"
+printf '#!/bin/bash\n' > "$WORK/stubs/deslop-please"
+chmod +x "$WORK/stubs/"*
+STUB_LIST="deslop-please v0.1.6 ($D_URL?rev=$D_REV#cfabfb9e):" PATH="$WORK/stubs:$PATH" expect 'deslop-please installed at the pin, scip-python --version exiting 1' 0 '' \
+  "command -v deslop-please -> $WORK/stubs/deslop-please" \
+  "cargo install --list -> exit=0 line=[deslop-please v0.1.6 ($D_URL?rev=$D_REV#cfabfb9e):]" \
+  "cargo install --list names $D_URL?rev=$D_REV -> yes" \
+  'scip-python --version -> exit=1 value=[SyntaxError: Invalid regular expression]' \
+  'scip-typescript --version -> exit=0 value=[0.5.2]'
+STUB_LIST='deslop-please v0.1.6:' PATH="$WORK/stubs:$PATH" expect 'deslop-please installed from crates.io' 0 '' \
+  'cargo install --list -> exit=0 line=[deslop-please v0.1.6:]' \
+  "cargo install --list names $D_URL?rev=$D_REV -> no"
+printf 'url=%s\nrev=%s\nindexer=@sourcegraph/deslop-test-absent@0.0.1\n' "$D_URL" "$D_REV" > "$WORK/harness/config/deslop-please.pins"
+PATH="$WORK/stubs:$PATH" expect 'an indexer not on PATH' 0 '' 'command -v deslop-test-absent -> none'
+rm -rf "$WORK/harness/config"
+
 mkdir -p "$WORK/copy/scripts" && cp "$CHECK" "$WORK/copy/scripts/session-check.sh"
 cd "$WORK/nested" || exit 1
 expect 'hidden-chars.sh absent beside the script' 0 "$WORK/copy/scripts/session-check.sh" \

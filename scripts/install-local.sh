@@ -369,8 +369,8 @@ deploy() {
   out=$(git -C "$DEPLOY" ls-files -v 2>&1); flag_rc=$?
   flagged=$( [ "$flag_rc" -eq 0 ] && printf '%s\n' "$out" | grep -a -c -E '^([a-z]|S) ')
   echo "git -C $DEPLOY ls-files -v, entries marked skip-worktree or assume-unchanged -> exit=$flag_rc count=${flagged:-unread}$([ "$flag_rc" -eq 0 ] || printf ' value=[%s]' "$(first_line "$out")")"
-  out=$(git -C "$DEPLOY" ls-files --error-unmatch -- config/CLAUDE.md config/settings.json config/plugins.tsv env/setup.sh 2>&1); payload_rc=$?
-  echo "git -C $DEPLOY ls-files --error-unmatch config/CLAUDE.md config/settings.json config/plugins.tsv env/setup.sh -> exit=$payload_rc$([ "$payload_rc" -eq 0 ] || printf ' value=[%s]' "$(first_line "$out")")"
+  out=$(git -C "$DEPLOY" ls-files --error-unmatch -- config/CLAUDE.md config/settings.json config/plugins.tsv config/deslop-please.pins env/setup.sh 2>&1); payload_rc=$?
+  echo "git -C $DEPLOY ls-files --error-unmatch config/CLAUDE.md config/settings.json config/plugins.tsv config/deslop-please.pins env/setup.sh -> exit=$payload_rc$([ "$payload_rc" -eq 0 ] || printf ' value=[%s]' "$(first_line "$out")")"
   echo "git -C $DEPLOY log -1 --format='%h %cI' -> $(first_line "$(git -C "$DEPLOY" log -1 --format='%h %cI' 2>&1)")"
   if [ "$head_rc" -ne 0 ] || [ "$want_rc" -ne 0 ] || [ -z "$head" ] || [ "$head" != "$want" ] \
     || [ "$branch_rc" -ne 0 ] || [ "$branch" != "$HARNESS_REF" ] || [ "$url_match" != yes ] \
@@ -710,6 +710,9 @@ main() {
   else
     fails=$((fails + 1))
   fi
+  bash "$DEPLOY/scripts/deslop-install.sh"; rc=$?
+  echo "bash $DEPLOY/scripts/deslop-install.sh -> exit=$rc"
+  fails=$((fails + rc))
 
   local SETUP="$DEPLOY/env/setup.sh" VER_LINES VER_RC VERSION=""
   VER_LINES=$(grep -a '^export BOOTSTRAP_VERSION=' "$SETUP" 2>/dev/null); VER_RC=$?
