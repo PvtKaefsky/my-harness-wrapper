@@ -6,7 +6,7 @@ tags: [deslop-please]
 
 Run the deslop pass on my branch `feat/bulk-price` of the Python repository
 `shop` before I send it for review. Its base branch is `main`. You cannot run
-commands here, so I ran `deslop-please` the way the pass runs it and pasted the
+commands here, so I ran `deslop-please` on my Linux machine the way the pass runs it and pasted the
 output below. Tell me what you change in the code for each finding, with the
 edited files, and give me the pass's report line.
 

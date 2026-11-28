@@ -51,6 +51,16 @@ if [ "$valid" != yes ]; then
 fi
 
 BUILD="cargo install --git $URL --rev $REV --locked deslop-please"
+OS=$(uname -s 2>/dev/null || echo unknown)
+echo "uname -s -> $(show "$OS")"
+case "$OS" in
+  MINGW*|MSYS*|CYGWIN*)
+    WIN="native Windows, the deslop pass runs in a container through scripts/deslop-run.sh"
+    echo "$BUILD -> skipped, $WIN"
+    for pkg in "${INDEXERS[@]}"; do echo "npm install -g --ignore-scripts --no-audit --no-fund $pkg -> skipped, $WIN"; done
+    finish
+    ;;
+esac
 CARGO=$(command -v cargo || echo none)
 echo "command -v cargo -> $(show "$CARGO")"
 if [ "$CARGO" = none ]; then
@@ -88,17 +98,30 @@ if [ "$NODE" != none ]; then
 fi
 [ "$NODE" != none ] || skip="no node"
 [ "$NPM" != none ] || skip="no npm"
+TOOL=$(command -v deslop-please || echo none)
+echo "command -v deslop-please -> $(show "$TOOL")"
+[ "$TOOL" != none ] || [ -n "$skip" ] || skip="deslop-please not on PATH"
 for pkg in "${INDEXERS[@]}"; do
   INSTALL="npm install -g --ignore-scripts --no-audit --no-fund $pkg"
   if [ -n "$skip" ]; then
     echo "$INSTALL -> skipped, $skip"
     continue
   fi
-  run_logged npm install -g --ignore-scripts --no-audit --no-fund "$pkg"; rc=$?
-  echo "$INSTALL -> exit=$rc"
-  [ "$rc" -eq 0 ] || fails=$((fails + 1))
-  bin=${pkg#*/}
-  bin=${bin%@*}
+  name=${pkg%@*}
+  LS=$(npm ls -g --depth=0 "$name" 2>&1); rc=$?
+  have=no
+  while IFS= read -r l; do
+    case "${l%$'\r'}" in *" $pkg") have=yes ;; esac
+  done <<< "$LS"
+  echo "npm ls -g --depth=0 $name -> exit=$rc, $pkg installed -> $have"
+  if [ "$have" = yes ]; then
+    echo "$INSTALL -> skipped, $pkg already installed"
+  else
+    run_logged npm install -g --ignore-scripts --no-audit --no-fund "$pkg"; rc=$?
+    echo "$INSTALL -> exit=$rc"
+    [ "$rc" -eq 0 ] || fails=$((fails + 1))
+  fi
+  bin=${name#*/}
   path=$(command -v "$bin" || echo none)
   echo "command -v $bin -> $(show "$path")"
   if [ "$path" != none ]; then
