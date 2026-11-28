@@ -80,6 +80,9 @@ check 'delegation combined pull request order' in_section TD '1. the combined br
 check 'delegation bounds order' in_section TD '| Order on the combined branch | the version bump, then the deslop pass'"'"'s two runs and their fixes, then the ponytail pass and its fixes, then the A/B probe |'
 check 'delegation bounds the head runs' in_section TD '| Deslop head runs per branch | two, the orchestrator'"'"'s verification run of a change that does not split not counted |'
 check 'delegation reports both combined runs' in_section TD 'It also states the combined branch'"'"'s deslop report line for each of its two runs,'
+check 'delegation sends the spec to its own session' in_section TD 'the spec'"'"'s requirement lines are one spec nested session; it depends on no part, every part implementing them depends on it, and it merges first; its requirement lines, across every spec file they touch, count as its one spec change;'
+check 'delegation sends shared documentation to one session' in_section TD 'documentation more than one part changes is one documentation nested session, which depends on every part it documents, starts after they have merged, and merges before the version bump;'
+check 'delegation keeps one-part documentation in its part' in_section TD 'documentation only one part changes stays in that part'"'"'s nested session.'
 check 'delegation report has a deslop column' in_section TD '| Deslop | the nested session'"'"'s report line'
 check 'the subagent path runs the pass' in_section TD 'a coding session first runs the deslop pass on its own branch, under the orchestrated path'"'"'s "Deslop pass", before its ponytail pass and before opening its pull request'
 

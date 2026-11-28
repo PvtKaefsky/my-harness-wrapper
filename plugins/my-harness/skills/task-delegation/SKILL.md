@@ -235,7 +235,16 @@ the orchestrator.
 
 - A part is its own nested session where it has its own files and its own
   acceptance check, and lands as its own pull request.
-- Parts that share a file are one nested session.
+- Parts that share a file are one nested session, except in a major change for
+  the spec and for documentation more than one part changes:
+  - the spec's requirement lines are one spec nested session; it depends on no
+    part, every part implementing them depends on it, and it merges first; its
+    requirement lines, across every spec file they touch, count as its one
+    spec change;
+  - documentation more than one part changes is one documentation nested
+    session, which depends on every part it documents, starts after they have
+    merged, and merges before the version bump;
+  - documentation only one part changes stays in that part's nested session.
 - For each nested session, record the nested sessions it depends on: one
   depends on another where its goal documents, tests, configures or calls what
   the other changes. Two that depend on each other are one nested session.
