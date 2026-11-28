@@ -1441,6 +1441,62 @@ ignored.
 | Owner | The repository owner, `PvtKaefsky`. |
 | Removal condition | None recorded. |
 
+## deslop-please
+
+The `deslop-please@my-harness-wrapper` plugin carries the `deslop-please:deslop-please` skill, which runs the linter `https://github.com/Bor4brn/deslop-please`, a fork of `https://github.com/deterministic-machines/deslop-please`. `config/CLAUDE.md`'s Harness bullet for the plugin sets when the deslop pass runs, and which path it takes: on native Windows the container through `scripts/deslop-run.sh`, elsewhere the native binary where it is on `PATH`, else the container where `docker info` succeeds.
+
+### Plugin source lookup
+
+Read on 2026-11-28 under `docs/environment-changes.md`, "Checking a plugin source". The guide's default branch resolved to the commit below, dated 2026-11-26; the file's header reads `version: "2.34.0"` and `updated: "2026-11-05"`.
+
+| Field | Value |
+| --- | --- |
+| Commit | `f97e4f7b9cde282b339f2757442e18762e028ba2` of `https://github.com/FlorianBruniaux/claude-code-ultimate-guide`, file `examples/commands/resources/threat-db.yaml` |
+| Searched | The names `Bor4brn/deslop-please`, `deterministic-machines/deslop-please` and `deslop`; the owners `Bor4brn` and `deterministic-machines`; the contributors both repositories list, `XiangpengHao`, `Bor4brn`, `BumaldaOverTheWater94`, `charlieyou`, `christopher-kapic`, `Osraka` and `Razubi`; each case-insensitively over the whole file, which holds `malicious_authors` and `malicious_skills` |
+| Result | `not listed` |
+
+### Facts verified on 2026-11-27
+
+| Probe | Observed |
+| --- | --- |
+| `claude plugin marketplace add` for a marketplace already added | Exit 0, "already on disk". Shown under a scratch config directory with a local-folder source; the GitHub source was not shown |
+| `cargo install --git <url> --rev <sha> --locked` without a package name | Exit 101, "multiple packages with binaries found: app, deslop-please, wt" |
+| The same command with `deslop-please` appended | Builds the tool |
+| A rerun with that commit installed | Builds nothing, exit 0 |
+| `cargo install --list` | `deslop-please v0.1.6 (https://github.com/Bor4brn/deslop-please?rev=cfabfb9ee417e150d5342e8ef0d6a0fe725cc9a0#cfabfb9e):` |
+| `deslop-please --version` | `deslop-please 0.1.6`, as the original's release prints |
+| `@sourcegraph/scip-python@0.6.8` and `@sourcegraph/scip-typescript@0.5.2` on Linux | Both install with `--ignore-scripts` and answer `--version` |
+| `scip-python@0.6.8 --version` on native Windows, Node 24.20.0 | Exit 1, `SyntaxError: Invalid regular expression: /\/g` |
+| A Windows build of the tool, cross-built in the container, on native Windows | Does not find npm's `.cmd` shims; exit 2, "scip-typescript is not installed", "scip-python is not installed" |
+| Rust on native Windows | Not checked; that machine had no Rust |
+| `scip-python` with no `pip` on `PATH` | Exit 2, "Could not find valid pip command" |
+| `deslop-please --json` | Prints one object with the keys `allow_path`, `count`, `diagnostics`, `fixed_allowed` and `ok` |
+| The fork's `main` | At `079bd19`; the pin stays at `cfabfb9` |
+
+### Facts verified on 2026-11-28
+
+Observed in a `rust:latest` container (rustc 1.100.0) with the tool at `cfabfb9`, on upstream's fixtures, rustup managing the toolchain.
+
+| Probe | Observed |
+| --- | --- |
+| A Rust fixture under `env -i PATH="$PATH" HOME=<scratch directory>` | Exit 2, `deslop-please: not inside a Cargo workspace: cargo metadata says: error: rustup could not choose a version of cargo to run, because one wasn't specified explicitly, and no default is configured.` |
+| The Python and TypeScript fixtures under the same environment | Exit 1, one `module-cycle` |
+| The Rust fixture with `RUSTUP_HOME="$RUSTUP_HOME"` also passed | Exit 1, one `module-cycle` |
+| The Rust fixture with only `RUSTUP_TOOLCHAIN` passed in place of `RUSTUP_HOME` | Exit 2, `error: Unknown binary 'rust-analyzer' in official toolchain` |
+
+### The control record for the deslop pass
+
+| Field | Value |
+| --- | --- |
+| Incident | None. Adopted on the user's request, issue #159. |
+| Blocked input | A change that adds a module cycle. |
+| Permitted neighbour | The same project with the cycle's constant moved to its user. |
+| Bypass | `--update-allow` onto a tracked allowlist; a session with no Docker daemon `docker info` reaches, on native Windows, or with neither that daemon nor the binary elsewhere; a container run the runner ends with a failure line. Each skips the pass. |
+| Host and revision | A `rust:latest` Linux container (rustc 1.100.0, rust-analyzer 1.100.0, Node 20.19.2, pip 25.1.1); the tool at `cfabfb9ee417e150d5342e8ef0d6a0fe725cc9a0`, `@sourcegraph/scip-python@0.6.8`, `@sourcegraph/scip-typescript@0.5.2`; the harness at `ddc1d77`. Upstream's fixtures `module_cycle`, `py_module_cycle` and `ts_module_cycle` and their `moved` variants. With the `moved` variant as base and the fixture as head, the head run exited 1 with one `module-cycle`, key `net::kinds,net::socket` for Rust and TypeScript and `netlib::net::kinds,netlib::net::socket` for Python. With the fixture as base and `moved` as head, it exited 0 with `fixed_allowed` 1. The container path: native Windows 11 with Docker Desktop 29.9.3, the image `deslop-please:cfabfb9ee417e150d5342e8ef0d6a0fe725cc9a0` built from `config/deslop-please.Dockerfile` on `rust:1.99.0-slim-trixie` pinned by digest, pull request #173. |
+| Cost | The build took 15.7 s. A run took 0.7 to 1.8 s on those fixtures, and a first Rust index 7.2 s. On the container path a first build and run took 170 s, a cached build 2 s and a cached run 4 to 6 s, and the image takes 2.05 GB. Each pass is one baseline run and at most two head runs; the orchestrator's verification run of a change that does not split is outside that cap, and a combined branch gets two orchestrator runs. No time on a real project is measured. False blocks: none measured. Upkeep: the pins in `config/deslop-please.pins`, the `image` pin among them. |
+| Owner | The user. |
+| Removal condition | Across the first 20 passes on real work, more findings are declined than fixed. |
+
 ## Diagnostic-output invariant
 
 Every diagnostic line prints the predicate tested and the value observed, never

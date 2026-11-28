@@ -83,6 +83,6 @@ Rules:
 - No record is written for each agent action.
 - Intermediate observations stay in machine logs or exploratory reports.
 - History entries are dated and appended; earlier entries are never edited.
-- A review or ponytail finding that would change an `approved` document, or
-  the semantics of code that implements one, is declined and reported as a
-  proposal.
+- A review, ponytail or deslop finding that would change an `approved`
+  document, or the semantics of code that implements one, is declined and
+  reported as a proposal.

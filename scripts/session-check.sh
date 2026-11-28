@@ -174,6 +174,64 @@ else
   [ "$FOUND" -gt 0 ] || emit "ls -d /home/user/*/ -> none"
 fi
 
+DESLOP_PINS="$REPO/config/deslop-please.pins"
+D_URL=""
+D_REV=""
+D_INDEXERS=()
+if [ -f "$DESLOP_PINS" ]; then
+  while IFS='=' read -r key value || [ -n "${key:-}" ]; do
+    value=${value%$'\r'}
+    case "$key" in
+      url) D_URL=$value ;;
+      rev) D_REV=$value ;;
+      indexer) D_INDEXERS+=("$value") ;;
+    esac
+  done < "$DESLOP_PINS"
+fi
+emit "read $DESLOP_PINS -> url=[$(clean "$D_URL")] rev=[$(clean "$D_REV")] indexers=[$(clean "${D_INDEXERS[*]-}")]"
+D_OS=$(uname -s 2>/dev/null || echo unknown)
+case "$D_OS" in
+  MINGW*|MSYS*|CYGWIN*)
+    emit "uname -s -> $(clean "$D_OS"), native Windows: the deslop pass takes the container path, scripts/deslop-run.sh"
+    if command -v docker >/dev/null 2>&1; then
+      (cd / && timeout -k 2 10 docker info) >/dev/null 2>&1; D_RC=$?
+      emit "docker info -> exit=$D_RC"
+    else
+      emit "command -v docker -> none"
+    fi
+    ;;
+  *)
+    emit "command -v deslop-please -> $(clean "$(command -v deslop-please || echo none)")"
+    if command -v cargo >/dev/null 2>&1; then
+      D_LIST=$(cd / && timeout -k 2 10 cargo install --list 2>&1); D_RC=$?
+      D_LINE=""
+      while IFS= read -r line; do
+        case "$line" in "deslop-please v"*) D_LINE=${line%$'\r'} ;; esac
+      done <<< "$D_LIST"
+      emit "cargo install --list -> exit=$D_RC line=[$(clean "$D_LINE")]"
+      D_PINNED=no
+      [ -z "$D_URL" ] || [ -z "$D_REV" ] || case "$D_LINE" in *"($D_URL?rev=$D_REV#"*) D_PINNED=yes ;; esac
+      emit "cargo install --list names $(clean "$D_URL")?rev=$(clean "$D_REV") -> $D_PINNED"
+    else
+      emit "cargo install --list -> not run, no cargo"
+    fi
+    for pkg in ${D_INDEXERS[@]+"${D_INDEXERS[@]}"}; do
+      bin=${pkg#*/}
+      bin=${bin%@*}
+      if ! [[ "$bin" =~ ^[a-z0-9._-]+$ ]]; then
+        emit "indexer name [$(clean "$bin")] matches ^[a-z0-9._-]+$ -> no"
+      elif command -v "$bin" >/dev/null 2>&1; then
+        out=$(cd / && timeout -k 2 10 "$bin" --version 2>&1); D_RC=$?
+        out=${out%%$'\n'*}
+        out=${out%$'\r'}
+        emit "$(clean "$bin") --version -> exit=$D_RC value=[$(clean "$out")]"
+      else
+        emit "command -v $(clean "$bin") -> none"
+      fi
+    done
+    ;;
+esac
+
 VERIFY="$REPO/scripts/verify.sh"
 emit "test -f $VERIFY -> $([ -f "$VERIFY" ] && echo yes || echo no)"
 if [ ! -f "$VERIFY" ]; then

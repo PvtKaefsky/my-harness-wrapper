@@ -363,6 +363,63 @@ d="${CLAUDE_CONFIG_DIR-$HOME/.claude}/my-harness-wrapper"; HARNESS_DIR="$d" bash
 A local session's hook processes carry `HARNESS_DIR` from `settings.json`, so
 the session-start check needs no setting.
 
+## The deslop-please install step
+
+Both installers run `scripts/deslop-install.sh`, which builds the
+`deslop-please` tool with the `cargo` on `PATH` and installs its indexers with
+the `npm` on `PATH`. `docs/scripts.md` carries what it runs and what it prints.
+
+Installing Rust and Node 18 or newer on a machine is your step. The install step
+installs no toolchain. A skip counts no failure.
+
+| Situation | Skipped |
+| --- | --- |
+| Native Windows, `uname -s` starting with `MINGW`, `MSYS` or `CYGWIN` | The tool and every indexer; the pass runs there in a container |
+| No `cargo` | The tool |
+| No `npm`, no `node`, or a Node older than 18 | Every indexer |
+| `deslop-please` not on `PATH` | Every indexer |
+| The indexer's pinned version already installed globally | That indexer's install |
+
+Changing a pin is a harness pull request that edits
+`config/deslop-please.pins`. The installer run after its merge runs the build
+and the indexer installs with the new pins.
+
+### Measured runs
+
+Measured on 2026-11-28 through `scripts/deslop-install.sh` for pull request
+#171, with `CARGO_INSTALL_ROOT` and `npm_config_prefix` pointing at scratch
+directories.
+
+| Where | Observed |
+| --- | --- |
+| Native Windows 11, Git Bash | 0.42 s, exit 0, nothing installed, the scratch directories empty afterwards. |
+| `rust:latest` Linux container, Node 20.19.2, npm and `python3-pip` | First run 25.9 s: the tool and both indexers installed, `scip-python --version` printing 0.6.8 and `scip-typescript --version` 0.5.2. |
+| The same container, second run | 1.31 s, both indexers skipped as `already installed`; `cargo install` ran again and built nothing. |
+| Any host | `scip-python` needs `pip` on `PATH` to index. Without it a tool run exits 2 with "Could not find valid pip command". |
+| npm pins | The pin fixes the indexer's own version. Its dependencies resolve within their ranges at install time. |
+
+## Running the deslop pass in a container
+
+On native Windows the deslop pass runs through `scripts/deslop-run.sh`, and
+elsewhere where `deslop-please` is not on `PATH` and `docker info` succeeds.
+The pass runs it from the deployed copy, `<harness>`. It needs Docker; locally
+on Windows, Docker Desktop with the Linux engine, used from Git Bash.
+`docs/scripts.md` carries its arguments, image, run flags and failure lines.
+
+```bash
+bash <harness>/scripts/deslop-run.sh <tree> --allow <allowlist> --json
+```
+
+Measured for pull request #173 on native Windows 11 with Docker Desktop 29.9.3:
+
+| Run | Time |
+| --- | --- |
+| First build and first run | 170 s |
+| A cached build | 2 s |
+| A cached run | 4 to 6 s |
+
+The image, `deslop-please:<rev>`, takes 2.05 GB, and the runner keeps it.
+
 ## Packaging plugins for claude.ai
 
 Cowork chat sessions get ponytail, humanizer and Modern Web Guidance through
@@ -805,6 +862,13 @@ lands through a combined branch, `release/<words>` or `release/<n>-<words>`.
    `bash <harness>/scripts/labels.sh apply pr <n> --areas --add type/<type> --add size/<band>`,
    adding `size/over-budget` when over its review budget. No nested pull request bumps
    `export BOOTSTRAP_VERSION=` in `env/setup.sh`, except the one in step 4.
+   Where the `deslop-please` tool finds a Rust, Python, TypeScript or
+   JavaScript project, the nested session runs the deslop pass on its branch
+   before opening its pull request. The spec's requirement lines are one
+   nested session, which merges first. Documentation more than one part
+   changes is one documentation nested session, which starts after those parts
+   have merged and merges before the bump of step 4; documentation one part
+   changes stays in that part.
 3. The orchestrator verifies each nested pull request under the
    `my-harness:task-delegation` skill, runs `ponytail:ponytail-review` on its
    diff, has its nested session fix every finding, and merges it into the
@@ -816,31 +880,45 @@ lands through a combined branch, `release/<words>` or `release/<n>-<words>`.
    changes the version line.
 5. The orchestrator opens the combined pull request against `main` as a draft,
    with the closing footers.
-6. The orchestrator runs `ponytail:ponytail-review` on the combined branch's
+6. Where the `deslop-please` tool finds a Rust, Python, TypeScript or
+   JavaScript project, the orchestrator runs the deslop pass on the combined
+   branch's head, under the `my-harness:task-delegation` skill's "Deslop
+   pass". A nested session fixes every finding in a pull request against the
+   combined branch. Once those fixes have merged, the orchestrator runs the
+   pass a second time, and after it each finding is fixed or declined with no
+   third run.
+7. The orchestrator runs `ponytail:ponytail-review` on the combined branch's
    diff against `main`. A nested session fixes every finding in a pull request
    against the combined branch.
-7. The orchestrator runs the A/B probe on the combined branch's resulting head.
+8. The orchestrator runs the A/B probe on the combined branch's resulting head.
    A blocked verdict goes to a nested session as a fix, and the probe runs
    again after that fix merges.
-8. Once the verdict is not blocked, the combined pull request leaves draft with
+9. Once the verdict is not blocked, the combined pull request leaves draft with
    the A/B verdict in its description. Where the runner exited 2, it stays a
    draft stating "A/B not run".
-9. You merge the combined pull request, then deploy it under "Deploying a
-   change" from step 3.
+10. You merge the combined pull request, then deploy it under "Deploying a
+    change" from step 3.
+
+On the combined branch the order is the version bump, then the deslop pass's
+two runs and their fixes, then the ponytail pass and its fixes, then the probe
+on the resulting head.
 
 A ponytail pass runs after the review gate's reviewers have approved the
 branch's commits, and its output is data. A pass that does not approve gets a
 second pass after its fixes. A branch merges after at most two passes, and a
 merge after a second pass that does not approve is reported as made at the
 cap. A fix in a held category of Pull request comments waits for your release
-in the session. The fix pull request of step 6 gets no pass of its own. Where
+in the session. The fix pull request of step 7 gets no pass of its own. Where
 `ponytail:ponytail-review` cannot be invoked, the pass is skipped and the
 orchestrator's report names the branch. `config/CLAUDE.md`'s Git workflow
 section holds the full rule.
 
 A change that does not split goes to one nested session, whose pull request
 targets the base branch, `main` or the branch the task names, and carries its
-own `BOOTSTRAP_VERSION` bump.
+own `BOOTSTRAP_VERSION` bump. Where the `deslop-please` tool finds a Rust,
+Python, TypeScript or JavaScript project, the orchestrator runs the deslop pass
+again at verification, on that pull request's head. That run is not one of the
+branch's two head runs, and a new finding in it fails the verification.
 
 ## Before every commit
 
@@ -882,6 +960,19 @@ only where every check passes. Run `scripts/test-session-check.sh` before
 committing a change to `scripts/session-check.sh`, to
 `git-hooks/lib/hidden-chars.sh` or `git-hooks/lib/hidden-chars.tsv`, or to the
 test script itself; it exits 0 only where every case passes. Run
+`scripts/test-deslop-install.sh` before committing a change to
+`scripts/deslop-install.sh`, to `config/deslop-please.pins` or to the test
+script itself; it exits 0 only where every case passes. Run
+`scripts/test-deslop-run.sh` before committing a change to
+`scripts/deslop-run.sh`, to `scripts/docker-lib.sh`, to
+`config/deslop-please.Dockerfile`, to `config/deslop-please.pins` or to the
+test script itself, and `scripts/test-ab-probe.sh` as well for a change to
+`scripts/docker-lib.sh`; each exits 0 only where every case passes. Run
+`scripts/test-deslop-rules.sh` before committing a change to
+`config/CLAUDE.md`'s Documentation, Harness, Git workflow or A/B probes
+section, to the `task-delegation` skill, to `plugins/deslop-please/`, to
+`.claude-plugin/marketplace.json`, to `config/plugins.tsv` or to the test
+script itself; it exits 0 only where every check passes. Run
 `scripts/test-hook-forwarding.sh` before committing a change to `git-hooks/`
 or to that script. It exits 0 only where every case passes, and it needs a
 checkout holding commit `5f3f87a`. `bash -n` is not
@@ -899,7 +990,8 @@ ends and what to do, and travels to every session, so it is not restated here.
 `scripts/ab-probe.sh` compares a baseline and a candidate commit of a project
 whose candidate carries `probe/`. `docs/scripts.md` carries the contract a
 project's `probe/` meets. For a combined branch, the candidate is its head
-after the version bump and the combined branch's ponytail fixes have merged.
+after the version bump and the combined branch's deslop and ponytail fixes have
+merged.
 
 1. Start Docker. Locally on Windows, Docker Desktop with the Linux engine, used
    from Git Bash.
