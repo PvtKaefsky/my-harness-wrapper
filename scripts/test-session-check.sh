@@ -171,7 +171,13 @@ STUB_LIST='deslop-please v0.1.6:' PATH="$WORK/stubs:$PATH" expect 'deslop-please
 D_WIN="uname -s -> MINGW64_NT-10.0-26200, native Windows: the deslop pass takes the container path, scripts/deslop-run.sh"
 STUB_UNAME=MINGW64_NT-10.0-26200 PATH="$WORK/stubs:$PATH" expect 'native Windows, docker info exiting 0' 0 '' "$D_WIN" 'docker info -> exit=0'
 STUB_UNAME=MINGW64_NT-10.0-26200 STUB_DOCKER_RC=1 PATH="$WORK/stubs:$PATH" expect 'native Windows, docker info exiting 1' 0 '' "$D_WIN" 'docker info -> exit=1'
-NODOCKER=$(IFS=:; for d in $PATH; do [ -e "$d/docker" ] || [ -e "$d/docker.exe" ] || printf '%s:' "$d"; done)
+NODOCKER=$(IFS=:; for d in $PATH; do
+  if [ -e "$d/docker" ] || [ -e "$d/docker.exe" ]; then
+    mkdir -p "$WORK/nodocker$d" && for f in "$d"/*; do case ${f##*/} in docker | docker.exe) ;; *) ln -s "$f" "$WORK/nodocker$d/" ;; esac; done
+    d=$WORK/nodocker$d
+  fi
+  printf '%s:' "$d"
+done)
 mv "$WORK/os/docker" "$WORK/docker.off"
 STUB_UNAME=MINGW64_NT-10.0-26200 PATH="$NODOCKER" expect 'native Windows, no docker on PATH' 0 '' "$D_WIN" 'command -v docker -> none'
 mv "$WORK/docker.off" "$WORK/os/docker"
