@@ -87,7 +87,7 @@ check 'delegation report has a deslop column' in_section TD '| Deslop | the nest
 check 'the subagent path runs the pass' in_section TD 'a coding session first runs the deslop pass on its own branch, under the orchestrated path'"'"'s "Deslop pass", before its ponytail pass and before opening its pull request'
 
 has_key() { jq -e "$1" >/dev/null 2>&1 <<<"$2"; }
-check 'the plugin manifest' has_key '.name == "deslop-please" and .version == "0.1.0"' "$MANIFEST"
+check 'the plugin manifest' has_key '.name == "deslop-please" and .version == "0.2.0"' "$MANIFEST"
 check 'the marketplace entry' has_key '.plugins | any(.name == "deslop-please" and .source == "./plugins/deslop-please")' "$MARKET"
 check 'the plugins.tsv row' grep -q -x -F "$(printf 'PvtKaefsky/my-harness-wrapper\tdeslop-please@my-harness-wrapper')" <<<"$ROWS"
 one_skill() { [ "$(find "$PLUGIN/skills" -name SKILL.md | wc -l)" -eq 1 ] && [ ! -e "$PLUGIN/hooks" ] && ! has_key 'has("hooks")' "$MANIFEST"; }
