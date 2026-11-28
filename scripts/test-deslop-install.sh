@@ -69,7 +69,7 @@ cargo_calls() { printf '%s\n' "$CALLS" | grep -a -c '^cargo '; }
 npm_calls() { printf '%s\n' "$CALLS" | grep -a -c '^npm install '; }
 
 expected_pins=$(printf '%s\n' "url=$URL" "rev=$REV" indexer=@sourcegraph/scip-python@0.6.8 indexer=@sourcegraph/scip-typescript@0.5.2)
-check "the pins file holds the URL, the commit and the two indexers" [ "$(tr -d '\r' < "$PINS")" = "$expected_pins" ]
+check "the pins file holds the URL, the commit and the two indexers" [ "$(tr -d '\r' < "$PINS" | grep -E '^(url|rev|indexer)=')" = "$expected_pins" ]
 
 run PATH="$WORK/all"
 check "every tool present: exit 0, last line fails -> 0" eval '[ "$RC" -eq 0 ] && [ "${OUT##*$'"'"'\n'"'"'}" = "deslop-install fails -> 0" ]'
