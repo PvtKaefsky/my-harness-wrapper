@@ -11,6 +11,11 @@
       "name": "my-harness",
       "source": "./plugins/my-harness",
       "description": "Six skills (task decomposition and delegation, Python property and model tests, Russian technical text, stage summaries, separating decisions from I/O in Python, and repository creation and layout), two executor agents and a per-prompt reminder."
+    },
+    {
+      "name": "deslop-please",
+      "source": "./plugins/deslop-please",
+      "description": "One skill, the deslop pass: running the deslop-please structure linter on a change and fixing or declining each finding the change introduces."
     }
   ]
 }

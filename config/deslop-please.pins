@@ -1,0 +1,4 @@
+url=https://github.com/Bor4brn/deslop-please
+rev=cfabfb9ee417e150d5342e8ef0d6a0fe725cc9a0
+indexer=@sourcegraph/scip-python@0.6.8
+indexer=@sourcegraph/scip-typescript@0.5.2

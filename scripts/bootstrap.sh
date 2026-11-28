@@ -167,6 +167,9 @@ if [ -f "$PLUGINS" ]; then
 else
   fails=$((fails + 1))
 fi
+bash "$SRC/scripts/deslop-install.sh"; rc=$?
+echo "bash $SRC/scripts/deslop-install.sh -> exit=$rc"
+fails=$((fails + rc))
 
 COMMIT=$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null); rc=$?
 echo "git -C $SRC rev-parse --short HEAD -> exit=$rc value=${COMMIT:-}"

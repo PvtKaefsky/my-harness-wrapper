@@ -27,7 +27,7 @@ The logged `fails` is the true count. The exit status is that count clamped to
 | 3 | Copies `config/CLAUDE.md` to `/root/.claude/CLAUDE.md`. |
 | 4 | Merges `config/settings.json` into `/root/.claude/settings.json`. |
 | 5 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, and the global `core.hooksPath` to `git-hooks/` in the clone. |
-| 6 | Installs each plugin named in `config/plugins.tsv` that is not installed yet, updates each one that is, then runs `scripts/plugin-dependencies.sh` for it. |
+| 6 | Installs each plugin named in `config/plugins.tsv` that is not installed yet, updates each one that is, then runs `scripts/plugin-dependencies.sh` for it. After the rows it runs `scripts/deslop-install.sh`. |
 | 7 | Writes `/root/.claude/.my-harness-wrapper.manifest.json`. |
 
 ### Step 2, the config directory
@@ -161,6 +161,11 @@ After each plugin's install or update, whatever its exit status, the step runs
 `bash "$SRC/scripts/plugin-dependencies.sh" claude <plugin_id>` and counts a
 non-zero exit as one failure.
 
+After the rows, the step runs `bash "$SRC/scripts/deslop-install.sh"`, prints
+`bash <dir>/scripts/deslop-install.sh -> exit=N`, and adds N to `fails`. N is
+that script's own failure count, clamped to 255. It runs whether or not
+`config/plugins.tsv` exists.
+
 ### Step 7, the manifest
 
 `git_user_email` records what `git config --get user.email` answers inside the
@@ -212,7 +217,7 @@ before step 3 can rewrite it in a deployed copy the script runs from.
 | 4 | Copies `config/CLAUDE.md` from the deployed copy to `CLAUDE.md` there, first printing `test -f` or `cmp -s` for the file it replaces, and keeping a differing one as `CLAUDE.md.pre-harness` where no such copy exists. |
 | 5 | Merges the deployed copy's `config/settings.json` into `settings.json` there, then sets `env.HARNESS_DIR` to the deployed copy, and `env.GIT_CONFIG_COUNT`, `env.GIT_CONFIG_KEY_0` and `env.GIT_CONFIG_VALUE_0` to deliver `core.hooksPath` naming the deployed copy's `git-hooks/`. A non-empty `settings.json` is first kept as `settings.json.pre-harness` where no such copy exists. |
 | 6 | Sets `commit.gpgsign` and `tag.gpgsign` to `false` globally, printing each prior value and its read's exit status, then unsets a global `core.hooksPath` naming the deployed copy's `git-hooks/`. |
-| 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv` that is not installed yet, updates each one that is, and reinstalls a shipped plugin whose files differ from the deployed copy. It runs the deployed copy's `scripts/plugin-dependencies.sh` for each, then prints how many rows carried a `plugin_id`. |
+| 7 | Installs each plugin named in the deployed copy's `config/plugins.tsv` that is not installed yet, updates each one that is, and reinstalls a shipped plugin whose files differ from the deployed copy. It runs the deployed copy's `scripts/plugin-dependencies.sh` for each, then prints how many rows carried a `plugin_id`. After the rows it runs the deployed copy's `scripts/deslop-install.sh`. |
 | 8 | Writes `.my-harness-wrapper.manifest.json` there. |
 
 ### Step 2, the prerequisites
@@ -257,11 +262,12 @@ After either path the step prints the copy's `HEAD`, its remote ref, its branch,
 whether its local `remote.origin.url` equals the clone URL, its
 `status --porcelain` entry count, the
 count of index entries marked skip-worktree or assume-unchanged, whether
-`config/CLAUDE.md`, `config/settings.json`, `config/plugins.tsv` and
-`env/setup.sh` are tracked, and `log -1`. A failed read prints the first line of
-git's error. The copy is ready where `HEAD` equals the remote ref, the branch is
-`main`, `remote.origin.url` equals the clone URL, the status has
-no entries, no index entry is marked, and the four files are tracked. The stored
+`config/CLAUDE.md`, `config/settings.json`, `config/plugins.tsv`,
+`config/deslop-please.pins` and `env/setup.sh` are tracked, and `log -1`. A
+failed read prints the first line of git's error. The copy is ready where `HEAD`
+equals the remote ref, the branch is `main`, `remote.origin.url` equals the
+clone URL, the status has no entries, no index entry is marked, and the five
+files are tracked. The stored
 value is compared, not the `url.<base>.insteadOf` rewrite `remote get-url`
 prints, so a rewrite in the user's git config does not fail the check. A clone
 URL given as a relative path is stored absolute and fails it.
@@ -497,6 +503,11 @@ After each plugin's install or update, whatever its exit status, the step runs
 it found, and counts a non-zero exit as one failure. Where no CLI is found, the
 dependency step is not run and counts one failure of its own.
 
+After the rows, the step runs `bash "$DEPLOY/scripts/deslop-install.sh"`,
+prints `bash <dir>/scripts/deslop-install.sh -> exit=N`, and adds N to `fails`,
+as bootstrap's step 6 does. It runs whether or not a CLI was found or
+`config/plugins.tsv` exists.
+
 ### Step 8, the manifest
 
 The fields are bootstrap's, plus `local_checkout`, the deployed copy's path.
@@ -552,6 +563,101 @@ reads neither the installed version nor the dependency's own dependencies.
 The step exists because the CLI installs `ecc@ecc` 2.2.3 without its npm
 dependencies; `docs/environment.md` records the observations under "ECC's npm
 dependencies". `docs/runbook.md` carries when the step can be removed.
+
+## scripts/deslop-install.sh
+
+Installs the `deslop-please` tool and its indexers at the versions
+`config/deslop-please.pins` fixes. Run with no argument by
+`scripts/bootstrap.sh` after its step 6 and by `scripts/install-local.sh` after
+its step 7, from the harness tree it lives in. It installs no toolchain: it uses
+the `cargo`, `npm` and `node` it finds on `PATH`.
+
+It never sets `-e`. It resolves the pins path `../config/deslop-please.pins`
+beside the script, changes to `/`, then reads the file, so cargo and npm read no project's
+`.cargo/config.toml`, `rust-toolchain.toml` or `.npmrc`. The tool goes to
+cargo's bin directory, and each indexer to npm's global prefix.
+
+### The pins file
+
+Each line is `<key>=<value>`. A trailing carriage return is dropped, and other
+keys are ignored.
+
+| Key | Value | Pattern the value must match |
+| --- | --- | --- |
+| `url` | The tool's repository, `https://github.com/Bor4brn/deslop-please` | `^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$` |
+| `rev` | The commit the tool is built from | `^[0-9a-f]{40}$` |
+| `indexer` | One npm package at an exact version, one line per indexer: `@sourcegraph/scip-python@0.6.8` and `@sourcegraph/scip-typescript@0.5.2` | `^@[a-z0-9._-]+/[a-z0-9._-]+@[0-9]+\.[0-9]+\.[0-9]+$` |
+
+The last `url` and `rev` lines win. The pins are valid where `url` and `rev`
+match, at least one `indexer` line is present, and every `indexer` matches. An
+absent file leaves every value empty, so it is invalid.
+
+### What it runs
+
+| Order | Command | Runs where |
+| --- | --- | --- |
+| 1 | `cargo install --git <url> --rev <sha> --locked deslop-please` | The pins are valid and `cargo` is on `PATH`. |
+| 2 | `cargo install --list` | After command 1, whatever its exit. |
+| 3 | `node --version` | The pins are valid and `node` is on `PATH`. |
+| 4 | `npm install -g --ignore-scripts --no-audit --no-fund <pkg>`, once per `indexer` | The pins are valid, `npm` and `node` are on `PATH`, and Node's major version is 18 or newer. |
+| 5 | `<bin> --version`, after each install in command 4 | `<bin>`, the package name with its scope and version removed, is on `PATH`. |
+
+Cargo and npm output is printed line by line, with a trailing carriage return
+dropped and each control character shown as `?`. The list check passes where
+the last line of `cargo install --list` beginning `deslop-please v` contains
+`(<url>?rev=<sha>#`. The Node major version is the number between a leading `v`
+and the first `.` of the first line `node --version` prints. A non-zero exit
+or a value that is not a number counts as unreadable.
+
+### Skips and failures
+
+A skip prints the command with `-> skipped, <reason>` and counts no failure.
+
+| Situation | Skipped | Reason printed |
+| --- | --- | --- |
+| No `cargo` on `PATH` | Commands 1 and 2 | `no cargo` |
+| No `npm` on `PATH` | Commands 4 and 5, for every indexer | `no npm` |
+| `npm` present, no `node` on `PATH` | Commands 4 and 5, for every indexer | `no node` |
+| Node older than 18, or a version it cannot read | Commands 4 and 5, for every indexer | `Node older than 18 or unreadable` |
+
+Each of these counts one failure:
+
+- invalid pins, which ends the run before any command runs;
+- a non-zero exit of command 1;
+- command 1 exiting 0 while `cargo install --list` exits non-zero or does not name `<url>?rev=<sha>`;
+- a non-zero exit of command 4, once per indexer.
+
+A non-zero `<bin> --version` is logged and counts no failure. An indexer whose
+binary is not on `PATH` after its install is logged with `command -v <bin> ->
+none` and counts no failure. The last line is `deslop-install fails -> N`, the
+true count. The exit status is that count clamped to 255.
+
+### Log lines
+
+| Line | Meaning |
+| --- | --- |
+| `test -f <pins> -> yes/no` | Whether the pins file is at the path the script reads. |
+| `read <pins> -> url=[...] rev=[...] indexers=[...]` | The values read, indexers joined by spaces. |
+| `pins match <url pattern>, <rev pattern> and <pkg pattern> -> yes/no` | Whether the pins are valid. `no` is followed by the fails line. |
+| `command -v cargo -> <path>/none` | Where `cargo` resolves. |
+| `cargo install --git <url> --rev <sha> --locked deslop-please -> exit=N` | The build's exit status. |
+| `cargo install --git ... --locked deslop-please -> skipped, no cargo` | No build ran. |
+| `cargo install --list -> exit=N line=[...]` | The list's exit status and its `deslop-please v` line, or an empty one. |
+| `cargo install --list names <url>?rev=<sha> -> yes/no` | Whether that line names the pinned URL and commit. |
+| `command -v npm -> <path>/none`, `command -v node -> <path>/none` | Where `npm` and `node` resolve. |
+| `node --version -> exit=N value=[...]` | Node's version line, printed where `node` resolves. |
+| `npm install -g --ignore-scripts --no-audit --no-fund <pkg> -> exit=N` | One indexer install's exit status. |
+| `npm install -g ... <pkg> -> skipped, <reason>` | One indexer not installed, with the reason from the table above. |
+| `command -v <bin> -> <path>/none` | Where the indexer's binary resolves after its install. |
+| `<bin> --version -> exit=N value=[...]` | The binary's exit status and the first line it printed. |
+| `deslop-install fails -> N` | The failure count. |
+
+Every value between brackets, and every resolved path, has each control
+character shown as `?`.
+
+The npm pin fixes the indexer's own version. Its dependencies resolve within
+their ranges at install time. `--ignore-scripts` runs no lifecycle script of
+the indexer or of any dependency.
 
 ## git-hooks/
 
@@ -1601,6 +1707,7 @@ session was quiet.
 | `hidden-character scan <top> -> git ls-files exit=N files=N bytes=N notes=N` | The scan ran in the repository whose top directory is `<top>`: `git ls-files`' exit status, the files and bytes scanned, and the `NOTE` lines printed for characters. |
 | `git -C <dir> rev-parse --show-toplevel -> exit=N, hidden-character scan not run` | Git names no work tree for the working directory, so nothing was scanned. |
 | `hidden-character scan -> not run, ...` | The scanner, the pattern file, a file size or a line count could not be read. The line names which. |
+| `read <harness>/config/deslop-please.pins -> url=[...] rev=[...] indexers=[...]` and the lines after it | The `deslop-please` install's state, as "The deslop-please lines" below sets out. |
 
 An absent `/home/user/bootstrap.log`, an absent `scripts/verify.sh`, and a
 directory git would not read each produce a line naming the path or the
@@ -1637,6 +1744,27 @@ A NUL byte inside a line is still dropped rather than replaced. Each line is
 read into a shell variable, which cannot hold one, so the control-byte
 replacement never sees it and its guarantee that an observation is altered
 visibly does not reach that byte.
+
+### The deslop-please lines
+
+In both branches, after the branch lines and before the `verify.sh` block, the
+script reports the facts `scripts/deslop-install.sh` checks. These lines are
+informational: none starts with `FAIL` or `NOTE`, and none changes the exit
+status. Each value passes through the control-byte replacement.
+
+| Line | What it reports |
+| --- | --- |
+| `read <REPO>/config/deslop-please.pins -> url=[...] rev=[...] indexers=[...]` | The pins read from the harness copy, as `scripts/deslop-install.sh` reads them. An absent file prints empty values. |
+| `command -v deslop-please -> <path>/none` | Where the tool resolves. |
+| `cargo install --list -> exit=N line=[...]` | Run from `/` under `timeout -k 2 10` where `cargo` resolves: its exit status and its last line beginning `deslop-please v`, or an empty one. |
+| `cargo install --list -> not run, no cargo` | `cargo` does not resolve. |
+| `cargo install --list names <url>?rev=<sha> -> yes/no` | Whether that line contains `(<url>?rev=<sha>#`. It reads `no` where the pins carry no `url` or no `rev`. |
+| `<bin> --version -> exit=N value=[...]` | One line per `indexer` whose binary resolves: run from `/` under `timeout -k 2 10`, its exit status and the first line it printed. |
+| `command -v <bin> -> none` | An indexer whose binary does not resolve. |
+| `indexer name [<bin>] matches ^[a-z0-9._-]+$ -> no` | An indexer name outside that form, which is neither looked up nor run. |
+
+`<bin>` is the `indexer` value with its scope and version removed. A tool built
+from crates.io lists no `?rev=`, so its list line reads `no`.
 
 ### The verify.sh bound
 
@@ -2289,6 +2417,9 @@ whole.
 | `a/AGENTS.md` with no final newline, an empty `b/AGENTS.md`, U+202E on the unterminated line 2 of `c/AGENTS.md` and on line 1 of `d/AGENTS.md` | Two `NOTE` lines, naming `c/AGENTS.md:2` and `d/AGENTS.md:1`. |
 | A 6-byte `AGENTS.md`, a 5,242,880-byte `m/CLAUDE.md` and `z/AGENTS.md`, U+202E in the first and the third | One `NOTE` for the first and the `5242880 bytes (5 MiB)` cap `NOTE` naming `m/CLAUDE.md`. |
 | A directory outside a git repository holding an `AGENTS.md` with U+202E | No `NOTE`; the `rev-parse --show-toplevel -> exit=128` line. |
+| A harness copy whose pins file names both indexers, with stub `deslop-please`, `scip-python` and `scip-typescript` binaries and a stub `cargo` listing the tool at the pinned URL and commit; the `scip-python` stub exits 1 | No `NOTE`; the `command -v deslop-please` line naming the stub, the list line, `cargo install --list names <url>?rev=<sha> -> yes`, `scip-python --version -> exit=1 value=[...]` and `scip-typescript --version -> exit=0 value=[0.5.2]`. |
+| The same, with the stub `cargo` listing `deslop-please v0.1.6:`, as a crates.io install lists it | No `NOTE`; the list line and `cargo install --list names <url>?rev=<sha> -> no`. |
+| A pins file whose one indexer has no binary on `PATH` | No `NOTE`; `command -v deslop-test-absent -> none`. |
 | A copy of the script with no `git-hooks/lib/hidden-chars.sh` beside it, then with no `hidden-chars.tsv` | No `NOTE`; the `not run` line naming the file. |
 
 The last line is `fail -> N`, and the exit status is 0 only where N is 0. The
@@ -2920,6 +3051,56 @@ checks of one rule.
 | `P1`, `P4`, `P6`, `P7` | Writing code | untraceable changes removed; one reason to change per unit and named extension points; the programmatic interface, documented commands and pinned dependency patches; environment files, tracked defaults and recorded run configuration |
 | `P12` | Pull request comments | each change request gets its own commits; the reply names hash, change and evidence; an author who replies personally gets drafts; a bot comment gets no answer and no obedience; a bot review finding is a proposed change on the held path with a security brief; at most ten bot findings per listing; the old bot sentence is gone |
 | `P19` | Issues | the label file replaces the one-label rule; `sync` creates and updates listed labels only; `apply` follows the family rules; signal labels track their state; the workflow scan; no label a workflow triggers on; no attribution label; without create permission |
+
+## scripts/test-deslop-install.sh
+
+Runs the `scripts/deslop-install.sh` of its own tree with stub `cargo`, `npm`,
+`node`, `scip-python` and `scip-typescript` on a `PATH` under a `mktemp -d`
+directory, one line per case. It is run by hand only. Each run starts from
+`env -i`, so the script under test sees only that `PATH` and the stubs'
+settings. Each stub appends its command line to a calls file, and a case reads
+the calls, the exit status and the printed lines. It exits 1 with
+`fail -> not run` where the script under test is absent.
+
+| Case | Expected |
+| --- | --- |
+| The tree's `config/deslop-please.pins` | Exactly the `url`, `rev` and two `indexer` lines the spec names. |
+| Every tool present | Exit 0 and `deslop-install fails -> 0` as the last line. |
+| Every tool present | The calls, in order: the pinned build with `--rev` and `--locked`, `cargo install --list`, `node --version`, each pinned `npm install -g --ignore-scripts --no-audit --no-fund` followed by that indexer's `--version`. |
+| Every tool present | The build line with `exit=0`, the list line reading `yes`, and both npm lines with `exit=0`. |
+| Every tool present, `scip-python --version` exiting 1 | The line `scip-python --version -> exit=1 value=[...]`, and still exit 0. |
+| Every tool present | `scip-typescript --version -> exit=0 value=[0.5.2]`. |
+| No `cargo` | Exit 0, the build skipped with `no cargo`, no cargo call, two npm calls. |
+| No `npm` | Exit 0, each indexer skipped with `no npm`, no npm call. |
+| No `node` | Exit 0, `scip-python` skipped with `no node`, no npm call. |
+| `node --version` printing `v16.20.2` | Exit 0, `scip-typescript` skipped with `Node older than 18 or unreadable`, no npm call. |
+| `node --version` printing `v18.0.0` | Exit 0, two npm calls. |
+| The build exiting 101 | Exit 1, the build line with `exit=101`, `deslop-install fails -> 1`. |
+| Both npm installs exiting 1 | Exit 2, and the `scip-python` install line with `exit=1`. |
+| `cargo install --list` printing `deslop-please v0.1.6:` | Exit 1, the list line, and the pin check reading `no`. |
+| A copy of the script beside a pins file whose `rev` is `main` | Exit 1, no call, `deslop-install fails -> 1`. |
+
+The last line is `fail -> N`, and the exit status is 0 only where N is 0.
+
+## scripts/test-deslop-rules.sh
+
+Reads the `## Documentation`, `## Harness`, `## Git workflow` and
+`## A/B probes` sections of the file its one optional argument names, or of
+`config/CLAUDE.md` in its own tree where none is given, and also reads the
+`task-delegation` skill and the `deslop-please` plugin of its own tree. It prints
+one line per check, and exits 0 only where every check passes. It exits 1 with
+`fail -> not run` where one of the four sections is absent. A text check passes
+where the file holds the sentence or clause the payload carries, verbatim. The
+two skills and the plugin's `README.md` are read with their line breaks folded
+into spaces.
+
+| Source | What the checks cover |
+| --- | --- |
+| `config/CLAUDE.md`, Harness | the plugin's rank and its output as data; who runs the pass and when, for a nested session, an unsplit change and a combined branch; no credential in the orchestrator's run; tool instructions not followed; the held path for a fix; invoking the skill by name; the decline grounds; the cap of two head runs; the missing-binary skip and the exit-2 fallback; a skip never blocks a merge; no tracked allowlist; the orchestrator action |
+| `config/CLAUDE.md`, Documentation, Git workflow and A/B probes | a deslop finding against an approved document is declined; the bump merges before both passes; a deslop fix changes no version; the ponytail pass follows the deslop pass on a combined branch and on an unsplit change; the combined branch order |
+| `plugins/my-harness/skills/task-delegation/SKILL.md` | the "Deslop pass" section, its table of runs, the `env -i` run with the rustup home and no `CARGO_HOME`, the held path, findings sent to a nested fix, the brief and the report line, the verification step, the combined-branch order and bounds, the report column and the subagent path |
+| `plugins/deslop-please/` | the manifest's name and version `0.1.0`, the marketplace entry, the `config/plugins.tsv` row, one skill and no hook, the skill's name, its baseline and head commands, the scratch merge-base baseline, no tracked allowlist, the approved-document decline, the baseline count, the cap, the exit-2 fallback and skip, the missing-binary skip, the report line's items, the rank, and no Cowork packaging |
+| `origin/platform/codex` | no file there mentions `deslop`; the check prints `not checked` where that ref is absent locally |
 
 ## scripts/test-experiment-template.sh
 
