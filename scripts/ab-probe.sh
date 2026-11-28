@@ -23,11 +23,7 @@ notrun() {
   exit 2
 }
 
-dk() { MSYS_NO_PATHCONV=1 docker "$@"; }
-
-hostpath() {
-  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi
-}
+. "$(dirname "${BASH_SOURCE[0]}")/docker-lib.sh"
 
 for tool in git jq docker; do
   command -v "$tool" >/dev/null 2>&1 || notrun "command -v $tool -> none, probe not run"
@@ -49,12 +45,7 @@ cleanup() {
 }
 
 dc() {
-  local keep=("PATH=$PATH") v
-  for v in HOME DOCKER_HOST DOCKER_CONTEXT DOCKER_CONFIG DOCKER_CERT_PATH DOCKER_TLS_VERIFY \
-    SYSTEMROOT USERPROFILE APPDATA LOCALAPPDATA PROGRAMFILES ProgramData TEMP TMP; do
-    [ -n "${!v:-}" ] && keep+=("$v=${!v}")
-  done
-  env -i "${keep[@]}" MSYS_NO_PATHCONV=1 PROBE_IMAGE="$TAG" PROBE_TREE="$1" PROBE_RESULTS="$2" \
+  dkenv PROBE_IMAGE="$TAG" PROBE_TREE="$1" PROBE_RESULTS="$2" \
     docker compose -f "$1/probe/compose.yaml" -p "$PROJECT" "${@:3}"
 }
 trap cleanup EXIT
