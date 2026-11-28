@@ -13,7 +13,10 @@ fi
 
 WORK=$(mktemp -d) || { echo "mktemp -d -> exit=$?, not run"; exit 1; }
 trap 'rm -rf -- "$WORK"' EXIT
-mkdir -p "$WORK/config" "$WORK/harness"
+mkdir -p "$WORK/config" "$WORK/harness" "$WORK/os"
+printf '#!/bin/bash\nprintf "%%s\\n" "${STUB_UNAME:-Linux}"\n' > "$WORK/os/uname"
+printf '#!/bin/bash\nexit "${STUB_DOCKER_RC:-0}"\n' > "$WORK/os/docker"
+chmod +x "$WORK/os/uname" "$WORK/os/docker"
 printf '{"local_checkout":"%s"}\n' "$WORK/harness" > "$WORK/config/.my-harness-wrapper.manifest.json"
 
 printf -v RLO '\342\200\256'
@@ -25,7 +28,7 @@ repo() {
 }
 
 run_check() {
-  CLAUDE_CONFIG_DIR="$WORK/config" HARNESS_DIR="$WORK/harness" GIT_CEILING_DIRECTORIES="$WORK" bash "${1:-$CHECK}" 2>&1
+  PATH="$WORK/os:$PATH" CLAUDE_CONFIG_DIR="$WORK/config" HARNESS_DIR="$WORK/harness" GIT_CEILING_DIRECTORIES="$WORK" bash "${1:-$CHECK}" 2>&1
 }
 
 expect() {
@@ -165,6 +168,17 @@ STUB_LIST="deslop-please v0.1.6 ($D_URL?rev=$D_REV#cfabfb9e):" PATH="$WORK/stubs
 STUB_LIST='deslop-please v0.1.6:' PATH="$WORK/stubs:$PATH" expect 'deslop-please installed from crates.io' 0 '' \
   'cargo install --list -> exit=0 line=[deslop-please v0.1.6:]' \
   "cargo install --list names $D_URL?rev=$D_REV -> no"
+D_WIN="uname -s -> MINGW64_NT-10.0-26200, native Windows: the deslop pass takes the container path, scripts/deslop-run.sh"
+STUB_UNAME=MINGW64_NT-10.0-26200 PATH="$WORK/stubs:$PATH" expect 'native Windows, docker info exiting 0' 0 '' "$D_WIN" 'docker info -> exit=0'
+STUB_UNAME=MINGW64_NT-10.0-26200 STUB_DOCKER_RC=1 PATH="$WORK/stubs:$PATH" expect 'native Windows, docker info exiting 1' 0 '' "$D_WIN" 'docker info -> exit=1'
+NODOCKER=$(IFS=:; for d in $PATH; do [ -e "$d/docker" ] || [ -e "$d/docker.exe" ] || printf '%s:' "$d"; done)
+mv "$WORK/os/docker" "$WORK/docker.off"
+STUB_UNAME=MINGW64_NT-10.0-26200 PATH="$NODOCKER" expect 'native Windows, no docker on PATH' 0 '' "$D_WIN" 'command -v docker -> none'
+mv "$WORK/docker.off" "$WORK/os/docker"
+out=$(STUB_UNAME=MINGW64_NT-10.0-26200 PATH="$WORK/stubs:$PATH" run_check)
+verdict=pass
+if printf '%s\n' "$out" | grep -a -q -E '^(command -v deslop-please|cargo install --list|scip-python --version) '; then verdict=FAIL; fails=$((fails + 1)); fi
+echo "native Windows: the native deslop lines -> expected absent, $verdict"
 printf 'url=%s\nrev=%s\nindexer=@sourcegraph/deslop-test-absent@0.0.1\n' "$D_URL" "$D_REV" > "$WORK/harness/config/deslop-please.pins"
 PATH="$WORK/stubs:$PATH" expect 'an indexer not on PATH' 0 '' 'command -v deslop-test-absent -> none'
 rm -rf "$WORK/harness/config"
