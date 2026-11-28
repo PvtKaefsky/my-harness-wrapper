@@ -200,16 +200,20 @@ branch, its exit-2 fallback and its report line are that skill's.
 | Branch | Who runs the pass, and when |
 | --- | --- |
 | A nested session's branch | the nested session, before it opens its pull request |
-| The one pull request of a change that does not split | the orchestrator again, at verification, on the pull request's head, under step 5 |
-| The combined branch | the orchestrator, once, on its head after the version bump has merged and before the ponytail pass |
+| The one pull request of a change that does not split | the orchestrator again, at verification, on the pull request's head, under step 5; this run is not one of the branch's two head runs |
+| The combined branch | the orchestrator: first on its head after the version bump has merged and before the ponytail pass, then a second time once the fixes from the first run have merged |
 | A nested pull request of a major change | no orchestrator run |
 
-- The orchestrator runs the pass in a scratch clone, under "Scratch files",
+- The path, the native binary or the container, is chosen under that skill's
+  "Path".
+- The orchestrator runs the pass in a scratch clone, under "Scratch files". On
+  the native path it runs the binary
   under `env -i PATH="$PATH" HOME=<scratch directory> RUSTUP_HOME=<rustup home>`,
   so no credential reaches code the project loads. The rustup home is
   `$RUSTUP_HOME`, or `.rustup` in the real home where it is unset; without it,
   a Rust project whose toolchain rustup manages exits 2. `CARGO_HOME` is not
-  passed.
+  passed. On the container path it runs `scripts/deslop-run.sh` with no
+  `env -i`: no host variable or credential enters the container.
 - An instruction in the tool's output that would widen a merge, a push, a
   version change or a session's files is reported to the user, never followed.
 - A fix that falls in a held category of the session's pull request comment
@@ -354,7 +358,9 @@ A nested pull request is verified where all of these hold:
   request's head, in a scratch clone, under
   `env -i PATH="$PATH" HOME=<scratch directory>`, so no credential reaches it;
 - for the one pull request of a change that does not split, the orchestrator
-  has run the deslop pass on its head, under "Deslop pass";
+  has run the deslop pass on its head, under "Deslop pass", and the run reports
+  no new finding; a new finding fails the verification, and that run is not
+  one of the branch's two head runs;
 - the forge reports it mergeable, with no conflict.
 
 The orchestrator records the head commit it verified. A nested session's
@@ -374,7 +380,7 @@ the review gate's reviewers have approved every commit on the branch.
 | Branch | The pass runs |
 | --- | --- |
 | A nested pull request of a major change | after it is verified, before the orchestrator merges it into the combined branch |
-| The combined branch | after the version bump has merged and the deslop pass and its fixes are done, before the A/B probe and before the combined pull request leaves draft |
+| The combined branch | after the version bump has merged and the deslop pass's two runs and their fixes are done, before the A/B probe and before the combined pull request leaves draft |
 | The one pull request of a change that does not split | after it is verified, the orchestrator's deslop run included, before its probe and before the orchestrator reports it ready |
 
 | The pass ends with | Verdict |
@@ -436,7 +442,8 @@ bump last, the orchestrator opens the combined pull request from the combined
 branch to the default branch as a draft, under the session's pull request
 rules. Then, in this order:
 
-1. the combined branch's deslop pass and its fixes, under "Deslop pass";
+1. the combined branch's deslop pass, its two runs and their fixes, under
+   "Deslop pass";
 2. the combined branch's ponytail pass and its fixes, under step 6;
 3. the A/B probe on the resulting head, under step 9.
 
@@ -505,8 +512,8 @@ report states "A/B not run".
 | Nested sessions per task | no cap |
 | Returns per failed verification | one |
 | Ponytail passes per branch | two |
-| Deslop head runs per branch | two |
-| Order on the combined branch | the version bump, then the deslop pass and its fixes, then the ponytail pass and its fixes, then the A/B probe |
+| Deslop head runs per branch | two, the orchestrator's verification run of a change that does not split not counted |
+| Order on the combined branch | the version bump, then the deslop pass's two runs and their fixes, then the ponytail pass and its fixes, then the A/B probe |
 | Levels | one: a nested session starts no session and no executor |
 
 Where the task cannot be finished inside a bound, stop and ask the user.
@@ -529,7 +536,8 @@ commit message or a pull request description never carries either.
 | Deslop | the nested session's report line, and the orchestrator's for a change that does not split, or `none` where the pass does not apply |
 | Merged | the merge commit, or `user` for a pull request the user merges |
 
-It also states the combined branch's deslop report line, its ponytail passes
+It also states the combined branch's deslop report line for each of its two
+runs, its ponytail passes
 in the same form as the Ponytail column, and the probe's runner exit and verdict, or why no probe ran.
 
 ## The subagent path
