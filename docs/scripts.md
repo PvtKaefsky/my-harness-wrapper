@@ -722,8 +722,15 @@ pinned.
 
 The tree is mounted read-only at `/src`. Inside the container, the tree is
 copied to `/work` with `tar`, and the tool runs there. The copy leaves out every
-`.git` and every directory named `target` holding a `CACHEDIR.TAG` file. A path
-holding a control character is never left out. Every other directory is copied.
+`.git`, every directory or symbolic link whose name starts with a dot except
+`.cargo`, every directory or symbolic link named `node_modules`, every directory
+below the tree root that holds a `pyvenv.cfg` file or symbolic link, and every
+directory named `target` holding a `CACHEDIR.TAG` file. The tree
+root is never left out. Every other directory is copied, so the copy keeps every
+source file the tool reads. A path holding a control character is never written
+to the list of paths left out, so a directory whose path holds one is copied even
+where a rule names it, apart from `.git`, which `tar --exclude=.git` leaves out
+at every depth.
 
 `docker run` gets `--rm`, `--name deslop-run-<pid>-<random>`,
 `--pids-limit 4096`, `--cap-drop ALL` and `--security-opt no-new-privileges`. It
@@ -3230,14 +3237,18 @@ into spaces.
 Runs the `scripts/deslop-run.sh` of its own tree, copied with
 `scripts/docker-lib.sh`, the pins file and the Dockerfile into a `mktemp -d`
 directory, with a stub `docker` on `PATH`, one line per case. It is run by hand
-only. The stub records each call's arguments and environment. The test needs
-bash, coreutils, grep and sed, and no Docker. It exits 1 with `fail -> not run`
-where one of the four files is absent.
+only. The stub records each call's arguments and environment. In the copy case
+the stub runs the runner's copy script on the host, with `/src`, `/work` and
+`/tmp/skip` replaced by host paths, and a stub `deslop-please` lists what reached
+the copy. The test needs bash, coreutils, grep, sed, GNU find and GNU tar, and no
+Docker. It exits 1 with `fail -> not run` where one of the four files is absent.
 
 | Case | Expected |
 | --- | --- |
 | The tool exiting 0, 1, then 2 | The same exit. |
 | A run | The tree mounted at `<tree>:/src:ro`; `--cap-drop ALL`, `--security-opt no-new-privileges` and `--pids-limit 4096`; no `--privileged`, Docker socket, host network, `-e`, `--env` or `--env-file`; no host canary variable in `docker run`'s environment; the tool's arguments passed; the tag `deslop-please:<rev>`; the container removed. |
+| A tree holding `node_modules/.bin/scip-typescript`, a `.venv`, a `venv` that holds `pyvenv.cfg`, a `.cargo/config.toml`, a `pyvenv.cfg` at its root and a source file | The copy holds the source file, `.cargo/config.toml` and the root `pyvenv.cfg`, and nothing under `node_modules`, `.venv` or `venv`. |
+| The same tree with symbolic links `pkg/node_modules` and `pkg/.tool` to a directory holding `.bin/scip-typescript`, and `env/pyvenv.cfg` to a file | The copy holds none of the three links. Where `ln -s` makes no symbolic link, the line reads `not run`. |
 | `docker run` exiting 125 | Exit 2 and its failure line. |
 | `--allow <path>` and `--allow=<path>` | The file mounted read-only at `/deslop/allow`, and `/deslop/allow` passed. |
 | `--update-allow <path>` and `--update-allow=<path>` | A writable mount at `/deslop/out`, `/deslop/out/allow` passed, the written allowlist copied back, the output directory removed. |

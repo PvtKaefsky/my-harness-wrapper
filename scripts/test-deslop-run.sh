@@ -43,12 +43,35 @@ case $1 in
       fi
       prev=$a
     done
+    if [ "$mode" = copy ]; then
+      prev=""
+      for a in "$@"; do
+        [ "$prev" = -v ] && [ "${a%:/src:ro}" != "$a" ] && src=${a%:/src:ro}
+        [ "$prev" = -c ] && script=$a
+        prev=$a
+      done
+      script=${script//\/tmp\/skip/$'\001'} script=${script//\/work/$'\002'} script=${script//\/src/$'\003'}
+      script=${script//$'\001'/$here/skip} script=${script//$'\002'/$here/w} script=${script//$'\003'/$src}
+      mkdir -p "$here/w" && cd "$here/w" && bash -o pipefail -c "$script" deslop-run
+      exit
+    fi
     case $mode in exit1) exit 1 ;; exit2) exit 2 ;; exit125) exit 125 ;; esac ;;
   *) exit 1 ;;
 esac
 EOF
-chmod +x "$BIN/docker"
+printf '#!/bin/bash\nfind . | LC_ALL=C sort > "${0%%/*}/copied"\n' > "$BIN/deslop-please"
+chmod +x "$BIN/docker" "$BIN/deslop-please"
 printf '%s\n' "$WORK/host/secret" > "$BIN/secret-path"
+for d in node_modules/.bin .venv venv .cargo src; do mkdir -p "$WORK/copytree/$d"; done
+printf 'echo indexer from the tree\n' > "$WORK/copytree/node_modules/.bin/scip-typescript"
+printf 'x = 1\n' | tee "$WORK/copytree/.venv/a.py" "$WORK/copytree/venv/b.py" > "$WORK/copytree/src/m.py"
+: | tee "$WORK/copytree/pyvenv.cfg" "$WORK/copytree/venv/pyvenv.cfg" > "$WORK/copytree/.cargo/config.toml"
+mkdir -p "$WORK/copytree/tools/.bin" "$WORK/copytree/pkg" "$WORK/copytree/env"
+cp "$WORK/copytree/node_modules/.bin/scip-typescript" "$WORK/copytree/tools/.bin/"
+links=no
+for l in node_modules .tool; do MSYS=winsymlinks:nativestrict ln -s ../tools "$WORK/copytree/pkg/$l" 2>/dev/null && links=yes; done
+MSYS=winsymlinks:nativestrict ln -s ../venv/pyvenv.cfg "$WORK/copytree/env/pyvenv.cfg" 2>/dev/null || links=no
+[ -L "$WORK/copytree/pkg/node_modules" ] && [ -L "$WORK/copytree/pkg/.tool" ] || links=no
 
 export DESLOP_RUN_CANARY=host-value
 STUB_PATH="$BIN:$PATH"
@@ -102,6 +125,16 @@ check 'no host variable reaches docker run' no '^DESLOP_RUN_CANARY=' "$BIN/env-r
 check 'the tool arguments pass through' has python "$BIN/args-run"
 check 'the image is tagged with the pinned commit' has "deslop-please:$REV" "$BIN/args-run"
 check 'the container is removed on exit' rm_named
+
+run copy "$WORK/copytree"
+check 'the copy keeps the source file, .cargo and a tree root holding pyvenv.cfg' \
+  eval '[ "$code" -eq 0 ] && has ./src/m.py "$BIN/copied" && has ./.cargo/config.toml "$BIN/copied" && has ./pyvenv.cfg "$BIN/copied"'
+check 'the copy leaves out node_modules, .venv and a venv holding pyvenv.cfg' no '^\./(node_modules|\.venv|venv)(/|$)' "$BIN/copied"
+if [ "$links" = yes ]; then
+  check 'the copy leaves out a symlinked node_modules, dot-name and pyvenv.cfg' no '^\./(pkg/node_modules|pkg/\.tool|env)(/|$)' "$BIN/copied"
+else
+  echo "check the copy leaves out a symlinked node_modules, dot-name and pyvenv.cfg -> not run, ln -s makes no symbolic link here"
+fi
 
 run exit1 "$WORK/tree"
 check 'the tool exit 1 passes through' [ "$code" -eq 1 ]

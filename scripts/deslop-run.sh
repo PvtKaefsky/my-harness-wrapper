@@ -83,8 +83,10 @@ if ! dkenv docker build -q -t "$TAG" --build-arg "IMAGE=$IMAGE" --build-arg "URL
   notrun "docker build config/deslop-please.Dockerfile -> failed"
 fi
 
-COPY='(cd /src && find . -path "*[[:cntrl:]]*" -prune -o -name .git -prune -o -type d -name target \
-  -exec test -f "{}/CACHEDIR.TAG" \; -prune -print) > /tmp/skip &&
+COPY='(cd /src && find . -path "*[[:cntrl:]]*" -prune -o -name .git -prune \
+  -o \( -type d -o -type l \) \( -name node_modules -o -name ".*" ! -name .cargo ! -path . \) -prune -print \
+  -o -type d -name target -exec test -f "{}/CACHEDIR.TAG" \; -prune -print \
+  -o \( -type f -o -type l \) -path "./*/pyvenv.cfg" -printf "%h\n") > /tmp/skip &&
   tar -C /src --exclude=.git --anchored --no-wildcards -X /tmp/skip -cf - . | tar -C /work -xf - ||
   { echo "copy of the tree -> failed" >&2; exit 2; }
 exec deslop-please "$@"'
