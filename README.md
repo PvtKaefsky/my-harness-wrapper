@@ -1,15 +1,16 @@
 # my-harness-wrapper
 
 A configuration source for Claude Code sessions, cloud and local. It is not
-an application. It has no build, no package manifest and no CI. Its fourteen
+an application. It has no build, no package manifest and no CI. Its fifteen
 test scripts, `scripts/test-attribution-guard.sh`,
 `scripts/test-web-guidance-gate.sh`, `scripts/test-pr-comment-rules.sh`,
 `scripts/test-orchestrator-rules.sh`, `scripts/test-team-practice-rules.sh`,
 `scripts/test-install-settings.sh`, `scripts/test-hook-forwarding.sh`,
 `scripts/test-session-check.sh`, `scripts/test-ab-probe.sh`,
 `scripts/test-labels.sh`, `scripts/test-experiment-template.sh`,
-`scripts/test-repository-templates.sh`, `scripts/test-deslop-install.sh` and
-`scripts/test-deslop-rules.sh`, are run by hand and by the A/B probe.
+`scripts/test-repository-templates.sh`, `scripts/test-deslop-install.sh`,
+`scripts/test-deslop-rules.sh` and `scripts/test-deslop-run.sh`, are run by
+hand and by the A/B probe.
 
 The repository holds one payload, `config/`, and the scripts that deliver it
 into a session's Claude config directory. It also holds two plugins, which
@@ -100,7 +101,8 @@ every session.
 | `config/CLAUDE.md` | The instruction payload, delivered as `CLAUDE.md` in the config directory: `/root/.claude` in the cloud, `${CLAUDE_CONFIG_DIR-$HOME/.claude}` locally. |
 | `config/settings.json` | Settings merged into the config directory's `settings.json`. It turns Claude Code's telemetry and error reports off and empties ponytail's webhook. Its `permissions.deny` rules refuse reads of secret files and edits of the deployed harness, and both installers add its `permissions.allow` and `permissions.deny` entries to the live lists without removing any. Its hook commands run the scripts under `${HARNESS_DIR:-/opt/my-harness-wrapper}`. |
 | `config/plugins.tsv` | The plugins bootstrap installs. |
-| `config/deslop-please.pins` | The `deslop-please` tool's repository and commit, and its indexers' npm versions, which `scripts/deslop-install.sh` installs. |
+| `config/deslop-please.pins` | The `deslop-please` tool's repository and commit, its indexers' npm versions, and the container's base image, which `scripts/deslop-install.sh` and `scripts/deslop-run.sh` read. |
+| `config/deslop-please.Dockerfile` | The image `scripts/deslop-run.sh` builds, `deslop-please:<pinned commit>`, holding the pinned tool and indexers. |
 | `.claude-plugin/marketplace.json` | The plugin marketplace `my-harness-wrapper`. It lists the two plugins under `plugins/`. `claude plugin marketplace add` reads it. |
 | `plugins/my-harness/` | The `my-harness` plugin: the `task-delegation`, `python-property-model-tests`, `edit-russian-technical-text`, `quick-human-readable-review`, `python-fp-refactor`, `repository-setup` and `research-workflow` skills, the project templates under `skills/repository-setup/templates/`, the `executor` and `analyst` agents, a `UserPromptSubmit` hook, a `PreToolUse` hook running the Modern Web Guidance gate `hooks/web-guidance-gate.sh`, and an eval suite under `evals/`. `plugins/my-harness/README.md` describes it. |
 | `plugins/deslop-please/` | The `deslop-please` plugin: the `deslop-please` skill, which runs the deslop pass with the third-party linter `deslop-please`, and an eval suite under `evals/`. It has no hook. `plugins/deslop-please/README.md` describes it. |
@@ -108,9 +110,12 @@ every session.
 | `scripts/bootstrap.sh` | The delivery step. Run by the init script, and by hand only in a disposable session, since it mutates the live config directory. |
 | `scripts/install-local.sh` | The local delivery step. Run by the user from any checkout. Writes `${CLAUDE_CONFIG_DIR-$HOME/.claude}`, the deployed copy under it, and the global git config's signing keys. |
 | `scripts/plugin-dependencies.sh` | Installs a delivered plugin's npm dependencies where any is unresolved, and runs nothing otherwise. Run by both delivery scripts after each plugin's install. Needs `npm` only where it installs. |
-| `scripts/deslop-install.sh` | Builds the `deslop-please` tool with `cargo` and installs its indexers with `npm` at the versions `config/deslop-please.pins` fixes, skipping each without its toolchain. Run by both delivery scripts after the plugin rows. |
+| `scripts/deslop-install.sh` | Builds the `deslop-please` tool with `cargo` and installs its indexers with `npm` at the versions `config/deslop-please.pins` fixes, skipping each without its toolchain and both on native Windows, and skipping an indexer already at its pinned version or without the tool on `PATH`. Run by both delivery scripts after the plugin rows. |
+| `scripts/deslop-run.sh` | Runs the pinned `deslop-please` in a Linux container on a copy of a read-only tree: the deslop pass's container path. Run by sessions from the deployed copy, and by hand. |
+| `scripts/docker-lib.sh` | The Docker helpers `scripts/ab-probe.sh` and `scripts/deslop-run.sh` source. |
+| `scripts/test-deslop-run.sh` | Runs the `scripts/deslop-run.sh` of its own tree with a stub `docker`, one line per case. Run by hand only. |
 | `scripts/test-deslop-install.sh` | Runs the `scripts/deslop-install.sh` of its own tree with stub tools, one line per case. Run by hand only. |
-| `scripts/test-deslop-rules.sh` | Checks a `config/CLAUDE.md`, its own tree's unless an argument names another, the `task-delegation` skill and the `deslop-please` plugin for the deslop pass rules issue #159 adds, one line per check. Run by hand only. |
+| `scripts/test-deslop-rules.sh` | Checks a `config/CLAUDE.md`, its own tree's unless an argument names another, the `task-delegation` skill and the `deslop-please` plugin for the deslop pass rules issues #159 and #168 add, one line per check. Run by hand only. |
 | `scripts/session-check.sh` | Reports what a session starts with, and prints a `NOTE` line for each hidden character in the working repository's instruction files. Run by the `SessionStart` hook in every session, and by hand. Reads the same `$HARNESS_DIR`. |
 | `scripts/test-session-check.sh` | Runs the `scripts/session-check.sh` of its own tree in scratch repositories against the hidden-character scan's cases, one line per case. Run by hand only. |
 | `scripts/verify.sh` | Reports what bootstrap left behind. Run by hand. Reads the delivered copy at `$HARNESS_DIR`, `/opt/my-harness-wrapper` by default. |

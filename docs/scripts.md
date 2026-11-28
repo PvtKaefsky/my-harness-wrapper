@@ -570,7 +570,9 @@ Installs the `deslop-please` tool and its indexers at the versions
 `config/deslop-please.pins` fixes. Run with no argument by
 `scripts/bootstrap.sh` after its step 6 and by `scripts/install-local.sh` after
 its step 7, from the harness tree it lives in. It installs no toolchain: it uses
-the `cargo`, `npm` and `node` it finds on `PATH`.
+the `cargo`, `npm` and `node` it finds on `PATH`. On native Windows, where
+`uname -s` starts with `MINGW`, `MSYS` or `CYGWIN`, it installs nothing, since
+the deslop pass runs there through `scripts/deslop-run.sh`.
 
 It never sets `-e`. It resolves the pins path `../config/deslop-please.pins`
 beside the script, changes to `/`, then reads the file, so cargo and npm read no project's
@@ -580,7 +582,7 @@ cargo's bin directory, and each indexer to npm's global prefix.
 ### The pins file
 
 Each line is `<key>=<value>`. A trailing carriage return is dropped, and other
-keys are ignored.
+keys, `image` among them, are ignored.
 
 | Key | Value | Pattern the value must match |
 | --- | --- | --- |
@@ -596,11 +598,12 @@ absent file leaves every value empty, so it is invalid.
 
 | Order | Command | Runs where |
 | --- | --- | --- |
-| 1 | `cargo install --git <url> --rev <sha> --locked deslop-please` | The pins are valid and `cargo` is on `PATH`. |
+| 1 | `cargo install --git <url> --rev <sha> --locked deslop-please` | The pins are valid, the host is not native Windows, and `cargo` is on `PATH`. |
 | 2 | `cargo install --list` | After command 1, whatever its exit. |
-| 3 | `node --version` | The pins are valid and `node` is on `PATH`. |
-| 4 | `npm install -g --ignore-scripts --no-audit --no-fund <pkg>`, once per `indexer` | The pins are valid, `npm` and `node` are on `PATH`, and Node's major version is 18 or newer. |
-| 5 | `<bin> --version`, after each install in command 4 | `<bin>`, the package name with its scope and version removed, is on `PATH`. |
+| 3 | `node --version` | The pins are valid, the host is not native Windows, and `node` is on `PATH`. |
+| 4 | `npm ls -g --depth=0 <name>`, once per `indexer`, `<name>` being the package without its version | The pins are valid, the host is not native Windows, `npm` and `node` are on `PATH`, Node's major version is 18 or newer, and `deslop-please` is on `PATH`. |
+| 5 | `npm install -g --ignore-scripts --no-audit --no-fund <pkg>` | After command 4, where no line of its output ends in ` <pkg>`, the pinned version. |
+| 6 | `<bin> --version`, after command 4 or 5 | `<bin>`, the package name with its scope and version removed, is on `PATH`. |
 
 Cargo and npm output is printed line by line, with a trailing carriage return
 dropped and each control character shown as `?`. The list check passes where
@@ -615,17 +618,20 @@ A skip prints the command with `-> skipped, <reason>` and counts no failure.
 
 | Situation | Skipped | Reason printed |
 | --- | --- | --- |
+| Native Windows | Commands 1 to 6; one skip line for the build and one per indexer | `native Windows, the deslop pass runs in a container through scripts/deslop-run.sh` |
 | No `cargo` on `PATH` | Commands 1 and 2 | `no cargo` |
-| No `npm` on `PATH` | Commands 4 and 5, for every indexer | `no npm` |
-| `npm` present, no `node` on `PATH` | Commands 4 and 5, for every indexer | `no node` |
-| Node older than 18, or a version it cannot read | Commands 4 and 5, for every indexer | `Node older than 18 or unreadable` |
+| No `npm` on `PATH` | Commands 4 to 6, for every indexer | `no npm` |
+| `npm` present, no `node` on `PATH` | Commands 4 to 6, for every indexer | `no node` |
+| Node older than 18, or a version it cannot read | Commands 4 to 6, for every indexer | `Node older than 18 or unreadable` |
+| `deslop-please` not on `PATH`, with none of the three reasons above | Commands 4 to 6, for every indexer | `deslop-please not on PATH` |
+| `npm ls` lists the pinned version | Command 5, for that indexer | `<pkg> already installed` |
 
 Each of these counts one failure:
 
 - invalid pins, which ends the run before any command runs;
 - a non-zero exit of command 1;
 - command 1 exiting 0 while `cargo install --list` exits non-zero or does not name `<url>?rev=<sha>`;
-- a non-zero exit of command 4, once per indexer.
+- a non-zero exit of command 5, once per indexer.
 
 A non-zero `<bin> --version` is logged and counts no failure. An indexer whose
 binary is not on `PATH` after its install is logged with `command -v <bin> ->
@@ -639,6 +645,7 @@ true count. The exit status is that count clamped to 255.
 | `test -f <pins> -> yes/no` | Whether the pins file is at the path the script reads. |
 | `read <pins> -> url=[...] rev=[...] indexers=[...]` | The values read, indexers joined by spaces. |
 | `pins match <url pattern>, <rev pattern> and <pkg pattern> -> yes/no` | Whether the pins are valid. `no` is followed by the fails line. |
+| `uname -s -> <value>` | The host's system name, `unknown` where `uname` fails. On native Windows the skip lines and the fails line follow. |
 | `command -v cargo -> <path>/none` | Where `cargo` resolves. |
 | `cargo install --git <url> --rev <sha> --locked deslop-please -> exit=N` | The build's exit status. |
 | `cargo install --git ... --locked deslop-please -> skipped, no cargo` | No build ran. |
@@ -646,9 +653,11 @@ true count. The exit status is that count clamped to 255.
 | `cargo install --list names <url>?rev=<sha> -> yes/no` | Whether that line names the pinned URL and commit. |
 | `command -v npm -> <path>/none`, `command -v node -> <path>/none` | Where `npm` and `node` resolve. |
 | `node --version -> exit=N value=[...]` | Node's version line, printed where `node` resolves. |
+| `command -v deslop-please -> <path>/none` | Where the tool resolves. |
+| `npm ls -g --depth=0 <name> -> exit=N, <pkg> installed -> yes/no` | Whether the pinned version is installed globally. |
 | `npm install -g --ignore-scripts --no-audit --no-fund <pkg> -> exit=N` | One indexer install's exit status. |
 | `npm install -g ... <pkg> -> skipped, <reason>` | One indexer not installed, with the reason from the table above. |
-| `command -v <bin> -> <path>/none` | Where the indexer's binary resolves after its install. |
+| `command -v <bin> -> <path>/none` | Where the indexer's binary resolves after its install or its `already installed` skip. |
 | `<bin> --version -> exit=N value=[...]` | The binary's exit status and the first line it printed. |
 | `deslop-install fails -> N` | The failure count. |
 
@@ -658,6 +667,101 @@ character shown as `?`.
 The npm pin fixes the indexer's own version. Its dependencies resolve within
 their ranges at install time. `--ignore-scripts` runs no lifecycle script of
 the indexer or of any dependency.
+
+## scripts/deslop-run.sh
+
+Runs the pinned `deslop-please` in a Linux container on a copy of a tree: the
+deslop pass's container path. Sessions run it from the deployed harness copy.
+
+```
+bash scripts/deslop-run.sh <tree> [deslop-please arguments]
+```
+
+The tool's output reaches stdout unchanged, so `--json` stays parseable. The
+runner's own lines go to stderr.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | The tool found nothing. |
+| 1 | The tool reported findings. |
+| 2 | The tool failed, or the runner did. |
+
+### Arguments
+
+Every argument after `<tree>` reaches the tool unchanged, except these two.
+Each takes its path as the next argument or after `=`.
+
+| Argument | In the container |
+| --- | --- |
+| `--allow <path>` | The file is mounted read-only at `/deslop/allow`, and the tool gets `--allow /deslop/allow`. |
+| `--update-allow <path>` | An empty directory the runner creates in its scratch directory is mounted writable at `/deslop/out`, and the tool gets `--update-allow /deslop/out/allow`. After the run, the written allowlist is copied to `<path>` where it is a regular file. |
+
+### The image
+
+The runner reads `url`, `rev`, `indexer` and `image` from
+`config/deslop-please.pins`, with the patterns `scripts/deslop-install.sh`
+applies, and `image` matching `name:tag` with an optional `@sha256:` digest.
+The pinned `image` is `rust:1.99.0-slim-trixie` with its digest. At every run
+it builds `config/deslop-please.Dockerfile` with `docker build -q -` from
+stdin, with no build context, tagged `deslop-please:<rev>`, and keeps the image,
+so a later build hits Docker's cache. The build arguments are `IMAGE`, `URL`,
+`REV` and `INDEXERS`, the indexers joined by spaces.
+
+| Dockerfile step | What it installs |
+| --- | --- |
+| `apt-get install` | `ca-certificates`, `nodejs`, `npm`, `python3`, `python3-pip` |
+| `rustup component add` | `rust-analyzer`, `rust-src` |
+| `cargo install --git <url> --rev <sha> --locked deslop-please` | The tool |
+| `npm install -g --ignore-scripts --no-audit --no-fund <indexers>` | The indexers |
+
+The image runs as the non-root user `deslop`, with `CARGO_HOME=/home/deslop/.cargo`
+and `WORKDIR /work`. Apt packages and the indexers' npm dependencies are not
+pinned.
+
+### The run
+
+The tree is mounted read-only at `/src`. Inside the container, the tree is
+copied to `/work` with `tar`, and the tool runs there. The copy leaves out every
+`.git` and every directory named `target` holding a `CACHEDIR.TAG` file. A path
+holding a control character is never left out. Every other directory is copied.
+
+`docker run` gets `--rm`, `--name deslop-run-<pid>-<random>`,
+`--pids-limit 4096`, `--cap-drop ALL` and `--security-opt no-new-privileges`. It
+gets no `--privileged`, no Docker socket, no host network and no `-e` or
+`--env`, and keeps Docker's default bridge network. It sets no memory limit.
+`docker build` and `docker run` run through `dkenv`, so no host variable
+reaches the container. On exit the runner removes its container and its scratch directory
+and keeps the image.
+
+### Failure lines
+
+Each runner failure prints one line on stderr ending `, deslop pass not run`,
+and exits 2.
+
+| Line | Cause |
+| --- | --- |
+| `usage: deslop-run.sh <tree> [deslop-please arguments]` | No argument. |
+| `tree <path> -> not a directory`, `tree <path> -> not readable` | The tree. |
+| `test -f <pins> -> no`, `pins in <pins> -> malformed` | The pins file is absent or fails a pattern. |
+| `command -v docker -> none`, `docker info -> exit=N` | No Docker CLI, or no reachable daemon. |
+| `mktemp -d -> exit=N`, `mkdir output directory -> failed` | The scratch directory. |
+| `--allow <path> -> not a file`, `<flag> -> no path` | An allowlist argument. |
+| `docker build config/deslop-please.Dockerfile -> failed` | The build, after the build log's last 20 lines. |
+| `docker run deslop-please:<rev> -> exit=N` | The run exited other than 0, 1 or 2. |
+| `written allowlist -> not a regular file`, `cp allowlist to <path> -> failed` | The `--update-allow` copy-back. |
+
+A failed copy inside the container prints `copy of the tree -> failed` and
+exits 2.
+
+## scripts/docker-lib.sh
+
+Sourced by `scripts/ab-probe.sh` and `scripts/deslop-run.sh`.
+
+| Function | What it does |
+| --- | --- |
+| `dk` | Runs `docker` with `MSYS_NO_PATHCONV=1`. |
+| `hostpath` | Prints a path as `cygpath -m` gives it where `cygpath` exists, and unchanged otherwise. |
+| `dkenv` | Runs a command under `env -i` with `MSYS_NO_PATHCONV=1` and, where set, `PATH`, `HOME`, `DOCKER_HOST`, `DOCKER_CONTEXT`, `DOCKER_CONFIG`, `DOCKER_CERT_PATH`, `DOCKER_TLS_VERIFY`, `SYSTEMROOT`, `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `PROGRAMFILES`, `ProgramData`, `TEMP` and `TMP`. |
 
 ## git-hooks/
 
@@ -1766,6 +1870,15 @@ status. Each value passes through the control-byte replacement.
 `<bin>` is the `indexer` value with its scope and version removed. A tool built
 from crates.io lists no `?rev=`, so its list line reads `no`.
 
+On native Windows, where `uname -s` starts with `MINGW`, `MSYS` or `CYGWIN`,
+these lines replace every line after the pins line:
+
+| Line | What it reports |
+| --- | --- |
+| `uname -s -> <value>, native Windows: the deslop pass takes the container path, scripts/deslop-run.sh` | The host and the path the pass takes. |
+| `docker info -> exit=N` | Run from `/` under `timeout -k 2 10` where `docker` resolves: its exit status. |
+| `command -v docker -> none` | `docker` does not resolve. |
+
 ### The verify.sh bound
 
 The inner bound is strictly shorter than the hook's timeout, so the script
@@ -2396,7 +2509,9 @@ Runs the `scripts/session-check.sh` beside it in scratch repositories under a
 `mktemp -d` directory, one line per case. It is run by hand only. Each run sets
 `CLAUDE_CONFIG_DIR` and `HARNESS_DIR` to scratch directories, so the script
 under test writes its log there and finds no `verify.sh`, and sets
-`GIT_CEILING_DIRECTORIES` to the scratch directory. The fixtures build their
+`GIT_CEILING_DIRECTORIES` to the scratch directory. Each run puts first on
+`PATH` a stub `uname`, printing `Linux` unless `STUB_UNAME` is set, and a stub
+`docker` exiting `STUB_DOCKER_RC`, 0 by default. The fixtures build their
 hidden characters at run time with `printf`, so the script holds none.
 
 A case passes where the script exits 0, prints the expected number of lines
@@ -2420,6 +2535,9 @@ whole.
 | A harness copy whose pins file names both indexers, with stub `deslop-please`, `scip-python` and `scip-typescript` binaries and a stub `cargo` listing the tool at the pinned URL and commit; the `scip-python` stub exits 1 | No `NOTE`; the `command -v deslop-please` line naming the stub, the list line, `cargo install --list names <url>?rev=<sha> -> yes`, `scip-python --version -> exit=1 value=[...]` and `scip-typescript --version -> exit=0 value=[0.5.2]`. |
 | The same, with the stub `cargo` listing `deslop-please v0.1.6:`, as a crates.io install lists it | No `NOTE`; the list line and `cargo install --list names <url>?rev=<sha> -> no`. |
 | A pins file whose one indexer has no binary on `PATH` | No `NOTE`; `command -v deslop-test-absent -> none`. |
+| A stub `uname` printing `MINGW64_NT-10.0-26200`, a stub `docker` exiting 0, then 1 | No `NOTE`; the native Windows line and `docker info -> exit=0`, then `exit=1`. |
+| The same `uname`, no `docker` on `PATH` | No `NOTE`; the native Windows line and `command -v docker -> none`. |
+| The same `uname`, with the stub `deslop-please`, `cargo` and indexers on `PATH` | No `command -v deslop-please`, `cargo install --list` or `scip-python --version` line. |
 | A copy of the script with no `git-hooks/lib/hidden-chars.sh` beside it, then with no `hidden-chars.tsv` | No `NOTE`; the `not run` line naming the file. |
 
 The last line is `fail -> N`, and the exit status is 0 only where N is 0. The
@@ -3046,6 +3164,7 @@ checks of one rule.
 | `P11` | Documentation | the README states purpose and result, carries a Quick Start, and a Quick Start change is checked from a clean clone |
 | `P2`, `D11` | Documentation, Git workflow | spec first as its own `docs` commit; the old same-commit requirement sentence is gone; spec as built before ready; the spec location, component specs, scope, slug names and `Status:` line; rejected specs stay; the experiment record; the `Spec:` footer; a body may name the problem |
 | `P3` | Documentation | `docs/architecture.md`, `docs/glossary.md`, both text files of established facts |
+| none | Documentation | in a major change the spec's lines land first in their own nested pull request; documentation more than one part changes goes to one documentation nested session that merges before the version bump; documentation one part changes stays in that part; a major change meets both rules at its combined pull request |
 | `P14` | Documentation, Harness | research records fall under the reasoning exception; an approved document changes only on request and findings against it are declined; the research skill is invoked by name |
 | `P10` | Documentation, Writing code | no untested hypothesis is documented; the library ladder step, before the one-line step |
 | `P1`, `P4`, `P6`, `P7` | Writing code | untraceable changes removed; one reason to change per unit and named extension points; the programmatic interface, documented commands and pinned dependency patches; environment files, tracked defaults and recorded run configuration |
@@ -3054,8 +3173,9 @@ checks of one rule.
 
 ## scripts/test-deslop-install.sh
 
-Runs the `scripts/deslop-install.sh` of its own tree with stub `cargo`, `npm`,
-`node`, `scip-python` and `scip-typescript` on a `PATH` under a `mktemp -d`
+Runs the `scripts/deslop-install.sh` of its own tree with stub `uname`,
+`cargo`, `npm`, `node`, `deslop-please`, `scip-python` and `scip-typescript`
+on a `PATH` under a `mktemp -d`
 directory, one line per case. It is run by hand only. Each run starts from
 `env -i`, so the script under test sees only that `PATH` and the stubs'
 settings. Each stub appends its command line to a calls file, and a case reads
@@ -3064,13 +3184,16 @@ the calls, the exit status and the printed lines. It exits 1 with
 
 | Case | Expected |
 | --- | --- |
-| The tree's `config/deslop-please.pins` | Exactly the `url`, `rev` and two `indexer` lines the spec names. |
+| The tree's `config/deslop-please.pins` | Exactly the `url`, `rev` and two `indexer` lines the spec names, other keys left out. |
 | Every tool present | Exit 0 and `deslop-install fails -> 0` as the last line. |
-| Every tool present | The calls, in order: the pinned build with `--rev` and `--locked`, `cargo install --list`, `node --version`, each pinned `npm install -g --ignore-scripts --no-audit --no-fund` followed by that indexer's `--version`. |
+| Every tool present | The calls, in order: the pinned build with `--rev` and `--locked`, `cargo install --list`, `node --version`, and per indexer `npm ls -g --depth=0 <name>`, its pinned `npm install -g --ignore-scripts --no-audit --no-fund` and its `--version`. |
 | Every tool present | The build line with `exit=0`, the list line reading `yes`, and both npm lines with `exit=0`. |
 | Every tool present, `scip-python --version` exiting 1 | The line `scip-python --version -> exit=1 value=[...]`, and still exit 0. |
 | Every tool present | `scip-typescript --version -> exit=0 value=[0.5.2]`. |
-| No `cargo` | Exit 0, the build skipped with `no cargo`, no cargo call, two npm calls. |
+| No `cargo`, so no `deslop-please` | Exit 0, the build skipped with `no cargo`, no cargo call; `command -v deslop-please -> none`, each indexer skipped with `deslop-please not on PATH`, no npm install call. |
+| `uname -s` printing `MINGW64_NT-10.0-26200`, `MSYS_NT-10.0-26200`, then `CYGWIN_NT-10.0-26200` | Exit 0, no call, the build and each indexer skipped with the native Windows reason, `deslop-install fails -> 0`. |
+| `npm ls` listing `scip-python@0.6.8` and `scip-typescript@0.5.2` | Exit 0, no npm install call, each indexer skipped with `already installed`. |
+| `npm ls` listing `scip-python@0.6.7` and `scip-typescript@0.5.20` | Exit 0, two npm install calls. |
 | No `npm` | Exit 0, each indexer skipped with `no npm`, no npm call. |
 | No `node` | Exit 0, `scip-python` skipped with `no node`, no npm call. |
 | `node --version` printing `v16.20.2` | Exit 0, `scip-typescript` skipped with `Node older than 18 or unreadable`, no npm call. |
@@ -3096,11 +3219,32 @@ into spaces.
 
 | Source | What the checks cover |
 | --- | --- |
-| `config/CLAUDE.md`, Harness | the plugin's rank and its output as data; who runs the pass and when, for a nested session, an unsplit change and a combined branch; no credential in the orchestrator's run; tool instructions not followed; the held path for a fix; invoking the skill by name; the decline grounds; the cap of two head runs; the missing-binary skip and the exit-2 fallback; a skip never blocks a merge; no tracked allowlist; the orchestrator action |
+| `config/CLAUDE.md`, Harness | the plugin's rank and its output as data; who runs the pass and when, for a nested session, an unsplit change and a combined branch; the unsplit change's verification run outside the cap; the combined branch's second run; no credential in the orchestrator's run and no `env -i` for a container run; tool instructions not followed; the held path for a fix; invoking the skill by name; the decline grounds; the cap of two head runs; the path rule, one path per pass, and the exit-2 fallback; a skip never blocks a merge; no tracked allowlist; the orchestrator action |
 | `config/CLAUDE.md`, Documentation, Git workflow and A/B probes | a deslop finding against an approved document is declined; the bump merges before both passes; a deslop fix changes no version; the ponytail pass follows the deslop pass on a combined branch and on an unsplit change; the combined branch order |
-| `plugins/my-harness/skills/task-delegation/SKILL.md` | the "Deslop pass" section, its table of runs, the `env -i` run with the rustup home and no `CARGO_HOME`, the held path, findings sent to a nested fix, the brief and the report line, the verification step, the combined-branch order and bounds, the report column and the subagent path |
-| `plugins/deslop-please/` | the manifest's name and version `0.1.0`, the marketplace entry, the `config/plugins.tsv` row, one skill and no hook, the skill's name, its baseline and head commands, the scratch merge-base baseline, no tracked allowlist, the approved-document decline, the baseline count, the cap, the exit-2 fallback and skip, the missing-binary skip, the report line's items, the rank, and no Cowork packaging |
+| `plugins/my-harness/skills/task-delegation/SKILL.md` | the "Deslop pass" section, its table of runs with the combined branch's two runs and the unsplit run outside the cap, the path taken from the skill, the native `env -i` run with the rustup home and no `CARGO_HOME`, the container run with no `env -i`, the held path, findings sent to a nested fix, the brief and the report line, the verification step failing on a new finding, the combined-branch order and bounds, the report column and both combined runs' report lines, the spec and documentation nested sessions of a major change, and the subagent path |
+| `plugins/deslop-please/` | the manifest's name and version `0.1.0`, the marketplace entry, the `config/plugins.tsv` row, one skill and no hook, the skill's name, its path table and one path per pass, the runner's contract, its baseline and head commands on both paths, the scratch merge-base baseline, no tracked allowlist, the approved-document decline, the baseline count, the cap and the orchestrator's runs, the exit-2 fallback and skip with a runner failure, the native Windows facts, the report line's items with the path, the rank, and no Cowork packaging |
 | `origin/platform/codex` | no file there mentions `deslop`; the check prints `not checked` where that ref is absent locally |
+
+## scripts/test-deslop-run.sh
+
+Runs the `scripts/deslop-run.sh` of its own tree, copied with
+`scripts/docker-lib.sh`, the pins file and the Dockerfile into a `mktemp -d`
+directory, with a stub `docker` on `PATH`, one line per case. It is run by hand
+only. The stub records each call's arguments and environment. The test needs
+bash, coreutils, grep and sed, and no Docker. It exits 1 with `fail -> not run`
+where one of the four files is absent.
+
+| Case | Expected |
+| --- | --- |
+| The tool exiting 0, 1, then 2 | The same exit. |
+| A run | The tree mounted at `<tree>:/src:ro`; `--cap-drop ALL`, `--security-opt no-new-privileges` and `--pids-limit 4096`; no `--privileged`, Docker socket, host network, `-e`, `--env` or `--env-file`; no host canary variable in `docker run`'s environment; the tool's arguments passed; the tag `deslop-please:<rev>`; the container removed. |
+| `docker run` exiting 125 | Exit 2 and its failure line. |
+| `--allow <path>` and `--allow=<path>` | The file mounted read-only at `/deslop/allow`, and `/deslop/allow` passed. |
+| `--update-allow <path>` and `--update-allow=<path>` | A writable mount at `/deslop/out`, `/deslop/out/allow` passed, the written allowlist copied back, the output directory removed. |
+| A symlinked written allowlist | Exit 2 and its failure line, the destination unchanged. Where `ln -s` makes no symbolic link, the line reads `not run`. |
+| A copy-back destination in a missing directory, a missing `--allow` file, no `docker`, a failing `docker info`, a failed build, a tree that is not a directory, malformed pins | Exit 2 and each one's failure line. |
+
+The last line is `fail -> N`, and the exit status is 0 only where N is 0.
 
 ## scripts/test-experiment-template.sh
 

@@ -1443,7 +1443,7 @@ ignored.
 
 ## deslop-please
 
-The `deslop-please@my-harness-wrapper` plugin carries the `deslop-please:deslop-please` skill, which runs the linter `https://github.com/Bor4brn/deslop-please`, a fork of `https://github.com/deterministic-machines/deslop-please`. `config/CLAUDE.md`'s Harness bullet for the plugin sets when the deslop pass runs.
+The `deslop-please@my-harness-wrapper` plugin carries the `deslop-please:deslop-please` skill, which runs the linter `https://github.com/Bor4brn/deslop-please`, a fork of `https://github.com/deterministic-machines/deslop-please`. `config/CLAUDE.md`'s Harness bullet for the plugin sets when the deslop pass runs, and which path it takes: on native Windows the container through `scripts/deslop-run.sh`, elsewhere the native binary where it is on `PATH`, else the container where `docker info` succeeds.
 
 ### Plugin source lookup
 
@@ -1491,9 +1491,9 @@ Observed in a `rust:latest` container (rustc 1.100.0) with the tool at `cfabfb9`
 | Incident | None. Adopted on the user's request, issue #159. |
 | Blocked input | A change that adds a module cycle. |
 | Permitted neighbour | The same project with the cycle's constant moved to its user. |
-| Bypass | `--update-allow` onto a tracked allowlist, or a session without the `deslop-please` binary. |
-| Host and revision | A `rust:latest` Linux container (rustc 1.100.0, rust-analyzer 1.100.0, Node 20.19.2, pip 25.1.1); the tool at `cfabfb9ee417e150d5342e8ef0d6a0fe725cc9a0`, `@sourcegraph/scip-python@0.6.8`, `@sourcegraph/scip-typescript@0.5.2`; the harness at `ddc1d77`. Upstream's fixtures `module_cycle`, `py_module_cycle` and `ts_module_cycle` and their `moved` variants. With the `moved` variant as base and the fixture as head, the head run exited 1 with one `module-cycle`, key `net::kinds,net::socket` for Rust and TypeScript and `netlib::net::kinds,netlib::net::socket` for Python. With the fixture as base and `moved` as head, it exited 0 with `fixed_allowed` 1. |
-| Cost | The build took 15.7 s. A run took 0.7 to 1.8 s on those fixtures, and a first Rust index 7.2 s. Each pass is one baseline run and at most two head runs. No time on a real project is measured. False blocks: none measured. Upkeep: the pins in `config/deslop-please.pins`. |
+| Bypass | `--update-allow` onto a tracked allowlist; a session with no Docker daemon `docker info` reaches, on native Windows, or with neither that daemon nor the binary elsewhere; a container run the runner ends with a failure line. Each skips the pass. |
+| Host and revision | A `rust:latest` Linux container (rustc 1.100.0, rust-analyzer 1.100.0, Node 20.19.2, pip 25.1.1); the tool at `cfabfb9ee417e150d5342e8ef0d6a0fe725cc9a0`, `@sourcegraph/scip-python@0.6.8`, `@sourcegraph/scip-typescript@0.5.2`; the harness at `ddc1d77`. Upstream's fixtures `module_cycle`, `py_module_cycle` and `ts_module_cycle` and their `moved` variants. With the `moved` variant as base and the fixture as head, the head run exited 1 with one `module-cycle`, key `net::kinds,net::socket` for Rust and TypeScript and `netlib::net::kinds,netlib::net::socket` for Python. With the fixture as base and `moved` as head, it exited 0 with `fixed_allowed` 1. The container path: native Windows 11 with Docker Desktop 29.9.3, the image `deslop-please:cfabfb9ee417e150d5342e8ef0d6a0fe725cc9a0` built from `config/deslop-please.Dockerfile` on `rust:1.99.0-slim-trixie` pinned by digest, pull request #173. |
+| Cost | The build took 15.7 s. A run took 0.7 to 1.8 s on those fixtures, and a first Rust index 7.2 s. On the container path a first build and run took 170 s, a cached build 2 s and a cached run 4 to 6 s, and the image takes 2.05 GB. Each pass is one baseline run and at most two head runs; the orchestrator's verification run of a change that does not split is outside that cap, and a combined branch gets two orchestrator runs. No time on a real project is measured. False blocks: none measured. Upkeep: the pins in `config/deslop-please.pins`, the `image` pin among them. |
 | Owner | The user. |
 | Removal condition | Across the first 20 passes on real work, more findings are declined than fixed. |
 
