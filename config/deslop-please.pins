@@ -2,3 +2,4 @@ url=https://github.com/Bor4brn/deslop-please
 rev=cfabfb9ee417e150d5342e8ef0d6a0fe725cc9a0
 indexer=@sourcegraph/scip-python@0.6.8
 indexer=@sourcegraph/scip-typescript@0.5.2
+image=rust:1.99.0-slim-trixie@sha256:2752b332db73fdbb7dc576f06c82ed1f312005784ef913d7e04a28f5f55dc581
