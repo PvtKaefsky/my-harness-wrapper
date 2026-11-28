@@ -6,7 +6,7 @@ tags: [deslop-please]
 
 Run the deslop pass on my branch `feat/order-index` of a Django project before
 I send it for review. Its base branch is `main`. You cannot run commands here,
-so I ran `deslop-please` the way the pass runs it and pasted the output below.
+so I ran `deslop-please` on my Linux machine the way the pass runs it and pasted the output below.
 Tell me what you do with each finding and give me the pass's report line.
 
 ```text
