@@ -1473,6 +1473,17 @@ Read on 2026-11-28 under `docs/environment-changes.md`, "Checking a plugin sourc
 | `deslop-please --json` | Prints one object with the keys `allow_path`, `count`, `diagnostics`, `fixed_allowed` and `ok` |
 | The fork's `main` | At `079bd19`; the pin stays at `cfabfb9` |
 
+### Facts verified on 2026-11-28
+
+Observed in a `rust:latest` container (rustc 1.100.0) with the tool at `cfabfb9`, on upstream's fixtures, rustup managing the toolchain.
+
+| Probe | Observed |
+| --- | --- |
+| A Rust fixture under `env -i PATH="$PATH" HOME=<scratch directory>` | Exit 2, `deslop-please: not inside a Cargo workspace: cargo metadata says: error: rustup could not choose a version of cargo to run, because one wasn't specified explicitly, and no default is configured.` |
+| The Python and TypeScript fixtures under the same environment | Exit 1, one `module-cycle` |
+| The Rust fixture with `RUSTUP_HOME="$RUSTUP_HOME"` also passed | Exit 1, one `module-cycle` |
+| The Rust fixture with only `RUSTUP_TOOLCHAIN` passed in place of `RUSTUP_HOME` | Exit 2, `error: Unknown binary 'rust-analyzer' in official toolchain` |
+
 ### The control record for the deslop pass
 
 | Field | Value |
